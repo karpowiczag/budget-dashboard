@@ -2,7 +2,7 @@ package com.budget.application.importing;
 
 import java.nio.file.Path;
 
-public record ImportSettings(long maxUploadBytes, Path localRoot) {
+public record ImportSettings(long maxUploadBytes, Path localRoot, boolean localRebuildEnabled) {
     public ImportSettings {
         if (maxUploadBytes <= 0) {
             throw new IllegalArgumentException("maxUploadBytes must be positive");

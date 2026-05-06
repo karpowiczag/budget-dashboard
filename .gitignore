@@ -26,6 +26,8 @@ exports/
 !.env.example
 application-local.properties
 application-*.local.properties
+personal-categorization.*
+private-categorization.*
 secrets.*
 *.pem
 *.key

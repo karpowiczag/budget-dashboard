@@ -7,7 +7,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 final class BudgetCatalog {
-    static final Set<String> INCOME_CATEGORIES = Set.of("Pensja Aleksander", "Pensja Volvo");
+    static final Set<String> INCOME_CATEGORIES = Set.of("Pensja");
     static final Set<String> EXCLUDED = Set.of(
             "Przelewy własne", "Oszczędności i inwestycje", "Spłata karty kredytowej",
             "Wpłata gotówki", "Zwroty i korekty", "Odsetki", "Zwrot podatku",
@@ -51,8 +51,7 @@ final class BudgetCatalog {
             Map.entry("Oszczędności i inwestycje", "Oszczędności"),
             Map.entry("Przelewy własne", "Transfery"),
             Map.entry("Wpływy", "Wpływy"),
-            Map.entry("Pensja Aleksander", "Wpływy"),
-            Map.entry("Pensja Volvo", "Wpływy"),
+            Map.entry("Pensja", "Wpływy"),
             Map.entry("Zwroty i korekty", "Transfery"),
             Map.entry("Odsetki", "Transfery"),
             Map.entry("Zwrot podatku", "Transfery"),
@@ -66,8 +65,7 @@ final class BudgetCatalog {
     );
 
     static final Map<String, String> BUDGET_AREAS = Map.ofEntries(
-            Map.entry("Pensja Aleksander", "Przychody"),
-            Map.entry("Pensja Volvo", "Przychody"),
+            Map.entry("Pensja", "Przychody"),
             Map.entry("Wpływy", "Przychody"),
             Map.entry("Żywność i chemia", "Koszty codzienne"),
             Map.entry("Jedzenie poza domem", "Styl życia"),
@@ -112,8 +110,7 @@ final class BudgetCatalog {
     );
 
     static final Map<String, String> BUDGET_BUCKETS = Map.ofEntries(
-            Map.entry("Pensja Aleksander", "Przychody"),
-            Map.entry("Pensja Volvo", "Przychody"),
+            Map.entry("Pensja", "Przychody"),
             Map.entry("Wpływy", "Przychody"),
             Map.entry("Żywność i chemia", "Potrzeby"),
             Map.entry("Zdrowie i uroda", "Potrzeby"),
@@ -185,18 +182,16 @@ final class BudgetCatalog {
             rule("ONLINE\\.SANTANDERC|ONLINE\\.SANTANDERCONSUMER|SANTANDERCONSUMER", "Spłaty i raty"),
             rule("\\bRATA\\b|\\bRATY\\b|POŻYCZKA|POZYCZKA", "Spłaty i raty"),
             rule("PRZELEW WŁASNY|PRZELEW WLASNY|PRZELEW ŚRODKÓW|PRZELEW SRODKOW|PRZELEW WEWNĘTRZNY|PRZELEW WEWNETRZNY", "Przelewy własne"),
-            rule("ALEKSANDER KARPOWICZ SOFTWARE.*PRZELEW ZEWNĘTRZNY WYCHODZĄCY", "Przelewy własne"),
-            rule("ALEKSANDER KARPOWICZ SOFTWARE.*(WYNAGRODZENIE|PRZELEW EXPRESS ELIXIR PRZYCH)|PRZELEW EXPRESS ELIXIR PRZYCH\\..*ALEKSANDER KARPOWICZ SOFTWARE", "Pensja Aleksander"),
-            rule("VOLVO POLSKA.*(WYNAGRODZENIE|SALARY)", "Pensja Volvo"),
+            rule("WYNAGRODZENIE|SALARY|PENSJA", "Pensja"),
             rule("ZWROT ZAKUPU|DOF DO OKULAROW|ADYEN|TOTALIZATOR SPORTOWY", "Zwroty i korekty"),
             rule("KAPITALIZACJA ODSETEK", "Odsetki"),
             rule("ZWROT Z PODATKU|URZĄD SKARBOWY|URZAD SKARBOWY", "Zwrot podatku"),
             rule("PRZELEW DO BM MBANKU|IKZE|ZAKUP SFI|FUNDUSZ|SUBFUNDUSZ|MAKLERSK|BROKERAGE", "Oszczędności i inwestycje"),
             rule("WYPŁATA GOTÓWKI|WYPLATA GOTOWKI|BANKOMAT|ATM", "Gotówka do rozliczenia"),
             rule("WPŁATA WE WPŁATOMACIE|WPLATA WE WPLATOMACIE", "Wpłata gotówki"),
-            rule("DOMOWSKIEGO 19F|DMOWSKIEGO 19F|OPLATY, ZALICZKA|OPŁATY, ZALICZKA|CZYNSZ|WYNAJEM", "Czynsz i wynajem"),
+            rule("OPLATY, ZALICZKA|OPŁATY, ZALICZKA|CZYNSZ|WYNAJEM", "Czynsz i wynajem"),
             rule("TAURON|PGE|ENERGA|ENEA|PRĄD|PRAD|GAZ", "Prąd"),
-            rule("KORBANK|PLUS TATIANA|PLUS ALEKSANDER|WWW\\.PLUS\\.PL|SSL\\.PLUSGSM\\.PL|ORANGE|T-MOBILE|UPC|VECTRA|NETIA|\\bPLAY\\b.*(TELEFON|ABONAMENT|DOŁADOWANIE|DOLADOWANIE)", "TV, internet, telefon"),
+            rule("KORBANK|WWW\\.PLUS\\.PL|SSL\\.PLUSGSM\\.PL|ORANGE|T-MOBILE|UPC|VECTRA|NETIA|\\bPLAY\\b.*(TELEFON|ABONAMENT|DOŁADOWANIE|DOLADOWANIE)", "TV, internet, telefon"),
             rule("PROWIZJA OD WYPŁATY GOTÓWKI|PROWIZJA OD WYPLATY GOTOWKI|PRZELEW EXPRESS ELIXIR WYCH|MTRANSFER BLUE MEDIA", "Opłaty bankowe"),
             rule("PLIP\\.WROCLAW\\.PL|PLIP\\.UM\\.WROC\\.PL|GMINA WROCŁAW|GMINA WROCLAW", "Opłaty publiczne"),
             rule("SKŁADKA UB|SKLADKA UB|UBEZPIECZ|POLISA|PZU|UNIQA|WARTA|LINK4|ALLIANZ|GENERALI|VWFS UBEZPIECZENIA", "Ubezpieczenia"),

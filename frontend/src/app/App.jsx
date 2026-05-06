@@ -20,10 +20,23 @@ import { TransactionsView } from "./views/TransactionsView.jsx";
 import "../styles.css";
 
 export default function App() {
-  const { years, year, setYear, data, status, uploading, importStatus, handleUpload } = useBudgetData();
+  const {
+    years,
+    year,
+    setYear,
+    data,
+    status,
+    uploading,
+    importStatus,
+    budgetSettings,
+    settingsStatus,
+    handleUpload,
+    saveBudgetSettings,
+  } = useBudgetData();
   const [query, setQuery] = useState("");
   const [bucket, setBucket] = useState("Wszystkie");
   const [customLimits, setCustomLimits] = useState({});
+  const [settingsDraft, setSettingsDraft] = useState(null);
   const [view, setView] = useState("overview");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedDay, setSelectedDay] = useState("");
@@ -45,13 +58,18 @@ export default function App() {
   }, [selectedMonth, year]);
 
   useEffect(() => {
-    setCustomLimits({});
     setDrillFilter(null);
     setAnalytics(null);
     setCalendar(null);
     setTransactionPage(null);
     setTransactionPageIndex(0);
   }, [year]);
+
+  useEffect(() => {
+    if (!budgetSettings) return;
+    setSettingsDraft(budgetSettings);
+    setCustomLimits(limitsToMap(budgetSettings.categoryLimits));
+  }, [budgetSettings]);
 
   useEffect(() => {
     setTransactionPageIndex(0);
@@ -178,6 +196,35 @@ export default function App() {
       ...current,
       [category]: limit,
     }));
+    setSettingsDraft((current) => mergeLimit(current || budgetSettings, category, limit));
+  }
+
+  function handleSettingChange(field, value) {
+    setSettingsDraft((current) => ({
+      ...(current || budgetSettings || {}),
+      [field]: value,
+      categoryLimits: current?.categoryLimits || budgetSettings?.categoryLimits || [],
+    }));
+  }
+
+  async function handleSaveSettings() {
+    const base = settingsDraft || budgetSettings || {};
+    const payload = {
+      targetMonthlySpend: Number(base.targetMonthlySpend || data.savingsPlan.targetMonthlySpend),
+      aggressiveMonthlySpend: Number(base.aggressiveMonthlySpend || data.savingsPlan.aggressiveMonthlySpend),
+      emergencyFundMinMonths: Number(base.emergencyFundMinMonths || 3),
+      emergencyFundComfortMonths: Number(base.emergencyFundComfortMonths || 6),
+      categoryLimits: model.planRows.map((row) => ({
+        category: row.category,
+        limit: Number(row.limit || 0),
+        action: row.action || "",
+      })),
+    };
+    try {
+      setSettingsDraft(await saveBudgetSettings(payload));
+    } catch {
+      // Status is already surfaced by the data hook.
+    }
   }
 
   return (
@@ -243,6 +290,10 @@ export default function App() {
           planTitle={planTitle}
           plannedInvestmentAfterCuts={model.plannedInvestmentAfterCuts}
           plannedSpendAfterCuts={model.plannedSpendAfterCuts}
+          settings={settingsDraft || budgetSettings}
+          settingsStatus={settingsStatus}
+          onSaveSettings={handleSaveSettings}
+          onSettingChange={handleSettingChange}
           onLimitChange={handleLimitChange}
         />
       )}
@@ -288,6 +339,23 @@ export default function App() {
       <DashboardFooter />
     </main>
   );
+}
+
+function limitsToMap(categoryLimits = []) {
+  return Object.fromEntries((categoryLimits || []).map((row) => [row.category, Number(row.limit || 0)]));
+}
+
+function mergeLimit(settings, category, limit) {
+  const base = settings || {};
+  const rows = [...(base.categoryLimits || [])];
+  const index = rows.findIndex((row) => row.category === category);
+  const next = { category, limit, action: rows[index]?.action || "" };
+  if (index >= 0) {
+    rows[index] = next;
+  } else {
+    rows.push(next);
+  }
+  return { ...base, categoryLimits: rows };
 }
 
 function apiFilters({ timeScope, selectedMonth, selectedDay, drillFilter }) {

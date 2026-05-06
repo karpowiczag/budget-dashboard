@@ -108,7 +108,7 @@ export function MonthlyStatsView({ activeTimeLabel, scopedStats, scopedTransacti
         </Panel>
       </section>
 
-      <Panel title={`Transakcje: ${activeTimeLabel}`}>
+      <Panel title={`Transakcje z bieżącej strony: ${activeTimeLabel}`}>
         <TransactionsTable transactions={scopedTransactions.slice(0, 160)} />
       </Panel>
     </section>

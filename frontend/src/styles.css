@@ -102,6 +102,17 @@ h1 {
   box-shadow: 0 1px 3px rgb(15 23 42 / 0.12);
 }
 
+.primaryButton {
+  background: #0f766e;
+  border: 1px solid #0f766e;
+  border-radius: 7px;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 800;
+  height: 36px;
+  padding: 0 14px;
+}
+
 .iconButton {
   align-items: center;
   background: #17324d;
@@ -665,7 +676,7 @@ footer {
 .planCards {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
 .planCards div {
@@ -693,10 +704,43 @@ footer {
   overflow-wrap: anywhere;
 }
 
+.planNumberInput {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  color: #172033;
+  font-size: 22px;
+  font-weight: 800;
+  height: 36px;
+  padding: 0 8px;
+  width: 100%;
+}
+
 .planCards p {
   color: #64748b;
   line-height: 1.35;
   margin: 8px 0 0;
+}
+
+.inlineStatus {
+  border-radius: 8px;
+  font-weight: 700;
+  padding: 10px 12px;
+}
+
+.inlineStatus.info {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.inlineStatus.success {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.inlineStatus.error {
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .planTable table {

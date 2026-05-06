@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.budget.web.controller.BudgetApiController;
 import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import java.nio.file.Path;
 import java.util.Map;
@@ -19,16 +20,18 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
         "app.security.oauth-enabled=false"
 })
 class OpenApiContractTest {
-    private static final Map<String, String> OPERATION_IDS = Map.of(
-            "session", "getSession",
-            "years", "listYears",
-            "dashboard", "getReportDashboard",
-            "calendar", "getReportCalendar",
-            "analytics", "getReportAnalytics",
-            "transactions", "listReportTransactions",
-            "upload", "uploadImportCsv",
-            "rebuild", "rebuildImports",
-            "importRuns", "listImportRuns"
+    private static final Map<String, String> OPERATION_IDS = Map.ofEntries(
+            Map.entry("session", "getSession"),
+            Map.entry("years", "listYears"),
+            Map.entry("dashboard", "getReportDashboard"),
+            Map.entry("calendar", "getReportCalendar"),
+            Map.entry("analytics", "getReportAnalytics"),
+            Map.entry("transactions", "listReportTransactions"),
+            Map.entry("upload", "uploadImportCsv"),
+            Map.entry("rebuild", "rebuildImports"),
+            Map.entry("importRuns", "listImportRuns"),
+            Map.entry("budgetSettings", "getBudgetSettings"),
+            Map.entry("saveBudgetSettings", "updateBudgetSettings")
     );
 
     @Autowired
@@ -58,6 +61,15 @@ class OpenApiContractTest {
                 });
             });
         });
+
+        assertRef(openApi.getComponents().getSchemas().get("DashboardResponse"), "monthControl", "MonthControl");
+        assertArrayItemRef(openApi.getComponents().getSchemas().get("DashboardResponse"), "fixedness", "FixednessSummary");
+        assertArrayItemRef(openApi.getComponents().getSchemas().get("DashboardResponse"), "topMerchants", "MerchantSummary");
+        assertArrayItemRef(openApi.getComponents().getSchemas().get("DashboardResponse"), "recurring", "RecurringItem");
+        assertArrayItemRef(openApi.getComponents().getSchemas().get("DashboardResponse"), "largeOneoffs", "LargeOneOff");
+        assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "areaTop", "AreaSpend");
+        assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "hierarchyTop", "HierarchySpend");
+        assertThat(openApi.getComponents().getSchemas()).containsKeys("BudgetSettings", "CategoryLimitSetting");
     }
 
     private io.swagger.v3.oas.models.Operation operation(PathItem pathItem, RequestMethod method) {
@@ -69,5 +81,15 @@ class OpenApiContractTest {
             case DELETE -> pathItem.getDelete();
             default -> null;
         };
+    }
+
+    private void assertRef(Schema<?> schema, String property, String target) {
+        var propertySchema = (Schema<?>) schema.getProperties().get(property);
+        assertThat(propertySchema.get$ref()).isEqualTo("#/components/schemas/" + target);
+    }
+
+    private void assertArrayItemRef(Schema<?> schema, String property, String target) {
+        var propertySchema = (Schema<?>) schema.getProperties().get(property);
+        assertThat(propertySchema.getItems().get$ref()).isEqualTo("#/components/schemas/" + target);
     }
 }
