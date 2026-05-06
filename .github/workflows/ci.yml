@@ -3,6 +3,7 @@ name: CI
 on:
   workflow_dispatch:
   pull_request:
+    branches: [main, develop]
     paths:
       - '.github/workflows/ci.yml'
       - 'pom.xml'
@@ -12,7 +13,7 @@ on:
       - 'src/**'
       - 'index.html'
   push:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - '.github/workflows/ci.yml'
       - 'pom.xml'
