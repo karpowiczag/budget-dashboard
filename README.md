@@ -1,5 +1,8 @@
 # Budget Dashboard
 
+[![CI](https://github.com/karpowiczag/budget-dashboard/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/karpowiczag/budget-dashboard/actions/workflows/ci.yml)
+[![Deploy](https://github.com/karpowiczag/budget-dashboard/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/karpowiczag/budget-dashboard/actions/workflows/deploy.yml)
+
 Private household budget dashboard for recurring bank CSV exports.
 
 ## Stack
