@@ -1,0 +1,40 @@
+# Private bank data and generated reports
+2025/
+2026/
+20[0-9][0-9]/
+data/
+outputs/
+*.csv
+*.xlsx
+*.xls
+*.sqlite
+*.sqlite-*
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Java / Spring
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Frontend
+node_modules/
+dist/
+src/main/resources/static/*
+!src/main/resources/static/.gitkeep
+
+# Python legacy/cache
+__pycache__/
+*.py[cod]
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Local scaffolding
+.tmp/
