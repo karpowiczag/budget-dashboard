@@ -18,6 +18,8 @@ Official OpenAI references:
 
 ## Daily Development Flow
 
+Codex GitHub smoke tests should use a small docs-only PR first. A healthy setup should show the `chatgpt-codex-connector[bot]` reacting to `@codex` mentions and, when PR review is enabled in Codex settings, a Codex review on the pull request.
+
 1. Create or select an issue.
 
 ```powershell
