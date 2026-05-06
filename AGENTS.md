@@ -6,6 +6,8 @@ These instructions apply to the whole repository.
 
 This is a household budget dashboard with public source code and private local/production data. It imports bank CSV exports, classifies transactions, stores normalized data in PostgreSQL/H2 through Spring Data JDBC, and serves a React dashboard from Spring Boot.
 
+Frontend source lives under `frontend/`. Java/Spring backend source lives under `src/main/java`, `src/main/resources`, and `src/test`. The only coupling point is the explicit frontend build sync into `src/main/resources/static`.
+
 The default branch is `develop`. Production releases flow from `develop` to `main`.
 
 ## Data Safety
@@ -52,8 +54,8 @@ $env:Path="$env:JAVA_HOME\bin;$env:Path"
 Before opening or updating a PR, run:
 
 ```powershell
-npm run build
-npm run sync:frontend
+npm --prefix frontend run build
+npm --prefix frontend run sync:backend
 .\mvnw.cmd test
 ```
 

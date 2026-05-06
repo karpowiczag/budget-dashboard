@@ -42,8 +42,8 @@ git switch -c feature/short-name
 3. Implement the change and run the normal checks.
 
 ```powershell
-npm run build
-npm run sync:frontend
+npm --prefix frontend run build
+npm --prefix frontend run sync:backend
 .\mvnw.cmd test
 ```
 
