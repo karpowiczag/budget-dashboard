@@ -7,10 +7,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "sync:frontend": "node scripts/sync-frontend.mjs",
-    "build:app": "npm run build && npm run sync:frontend && .\\mvnw.cmd -DskipTests package",
-    "app": ".\\mvnw.cmd spring-boot:run",
-    "native": "npm run build && npm run sync:frontend && .\\mvnw.cmd -Pnative native:compile"
+    "sync:backend": "node scripts/sync-backend-static.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.14.0",

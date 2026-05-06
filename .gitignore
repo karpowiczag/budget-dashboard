@@ -43,8 +43,11 @@ replay_pid*
 
 # Frontend
 node_modules/
+frontend/node_modules/
 dist/
+frontend/dist/
 coverage/
+frontend/coverage/
 src/main/resources/static/*
 !src/main/resources/static/.gitkeep
 

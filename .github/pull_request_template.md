@@ -16,8 +16,8 @@ Closes #
 
 ## Verification
 
-- [ ] `npm run build`
-- [ ] `npm run sync:frontend`
+- [ ] `npm run build` from `frontend/`
+- [ ] `npm run sync:backend` from `frontend/`
 - [ ] `.\mvnw.cmd test`
 - [ ] UI checked when frontend changed
 - [ ] Not applicable, docs/process only

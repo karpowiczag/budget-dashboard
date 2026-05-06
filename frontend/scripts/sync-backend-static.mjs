@@ -2,12 +2,13 @@ import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-const root = resolve(import.meta.dirname, "..");
-const dist = resolve(root, "dist");
-const target = resolve(root, "src/main/resources/static");
+const frontendRoot = resolve(import.meta.dirname, "..");
+const repoRoot = resolve(frontendRoot, "..");
+const dist = resolve(frontendRoot, "dist");
+const target = resolve(repoRoot, "src/main/resources/static");
 
 if (!existsSync(dist)) {
-  throw new Error("dist/ does not exist. Run npm run build first.");
+  throw new Error("frontend/dist/ does not exist. Run npm run build from frontend/ first.");
 }
 
 await mkdir(target, { recursive: true });
