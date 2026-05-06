@@ -3,7 +3,7 @@
 [![CI](https://github.com/karpowiczag/budget-dashboard/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/karpowiczag/budget-dashboard/actions/workflows/ci.yml)
 [![Deploy](https://github.com/karpowiczag/budget-dashboard/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/karpowiczag/budget-dashboard/actions/workflows/deploy.yml)
 
-Private household budget dashboard for recurring bank CSV exports.
+Household budget dashboard for recurring bank CSV exports. Source code is public; bank exports, generated reports, local databases, and secrets stay private and must never be committed.
 
 ## Stack
 
@@ -73,6 +73,7 @@ GitHub Actions:
 - `ci.yml` builds React, syncs the frontend into Spring static resources, and runs Java tests for every PR into `develop`/`main` and every push to those branches. It cancels older in-progress runs on the same branch.
 - `deploy.yml` is manual-only and runs only from `main` because the GraalVM native build is expensive. It builds the native binary, packages a minimal Docker image, pushes it to GHCR, and creates or updates Koyeb when `KOYEB_TOKEN`, `KOYEB_APP`, and `KOYEB_SERVICE` are configured.
 - Dependabot checks npm, Maven, GitHub Actions, and Docker weekly against `develop`, grouped by ecosystem with major version updates ignored so dependency maintenance does not burn CI minutes unexpectedly.
+- GitHub branch protection is the merge gate for `develop` and `main`. It requires PRs, the `test` status check, up-to-date branches, resolved review conversations, dismisses stale reviews, includes admins, and blocks force pushes/deletions.
 
 For private GHCR images, create a Koyeb private-registry secret and expose its name to GitHub Actions as `KOYEB_GHCR_SECRET`. Production database and OAuth values should be configured directly in Koyeb secrets/environment variables.
 
@@ -85,15 +86,18 @@ git switch develop
 git switch -c feature/short-name
 ```
 
-Merge finished work into `develop`. When ready to release, merge `develop` into `main`, tag it, push both branches, then manually run the Deploy workflow from `main`:
+Merge finished work into `develop` only after GitHub branch protection allows the PR to merge. When ready to release, open a PR from `develop` into `main`, tag after merge, push tags, then manually run the Deploy workflow from `main`:
 
 ```powershell
+gh pr create --base main --head develop --title "Release v2026.05.06-1" --body "Release from develop."
+gh pr checks --watch
+gh pr merge --merge
 git switch main
-git merge --no-ff develop
+git pull --ff-only origin main
 git tag v2026.05.06-1
-git push origin main develop --tags
+git push origin v2026.05.06-1
 ```
 
 For urgent production fixes, branch from `main` as `hotfix/short-name`, merge it back into both `main` and `develop`.
 
-Keep the repo private and never commit bank exports. `.gitignore` excludes yearly folders, CSV files, generated Excel/JSON reports, local databases, and secrets.
+Keep financial data private even though the source repo is public. `.gitignore` excludes yearly folders, CSV files, generated Excel/JSON reports, local databases, and secrets.

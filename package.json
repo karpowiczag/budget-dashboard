@@ -2,7 +2,7 @@
   "name": "budget-dashboard",
   "version": "1.0.0",
   "private": true,
-  "description": "Private household budget dashboard with Spring Boot and React.",
+  "description": "Household budget dashboard with Spring Boot and React.",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",

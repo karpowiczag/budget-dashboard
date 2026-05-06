@@ -22,6 +22,13 @@ Closes #
 - [ ] UI checked when frontend changed
 - [ ] Not applicable, docs/process only
 
+## Merge Gate
+
+- [ ] CI/status checks are green
+- [ ] All review conversations are resolved
+- [ ] Codex review signal is current for the PR head commit
+- [ ] GitHub branch protection allows merge
+
 ## Data And Security
 
 - [ ] No bank exports, generated reports, local databases, or secrets committed
