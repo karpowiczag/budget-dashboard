@@ -7,7 +7,7 @@ outputs/
 imports/
 exports/
 *.csv
-!src/test/resources/**/*.csv
+!src/test/resources/fixtures/mbank/fake-*.csv
 *.xlsx
 *.xls
 *.xlsm
