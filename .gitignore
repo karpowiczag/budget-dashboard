@@ -4,32 +4,53 @@
 20[0-9][0-9]/
 data/
 outputs/
+imports/
+exports/
 *.csv
 *.xlsx
 *.xls
+*.xlsm
+*.ods
+*.ofx
+*.qif
+*.mt940
 *.sqlite
 *.sqlite-*
+*.mv.db
+*.trace.db
 
 # Secrets
 .env
 .env.*
 !.env.example
+application-local.properties
+application-*.local.properties
+secrets.*
+*.pem
+*.key
+*.p12
+*.jks
 
 # Java / Spring
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+*.log
+hs_err_pid*
+replay_pid*
 
 # Frontend
 node_modules/
 dist/
+coverage/
 src/main/resources/static/*
 !src/main/resources/static/.gitkeep
 
 # Python legacy/cache
 __pycache__/
 *.py[cod]
+.pytest_cache/
 
 # IDEs
 .idea/
@@ -38,3 +59,7 @@ __pycache__/
 
 # Local scaffolding
 .tmp/
+
+# OS
+.DS_Store
+Thumbs.db
