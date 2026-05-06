@@ -49,13 +49,19 @@ jobs:
             ${{ env.IMAGE_NAME }}:latest
 
       - name: Install Koyeb CLI
-        if: ${{ secrets.KOYEB_TOKEN != '' && secrets.KOYEB_APP != '' && secrets.KOYEB_SERVICE != '' }}
+        env:
+          KOYEB_TOKEN: ${{ secrets.KOYEB_TOKEN }}
+          KOYEB_APP: ${{ secrets.KOYEB_APP }}
+          KOYEB_SERVICE: ${{ secrets.KOYEB_SERVICE }}
         run: |
+          if [ -z "${KOYEB_TOKEN:-}" ] || [ -z "${KOYEB_APP:-}" ] || [ -z "${KOYEB_SERVICE:-}" ]; then
+            echo "Koyeb secrets are not configured; skipping CLI install."
+            exit 0
+          fi
           curl -fsSL https://raw.githubusercontent.com/koyeb/koyeb-cli/master/install.sh | sh
           echo "$HOME/.koyeb/bin" >> "$GITHUB_PATH"
 
       - name: Deploy image to Koyeb
-        if: ${{ secrets.KOYEB_TOKEN != '' && secrets.KOYEB_APP != '' && secrets.KOYEB_SERVICE != '' }}
         env:
           KOYEB_TOKEN: ${{ secrets.KOYEB_TOKEN }}
           KOYEB_APP: ${{ secrets.KOYEB_APP }}
@@ -64,6 +70,11 @@ jobs:
           IMAGE: ${{ env.IMAGE_NAME }}:${{ github.sha }}
         run: |
           set -euo pipefail
+
+          if [ -z "${KOYEB_TOKEN:-}" ] || [ -z "${KOYEB_APP:-}" ] || [ -z "${KOYEB_SERVICE:-}" ]; then
+            echo "Koyeb secrets are not configured; image was pushed but deploy was skipped."
+            exit 0
+          fi
 
           args=(
             --docker "$IMAGE"
