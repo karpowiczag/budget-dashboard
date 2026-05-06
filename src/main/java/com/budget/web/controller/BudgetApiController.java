@@ -109,7 +109,7 @@ public class BudgetApiController {
 
     @PostMapping(path = "/imports/uploads", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     ImportSummary upload(@RequestParam("file") MultipartFile file) {
-        return importService.importUpload(new TransactionImportFile(file.getOriginalFilename(), file.getSize(), file::getInputStream));
+        return importService.importUpload(new TransactionImportFile(file.getOriginalFilename(), file.getSize(), file.getContentType(), file::getInputStream));
     }
 
     @PostMapping("/imports/rebuild")

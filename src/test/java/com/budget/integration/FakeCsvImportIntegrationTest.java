@@ -1,6 +1,7 @@
 package com.budget.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.budget.application.importing.BudgetImportService;
 import com.budget.application.importing.ImportSummary;
 import com.budget.application.importing.TransactionImportFile;
@@ -119,7 +120,25 @@ class FakeCsvImportIntegrationTest {
         var calendar = getMap("/api/v1/reports/2026/calendar", Map.of("month", "2026-01"));
         assertThat((List<?>) calendar.get("days")).hasSize(31);
 
+        assertThat(getStatus("/api/v1/reports/2026/calendar", Map.of("month", "bad"))).isEqualTo(400);
+        assertThat(getStatus("/api/v1/reports/2026/analytics", Map.of("scope", "month"))).isEqualTo(400);
+        assertThat(getStatus("/api/v1/reports/2026/analytics", Map.of("scope", "day", "month", "2026-01"))).isEqualTo(400);
+        assertThat(getStatus("/api/v1/reports/2026/transactions", Map.of("month", "bad"))).isEqualTo(400);
         assertThat(getStatus("/api/budget/2026", Map.of())).isEqualTo(404);
+    }
+
+    @Test
+    void rejectsCsvUploadWithNonCsvContentType() throws Exception {
+        var bytes = resourceBytes("/fixtures/mbank/fake-2026.csv");
+
+        assertThatThrownBy(() -> importService.importUpload(new TransactionImportFile(
+                "lista_operacji_260101_260331_fake.csv",
+                bytes.length,
+                "application/json",
+                () -> new ByteArrayInputStream(bytes)
+        )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Only CSV-compatible content types are accepted");
     }
 
     private ImportSummary importFixture(String resourcePath, String fileName) throws IOException {

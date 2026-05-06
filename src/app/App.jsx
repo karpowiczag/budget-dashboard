@@ -157,7 +157,20 @@ export default function App() {
 
   function handleMonthChange(nextMonth) {
     setSelectedMonth(nextMonth);
-    setTimeScope(timeScope === "all" ? "month" : timeScope);
+    setSelectedDay("");
+    setTimeScope(timeScope === "all" || timeScope === "day" ? "month" : timeScope);
+  }
+
+  function handleTimeScopeChange(nextScope) {
+    if (nextScope === "day") {
+      const fallbackDay = selectedDay || model.calendarStats?.selected;
+      if (!fallbackDay) {
+        setTimeScope("month");
+        return;
+      }
+      setSelectedDay(String(fallbackDay));
+    }
+    setTimeScope(nextScope);
   }
 
   function handleLimitChange(category, limit) {
@@ -188,7 +201,7 @@ export default function App() {
           setSelectedDay(day);
           setTimeScope("day");
         }}
-        onTimeScopeChange={setTimeScope}
+        onTimeScopeChange={handleTimeScopeChange}
       />
 
       {view === "overview" && (
