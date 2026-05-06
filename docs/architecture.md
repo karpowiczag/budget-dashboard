@@ -17,6 +17,7 @@ Current design choices:
 - Flyway migrations remain the source of truth for database shape.
 - Google OAuth/OIDC is used in production and only one verified Google email is allowlisted.
 - OAuth sessions use cookie-backed CSRF protection for state-changing browser requests.
+- `KnownCsvEndToEndIntegrationTest` runs against local ignored `2025/` and `2026/` CSV exports when they exist, without committing bank data or exact private totals.
 
 Next refactor targets:
 
