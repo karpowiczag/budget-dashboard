@@ -1,0 +1,45 @@
+name: Feature request
+description: Propose a product or workflow improvement.
+title: "[Feature]: "
+labels: ["type:feature", "priority:p2"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What should the app help you do?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why is this useful for budget analysis or savings decisions?
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Backend
+        - Frontend
+        - Categorization/data
+        - CI/CD
+        - Documentation/process
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - 
+        - 
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label: Must not commit private bank data.
+        - label: Must not add expensive default CI jobs.

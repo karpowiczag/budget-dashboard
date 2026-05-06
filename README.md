@@ -16,6 +16,7 @@ Private household budget dashboard for recurring bank CSV exports.
 
 Java 25 usage is documented in [docs/java-25.md](docs/java-25.md).
 Current backend architecture is documented in [docs/architecture.md](docs/architecture.md).
+Codex-assisted issue, PR, review, and merge workflow is documented in [docs/codex-gitflow.md](docs/codex-gitflow.md).
 
 ## Local Development
 
@@ -69,7 +70,7 @@ The raw CSV upload is processed in memory and not retained. The app persists nor
 
 GitHub Actions:
 
-- `ci.yml` builds React, syncs the frontend into Spring static resources, and runs Java tests for application-code changes on `develop` and `main`. It cancels older in-progress runs on the same branch.
+- `ci.yml` builds React, syncs the frontend into Spring static resources, and runs Java tests for every PR into `develop`/`main` and every push to those branches. It cancels older in-progress runs on the same branch.
 - `deploy.yml` is manual-only and runs only from `main` because the GraalVM native build is expensive. It builds the native binary, packages a minimal Docker image, pushes it to GHCR, and creates or updates Koyeb when `KOYEB_TOKEN`, `KOYEB_APP`, and `KOYEB_SERVICE` are configured.
 - Dependabot checks npm, Maven, GitHub Actions, and Docker weekly against `develop`, grouped by ecosystem with major version updates ignored so dependency maintenance does not burn CI minutes unexpectedly.
 

@@ -1,0 +1,47 @@
+name: Refactor task
+description: Track internal code quality, package, or architecture work.
+title: "[Refactor]: "
+labels: ["type:refactor", "priority:p2"]
+body:
+  - type: textarea
+    id: target
+    attributes:
+      label: Refactor target
+      description: Which package, class, component, or workflow needs improvement?
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: Why now
+      description: What risk, duplication, coupling, or maintenance cost does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      placeholder: |
+        In scope:
+        - 
+
+        Out of scope:
+        - 
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      placeholder: |
+        - Unit tests:
+        - Integration tests:
+        - Frontend build:
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Architecture checks
+      options:
+        - label: Domain/application package boundaries remain valid.
+        - label: Spring Data JDBC remains the persistence approach.
+        - label: No behavior changes unless explicitly listed in acceptance criteria.
