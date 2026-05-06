@@ -9,6 +9,10 @@ import org.springframework.context.annotation.Configuration;
 public class ImportConfiguration {
     @Bean
     ImportSettings importSettings(BudgetProperties properties) {
-        return new ImportSettings(properties.upload().maxBytes(), Path.of(properties.localImport().root()));
+        return new ImportSettings(
+                properties.upload().maxBytes(),
+                Path.of(properties.localImport().root()),
+                properties.localImport().rebuildEnabled()
+        );
     }
 }

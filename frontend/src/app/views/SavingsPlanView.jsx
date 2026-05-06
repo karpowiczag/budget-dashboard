@@ -10,10 +10,21 @@ export function SavingsPlanView({
   planTitle,
   plannedInvestmentAfterCuts,
   plannedSpendAfterCuts,
+  settings,
+  settingsStatus,
   onLimitChange,
+  onSaveSettings,
+  onSettingChange,
 }) {
   return (
-    <Panel title={planTitle}>
+    <Panel
+      title={planTitle}
+      action={
+        <button className="primaryButton" onClick={onSaveSettings} type="button">
+          Zapisz ustawienia
+        </button>
+      }
+    >
       <div className="savingPlan">
         {isHistorical && (
           <div className="historicalNotice">
@@ -23,8 +34,29 @@ export function SavingsPlanView({
         <div className="planCards">
           <div>
             <span>{isHistorical ? "Hipotetyczny target" : "Target wydatków"}</span>
-            <strong>{money(plan.targetMonthlySpend)}</strong>
-            <p>ambitnie: {money(plan.aggressiveMonthlySpend)}</p>
+            <input
+              className="planNumberInput"
+              type="number"
+              min="0"
+              step="100"
+              value={Math.round(Number(settings?.targetMonthlySpend || plan.targetMonthlySpend))}
+              onChange={(event) => onSettingChange("targetMonthlySpend", Number(event.target.value || 0))}
+              aria-label="Target wydatków"
+            />
+            <p>ambitnie: {money(settings?.aggressiveMonthlySpend || plan.aggressiveMonthlySpend)}</p>
+          </div>
+          <div>
+            <span>Ambitny target</span>
+            <input
+              className="planNumberInput"
+              type="number"
+              min="0"
+              step="100"
+              value={Math.round(Number(settings?.aggressiveMonthlySpend || plan.aggressiveMonthlySpend))}
+              onChange={(event) => onSettingChange("aggressiveMonthlySpend", Number(event.target.value || 0))}
+              aria-label="Ambitny target wydatków"
+            />
+            <p>ustawienie globalne</p>
           </div>
           <div>
             <span>{isHistorical ? "Możliwy przelew wtedy" : "Przelew inwestycyjny po pensji"}</span>
@@ -47,6 +79,7 @@ export function SavingsPlanView({
             <p>komfort 6 mies.: {money(plan.emergencyFundComfort)}</p>
           </div>
         </div>
+        {settingsStatus && <div className={`inlineStatus ${settingsStatus.type}`}>{settingsStatus.message}</div>}
 
         <div className="planTable">
           <div className="tableWrap">

@@ -9,9 +9,9 @@ class CategoryClassifierTest {
 
     @Test
     void classifiesSalaryFromTransferTitle() {
-        var category = classifier.classify("", "PRZELEW EXPRESS ELIXIR PRZYCH. ALEKSANDER KARPOWICZ SOFTWARE WYNAGRODZENIE", 18000);
+        var category = classifier.classify("", "PRZELEW EXPRESS ELIXIR PRZYCH. TEST EMPLOYER WYNAGRODZENIE", 18000);
 
-        assertThat(category).isEqualTo("Pensja Aleksander");
+        assertThat(category).isEqualTo("Pensja");
         assertThat(classifier.budgetArea(category)).isEqualTo("Przychody");
     }
 

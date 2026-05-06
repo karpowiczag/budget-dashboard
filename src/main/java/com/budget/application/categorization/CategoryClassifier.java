@@ -11,7 +11,11 @@ public class CategoryClassifier {
     private final SubcategoryClassifier subcategoryClassifier;
 
     public CategoryClassifier() {
-        this(new RegexCategoryRuleMatcher(), new SubcategoryClassifier());
+        this(PersonalCategoryRules.empty());
+    }
+
+    public CategoryClassifier(PersonalCategoryRules personalRules) {
+        this(new RegexCategoryRuleMatcher(personalRules), new SubcategoryClassifier());
     }
 
     CategoryClassifier(RegexCategoryRuleMatcher regexMatcher, SubcategoryClassifier subcategoryClassifier) {

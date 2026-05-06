@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchDashboard, fetchYears, uploadTransactions } from "../api/budgetApi.js";
+import { fetchBudgetSettings, fetchDashboard, fetchYears, updateBudgetSettings, uploadTransactions } from "../api/budgetApi.js";
 
 export function useBudgetData() {
   const [years, setYears] = useState([]);
@@ -8,13 +8,16 @@ export function useBudgetData() {
   const [status, setStatus] = useState("loading");
   const [uploading, setUploading] = useState(false);
   const [importStatus, setImportStatus] = useState(null);
+  const [budgetSettings, setBudgetSettings] = useState(null);
+  const [settingsStatus, setSettingsStatus] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchYears()
-      .then((payload) => {
+    Promise.all([fetchYears(), fetchBudgetSettings()])
+      .then(([payload, settings]) => {
         if (cancelled) return;
         setYears(payload);
+        setBudgetSettings(settings);
         const latest = payload.at(-1)?.year;
         if (latest) {
           setYear(String(latest));
@@ -72,6 +75,19 @@ export function useBudgetData() {
     }
   }
 
+  async function saveBudgetSettings(settings) {
+    setSettingsStatus({ type: "info", message: "Zapisuję ustawienia budżetu..." });
+    try {
+      const saved = await updateBudgetSettings(settings);
+      setBudgetSettings(saved);
+      setSettingsStatus({ type: "success", message: "Ustawienia zapisane dla kolejnych analiz." });
+      return saved;
+    } catch (error) {
+      setSettingsStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
   return {
     years,
     year,
@@ -80,6 +96,9 @@ export function useBudgetData() {
     status,
     uploading,
     importStatus,
+    budgetSettings,
+    settingsStatus,
     handleUpload,
+    saveBudgetSettings,
   };
 }

@@ -9,6 +9,8 @@ import com.budget.application.reporting.CalendarReport;
 import com.budget.application.reporting.TransactionPage;
 import com.budget.application.reporting.TransactionQuery;
 import com.budget.application.reporting.YearSummary;
+import com.budget.application.settings.BudgetSettings;
+import com.budget.application.settings.BudgetSettingsService;
 import com.budget.domain.importjob.ImportRun;
 import com.budget.domain.report.BudgetSnapshot;
 import jakarta.validation.constraints.Max;
@@ -22,6 +24,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,10 +36,12 @@ import org.springframework.web.multipart.MultipartFile;
 public class BudgetApiController {
     private final BudgetQueryService queryService;
     private final BudgetImportService importService;
+    private final BudgetSettingsService settingsService;
 
-    public BudgetApiController(BudgetQueryService queryService, BudgetImportService importService) {
+    public BudgetApiController(BudgetQueryService queryService, BudgetImportService importService, BudgetSettingsService settingsService) {
         this.queryService = queryService;
         this.importService = importService;
+        this.settingsService = settingsService;
     }
 
     @GetMapping("/session")
@@ -120,6 +125,16 @@ public class BudgetApiController {
     @GetMapping("/imports/runs")
     List<ImportRun> importRuns() {
         return queryService.importRuns();
+    }
+
+    @GetMapping("/settings/budget")
+    BudgetSettings budgetSettings() {
+        return settingsService.current();
+    }
+
+    @PutMapping("/settings/budget")
+    BudgetSettings saveBudgetSettings(@org.springframework.web.bind.annotation.RequestBody BudgetSettings settings) {
+        return settingsService.save(settings);
     }
 
     public record SessionResponse(boolean authenticated, String name) {

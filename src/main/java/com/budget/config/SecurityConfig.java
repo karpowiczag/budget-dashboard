@@ -19,7 +19,6 @@ import org.springframework.security.web.authentication.www.BasicAuthenticationFi
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Configuration(proxyBeanMethods = false)
@@ -44,17 +43,16 @@ public class SecurityConfig {
     }
 
     @Bean
-    OAuth2UserService<OidcUserRequest, OidcUser> googleAllowlistOidcUserService(BudgetProperties properties) {
+    OAuth2UserService<OidcUserRequest, OidcUser> googleAllowlistOidcUserService(GoogleAccountAllowlist allowlist) {
         var delegate = new OidcUserService();
         return request -> {
             var user = delegate.loadUser(request);
             if (!"google".equals(request.getClientRegistration().getRegistrationId())) {
                 return user;
             }
-            var allowed = properties.security().allowedGoogleEmail();
             var email = user.getEmail();
             var verified = Boolean.TRUE.equals(user.getEmailVerified());
-            if (!StringUtils.hasText(allowed) || !verified || !allowed.equalsIgnoreCase(email)) {
+            if (!allowlist.allowed(email, verified)) {
                 var error = new OAuth2Error("access_denied", "Google account is not allowlisted", null);
                 throw new OAuth2AuthenticationException(error);
             }

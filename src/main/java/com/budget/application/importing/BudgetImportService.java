@@ -23,41 +23,41 @@ public class BudgetImportService {
     private final BankTransactionReader csvReader;
     private final BudgetAnalysisService analysisService;
     private final BudgetReportStore repository;
+    private final ImportAuditService auditService;
 
-    public BudgetImportService(ImportSettings settings, BankTransactionReader csvReader, BudgetAnalysisService analysisService, BudgetReportStore repository) {
+    public BudgetImportService(
+            ImportSettings settings,
+            BankTransactionReader csvReader,
+            BudgetAnalysisService analysisService,
+            BudgetReportStore repository,
+            ImportAuditService auditService
+    ) {
         this.settings = settings;
         this.csvReader = csvReader;
         this.analysisService = analysisService;
         this.repository = repository;
+        this.auditService = auditService;
     }
 
     @Transactional
     public ImportSummary importUpload(TransactionImportFile file) {
         var fileName = sanitize(file.originalFileName());
-        if (file.size() <= 0) {
-            throw new IllegalArgumentException("Upload is empty");
-        }
-        if (file.size() > settings.maxUploadBytes()) {
-            throw new IllegalArgumentException("CSV is larger than allowed limit");
-        }
-        if (!fileName.toLowerCase().endsWith(".csv")) {
-            throw new IllegalArgumentException("Only CSV files are accepted");
-        }
-        if (!isCsvCompatibleContentType(file.contentType())) {
-            throw new IllegalArgumentException("Only CSV-compatible content types are accepted");
-        }
-        try (var input = file.openStream()) {
-            var result = importStream(input, fileName, null);
-            repository.recordImportRun(result.year(), fileName, "ok", "uploaded and imported");
+        try {
+            validateUpload(file, fileName);
+            var result = importUploadStream(file, fileName);
+            auditService.record(result.year(), fileName, "ok", "uploaded and imported");
             return new ImportSummary("ok", List.of(result.year()), result.transactionCount(), result.income(), result.spend(), "CSV imported; raw file was not retained");
         } catch (Exception e) {
-            repository.recordImportRun(null, fileName, "error", e.getMessage());
+            auditService.record(null, fileName, "error", e.getMessage());
             throw new IllegalArgumentException("Import failed: " + e.getMessage(), e);
         }
     }
 
     @Transactional
     public ImportSummary rebuildLocal(Integer requestedYear) {
+        if (!settings.localRebuildEnabled()) {
+            throw new IllegalArgumentException("Local CSV rebuild is disabled in this environment");
+        }
         var files = findLocalCsvs(requestedYear);
         if (files.isEmpty()) {
             throw new IllegalArgumentException("No local CSV files found for rebuild");
@@ -70,13 +70,13 @@ public class BudgetImportService {
             try (var input = Files.newInputStream(path)) {
                 var year = requestedYear != null ? requestedYear : inferYearFromPath(path);
                 var result = importStream(input, path.getFileName().toString(), year);
-                repository.recordImportRun(result.year(), path.toString(), "ok", "local rebuild");
+                auditService.record(result.year(), path.toString(), "ok", "local rebuild");
                 years.add(result.year());
                 transactions += result.transactionCount();
                 income = income.add(result.income());
                 spend = spend.add(result.spend());
             } catch (Exception e) {
-                repository.recordImportRun(requestedYear, path.toString(), "error", e.getMessage());
+                auditService.record(requestedYear, path.toString(), "error", e.getMessage());
                 throw new IllegalArgumentException("Rebuild failed for " + path + ": " + e.getMessage(), e);
             }
         }
@@ -88,6 +88,27 @@ public class BudgetImportService {
         var result = analysisService.analyze(budgetInput);
         repository.save(result);
         return result;
+    }
+
+    private BudgetAnalysisResult importUploadStream(TransactionImportFile file, String fileName) throws IOException {
+        try (var input = file.openStream()) {
+            return importStream(input, fileName, null);
+        }
+    }
+
+    private void validateUpload(TransactionImportFile file, String fileName) {
+        if (file.size() <= 0) {
+            throw new IllegalArgumentException("Upload is empty");
+        }
+        if (file.size() > settings.maxUploadBytes()) {
+            throw new IllegalArgumentException("CSV is larger than allowed limit");
+        }
+        if (!fileName.toLowerCase().endsWith(".csv")) {
+            throw new IllegalArgumentException("Only CSV files are accepted");
+        }
+        if (!isCsvCompatibleContentType(file.contentType())) {
+            throw new IllegalArgumentException("Only CSV-compatible content types are accepted");
+        }
     }
 
     private List<Path> findLocalCsvs(Integer requestedYear) {

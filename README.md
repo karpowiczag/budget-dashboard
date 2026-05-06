@@ -51,10 +51,25 @@ Run the Spring app:
 .\mvnw.cmd spring-boot:run
 ```
 
+This project targets Java 25. On Windows, verify the shell before running Maven:
+
+```powershell
+java -version
+$env:JAVA_HOME="C:\Users\sanyak\.jdks\openjdk-25.0.1"
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+```
+
 By default local auth is disabled and the app uses `data/budget.mv.db`. Upload a bank CSV from the Import tab or rebuild local year folders:
 
 ```powershell
-Invoke-RestMethod -Method Post http://127.0.0.1:8080/api/rebuild
+Invoke-RestMethod -Method Post http://127.0.0.1:8080/api/v1/imports/rebuild
+```
+
+Household-specific categorization rules should stay out of public source. Put private salary/counterparty rules in ignored local Spring config such as `application-local.properties`:
+
+```properties
+app.categorization.personal-rules[0].pattern=PRIVATE EMPLOYER.*WYNAGRODZENIE
+app.categorization.personal-rules[0].category=Pensja
 ```
 
 ## Production Settings
@@ -70,14 +85,14 @@ APP_ALLOWED_GOOGLE_EMAIL=you@example.com
 PORT=8080
 ```
 
-The raw CSV upload is processed in memory and not retained. The app persists normalized transactions, import audit records, and dashboard payloads in PostgreSQL.
+The raw CSV upload is processed in memory and not retained. The app persists normalized transactions, import audit records, budget settings, and structured analytics snapshots in PostgreSQL.
 
 ## CI/CD
 
 GitHub Actions:
 
-- `ci.yml` builds React from `frontend/`, syncs the frontend into Spring static resources, and runs Java tests for every PR into `develop`/`main` and every push to those branches. It cancels older in-progress runs on the same branch.
-- `deploy.yml` is manual-only and runs only from `main` because the GraalVM native build is expensive. It builds the native binary, packages a minimal Docker image, pushes it to GHCR, and creates or updates Koyeb when `KOYEB_TOKEN`, `KOYEB_APP`, and `KOYEB_SERVICE` are configured.
+- `ci.yml` tests and builds React from `frontend/`, syncs the frontend into Spring static resources, and runs Java tests for every PR into `develop`/`main` and every push to those branches. It cancels older in-progress runs on the same branch.
+- `deploy.yml` is manual-only and runs only from `main` because the GraalVM native build is expensive. It builds the native binary, packages a minimal Docker image, pushes it to GHCR, creates or updates Koyeb, and smokes `/actuator/health`. `KOYEB_TOKEN`, `KOYEB_APP`, `KOYEB_SERVICE`, and `KOYEB_PUBLIC_URL` are required for a release deployment.
 - Dependabot checks npm, Maven, GitHub Actions, and Docker weekly against `develop`, grouped by ecosystem with major version updates ignored so dependency maintenance does not burn CI minutes unexpectedly.
 - GitHub branch protection is the merge gate for `develop` and `main`. It requires PRs, the `test` status check, up-to-date branches, resolved review conversations, dismisses stale reviews, includes admins, and blocks force pushes/deletions.
 

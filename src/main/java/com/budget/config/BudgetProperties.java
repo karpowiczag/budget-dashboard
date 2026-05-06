@@ -2,6 +2,7 @@ package com.budget.config;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -15,13 +16,19 @@ public record BudgetProperties(
         @Valid
         Upload upload,
         @Valid
-        LocalImport localImport
+        LocalImport localImport,
+        @Valid
+        BudgetSettings budgetSettings,
+        @Valid
+        Categorization categorization
 ) {
     public BudgetProperties {
         if (security == null) security = new Security(false, "");
         if (database == null) database = new Database("");
         if (upload == null) upload = new Upload(12_582_912L);
-        if (localImport == null) localImport = new LocalImport(".");
+        if (localImport == null) localImport = new LocalImport(".", true);
+        if (budgetSettings == null) budgetSettings = new BudgetSettings(14_000d, 13_000d, 3, 6);
+        if (categorization == null) categorization = new Categorization(List.of());
     }
 
     public record Security(boolean oauthEnabled, String allowedGoogleEmail) {
@@ -39,9 +46,30 @@ public record BudgetProperties(
     public record Upload(@Positive long maxBytes) {
     }
 
-    public record LocalImport(String root) {
+    public record LocalImport(String root, boolean rebuildEnabled) {
         public LocalImport {
             if (root == null || root.isBlank()) root = ".";
+        }
+    }
+
+    public record BudgetSettings(
+            @Positive double targetMonthlySpend,
+            @Positive double aggressiveMonthlySpend,
+            @Positive int emergencyFundMinMonths,
+            @Positive int emergencyFundComfortMonths
+    ) {
+    }
+
+    public record Categorization(List<Rule> personalRules) {
+        public Categorization {
+            personalRules = personalRules == null ? List.of() : List.copyOf(personalRules);
+        }
+    }
+
+    public record Rule(String pattern, String category) {
+        public Rule {
+            if (pattern == null) pattern = "";
+            if (category == null) category = "";
         }
     }
 }

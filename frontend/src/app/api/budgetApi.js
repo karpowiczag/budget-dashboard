@@ -49,6 +49,23 @@ export async function fetchTransactions(year, params = {}) {
   return readJson(response, "Nie mogę wczytać transakcji");
 }
 
+export async function fetchBudgetSettings() {
+  const response = await fetch("/api/v1/settings/budget");
+  return readJson(response, "Nie mogę wczytać ustawień budżetu");
+}
+
+export async function updateBudgetSettings(settings) {
+  const response = await fetch("/api/v1/settings/budget", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(settings),
+  });
+  return readJson(response, "Nie mogę zapisać ustawień budżetu");
+}
+
 export async function uploadTransactions(file) {
   const body = new FormData();
   body.append("file", file);

@@ -8,17 +8,22 @@ import java.nio.charset.StandardCharsets;
 import javax.sql.DataSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.util.StringUtils;
 
 @Configuration(proxyBeanMethods = false)
 public class DataSourceConfiguration {
     @Bean
-    DataSource dataSource(BudgetProperties properties) {
+    DataSource dataSource(BudgetProperties properties, Environment environment) {
         var databaseUrl = properties.database().url();
         var config = new HikariConfig();
         config.setMaximumPoolSize(4);
         config.setMinimumIdle(0);
         config.setPoolName("budget-db");
+
+        if (isProd(environment) && !StringUtils.hasText(databaseUrl)) {
+            throw new IllegalStateException("DATABASE_URL must be configured when the prod profile is active");
+        }
 
         if (StringUtils.hasText(databaseUrl) && databaseUrl.startsWith("jdbc:")) {
             configureJdbc(databaseUrl, config);
@@ -31,6 +36,10 @@ public class DataSourceConfiguration {
             config.setDriverClassName("org.h2.Driver");
         }
         return new HikariDataSource(config);
+    }
+
+    private boolean isProd(Environment environment) {
+        return java.util.Arrays.asList(environment.getActiveProfiles()).contains("prod");
     }
 
     private void configureJdbc(String jdbcUrl, HikariConfig config) {

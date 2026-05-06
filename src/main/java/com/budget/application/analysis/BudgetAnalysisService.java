@@ -1,6 +1,8 @@
 package com.budget.application.analysis;
 
 import com.budget.application.categorization.CategoryClassifier;
+import com.budget.application.settings.BudgetSettings;
+import com.budget.application.settings.BudgetSettingsService;
 import com.budget.domain.report.BudgetAnalysisResult;
 import com.budget.domain.report.BudgetInput;
 import com.budget.domain.report.BudgetSnapshot;
@@ -24,7 +26,7 @@ import org.springframework.stereotype.Service;
 public class BudgetAnalysisService {
     private static final DateTimeFormatter MONTH_LABEL = DateTimeFormatter.ofPattern("MM.yyyy");
     private static final Set<String> REAL_SAVING_CATEGORIES = Set.of("Oszczędności i inwestycje", "Nadpłata kredytu");
-    private static final Map<String, ConfiguredCategoryLimit> CATEGORY_LIMITS = Map.ofEntries(
+    private static final Map<String, ConfiguredCategoryLimit> DEFAULT_CATEGORY_LIMITS = Map.ofEntries(
             Map.entry("Żywność i chemia", new ConfiguredCategoryLimit(2400, "Plan posiłków, większe zakupy z listą, mniej awaryjnych wizyt.")),
             Map.entry("Jedzenie poza domem", new ConfiguredCategoryLimit(600, "Limit na restauracje, kawę i dostawy; zostawić tylko celowe wyjścia.")),
             Map.entry("Odzież i obuwie", new ConfiguredCategoryLimit(800, "Limit kwartalny i lista braków zamiast zakupów impulsowych.")),
@@ -42,10 +44,12 @@ public class BudgetAnalysisService {
 
     private final TransactionNormalizer normalizer;
     private final CategoryClassifier classifier;
+    private final BudgetSettingsService settingsService;
 
-    public BudgetAnalysisService(TransactionNormalizer normalizer, CategoryClassifier classifier) {
+    public BudgetAnalysisService(TransactionNormalizer normalizer, CategoryClassifier classifier, BudgetSettingsService settingsService) {
         this.normalizer = normalizer;
         this.classifier = classifier;
+        this.settingsService = settingsService;
     }
 
     public BudgetAnalysisResult analyze(BudgetInput input) {
@@ -88,15 +92,16 @@ public class BudgetAnalysisService {
                 .sum());
 
         var budgetMixRows = budgetMixRows(transactions, incomeTotal, activeMonthCount, realSavingsOut, unassignedSurplus);
-        var categoryPlanRows = categoryPlanRows(categories);
+        var settings = settingsService.current();
+        var categoryPlanRows = categoryPlanRows(categories, settings);
 
         var avgIncome = round2(incomeTotal / activeMonthCount);
         var avgSpend = round2(spendTotal / activeMonthCount);
         var needsTotal = sum(transactions.stream().filter(tx -> "Potrzeby".equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
         var mixedNeedsTotal = sum(transactions.stream().filter(tx -> "Potrzeby mieszane".equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
         var coreMonthlyCost = round2((needsTotal + mixedNeedsTotal) / activeMonthCount);
-        var targetMonthlySpend = 14_000d;
-        var aggressiveMonthlySpend = 13_000d;
+        var targetMonthlySpend = settings.targetMonthlySpend().doubleValue();
+        var aggressiveMonthlySpend = settings.aggressiveMonthlySpend().doubleValue();
         var latestMonthKey = activeMonths.getLast();
         var monthControl = monthControl(latestMonthKey, transactions, categoryPlanRows, targetMonthlySpend, periodStart, periodEnd, checkAmount, checkCount, categories);
 
@@ -137,8 +142,8 @@ public class BudgetAnalysisService {
                         money(Math.max(0, avgIncome - targetMonthlySpend)),
                         money(Math.max(0, avgIncome - aggressiveMonthlySpend)),
                         money(Math.max(0, avgSpend - targetMonthlySpend)),
-                        money(coreMonthlyCost * 3),
-                        money(coreMonthlyCost * 6),
+                        money(coreMonthlyCost * settings.emergencyFundMinMonths()),
+                        money(coreMonthlyCost * settings.emergencyFundComfortMonths()),
                         categoryPlanRows
                 ),
                 monthControl,
@@ -281,13 +286,21 @@ public class BudgetAnalysisService {
         return new BudgetSnapshot.BudgetMixItem(bucket, money(sum), money(sum / activeMonthCount), ratio(incomeTotal == 0 ? 0 : sum / incomeTotal), note);
     }
 
-    private List<BudgetSnapshot.CategoryLimit> categoryPlanRows(List<CategoryRow> categories) {
+    private List<BudgetSnapshot.CategoryLimit> categoryPlanRows(List<CategoryRow> categories, BudgetSettings settings) {
+        var overrides = settings.categoryLimits().stream()
+                .filter(row -> row.category() != null && !row.category().isBlank())
+                .collect(java.util.stream.Collectors.toMap(
+                        BudgetSettings.CategoryLimitSetting::category,
+                        row -> new ConfiguredCategoryLimit(row.limit().doubleValue(), row.action()),
+                        (first, second) -> second,
+                        LinkedHashMap::new
+                ));
         var rows = new ArrayList<BudgetSnapshot.CategoryLimit>();
         for (var category : categories) {
             if (category.monthlyAverage() <= 0) {
                 continue;
             }
-            var configured = CATEGORY_LIMITS.get(category.category());
+            var configured = overrides.getOrDefault(category.category(), DEFAULT_CATEGORY_LIMITS.get(category.category()));
             double limit;
             String action;
             if (configured != null) {

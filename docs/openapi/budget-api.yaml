@@ -213,6 +213,33 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ImportRun"
+  /api/v1/settings/budget:
+    get:
+      operationId: getBudgetSettings
+      responses:
+        "200":
+          description: Current global budget settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetSettings"
+    put:
+      operationId: updateBudgetSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BudgetSettings"
+      responses:
+        "200":
+          description: Updated global budget settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetSettings"
+        "400":
+          $ref: "#/components/responses/Problem"
 components:
   parameters:
     Year:
@@ -319,33 +346,54 @@ components:
         savingsPlan:
           $ref: "#/components/schemas/SavingsPlan"
         monthControl:
-          type: object
+          $ref: "#/components/schemas/MonthControl"
         fixedness:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/FixednessSummary"
         topMerchants:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/MerchantSummary"
         recurring:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/RecurringItem"
         largeOneoffs:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/LargeOneOff"
     Kpis:
       type: object
+      required: [income, spend, discretionary, operatingSurplus, savingsRate, excludedGross, excludedOutgoing, excludedIncoming, excludedNet, realSavingsOutgoing, unassignedSurplus, transactions, corrections, lowConfidence, toCheck, toCheckAmount]
       properties:
         income:
           $ref: "#/components/schemas/Money"
         spend:
           $ref: "#/components/schemas/Money"
+        discretionary:
+          $ref: "#/components/schemas/Money"
+        operatingSurplus:
+          $ref: "#/components/schemas/Money"
         savingsRate:
           $ref: "#/components/schemas/Ratio"
+        excludedGross:
+          $ref: "#/components/schemas/Money"
+        excludedOutgoing:
+          $ref: "#/components/schemas/Money"
+        excludedIncoming:
+          $ref: "#/components/schemas/Money"
+        excludedNet:
+          $ref: "#/components/schemas/Money"
+        realSavingsOutgoing:
+          $ref: "#/components/schemas/Money"
+        unassignedSurplus:
+          $ref: "#/components/schemas/Money"
         transactions:
+          type: integer
+        corrections:
+          type: integer
+        lowConfidence:
           type: integer
         toCheck:
           type: integer
@@ -353,6 +401,7 @@ components:
           $ref: "#/components/schemas/Money"
     MonthlySummary:
       type: object
+      required: [month, monthKey, income, spend, discretionary, excluded, savingsInvestments, netFlow, savingsRate, transactions, spendPerDay]
       properties:
         month:
           type: string
@@ -362,10 +411,23 @@ components:
           $ref: "#/components/schemas/Money"
         spend:
           $ref: "#/components/schemas/Money"
+        discretionary:
+          $ref: "#/components/schemas/Money"
+        excluded:
+          $ref: "#/components/schemas/Money"
+        savingsInvestments:
+          $ref: "#/components/schemas/Money"
+        netFlow:
+          $ref: "#/components/schemas/Money"
+        savingsRate:
+          $ref: "#/components/schemas/Ratio"
         transactions:
           type: integer
+        spendPerDay:
+          $ref: "#/components/schemas/Money"
     CategorySummary:
       type: object
+      required: [category, group, spend, income, excluded, monthlyAverage, maxAmount, discretionary, count]
       properties:
         category:
           type: string
@@ -373,7 +435,16 @@ components:
           type: string
         spend:
           $ref: "#/components/schemas/Money"
+        income:
+          $ref: "#/components/schemas/Money"
+        excluded:
+          $ref: "#/components/schemas/Money"
         monthlyAverage:
+          $ref: "#/components/schemas/Money"
+        maxMonth:
+          type: string
+          nullable: true
+        maxAmount:
           $ref: "#/components/schemas/Money"
         discretionary:
           type: boolean
@@ -381,6 +452,7 @@ components:
           type: integer
     HierarchySummary:
       type: object
+      required: [area, group, category, subcategory, spend, income, excluded, monthlyAverage, count, discretionary]
       properties:
         area:
           type: string
@@ -392,10 +464,19 @@ components:
           type: string
         spend:
           $ref: "#/components/schemas/Money"
+        income:
+          $ref: "#/components/schemas/Money"
+        excluded:
+          $ref: "#/components/schemas/Money"
+        monthlyAverage:
+          $ref: "#/components/schemas/Money"
         count:
           type: integer
+        discretionary:
+          type: boolean
     BudgetMixItem:
       type: object
+      required: [bucket, sum, monthlyAverage, incomeShare, note]
       properties:
         bucket:
           type: string
@@ -409,17 +490,222 @@ components:
           type: string
     SavingsPlan:
       type: object
+      required: [currentMonthlySpend, currentMonthlyIncome, coreMonthlyCost, targetMonthlySpend, aggressiveMonthlySpend, targetInvestmentTransfer, aggressiveInvestmentTransfer, monthlyCutNeeded, emergencyFundMin, emergencyFundComfort, categoryLimits]
       properties:
         currentMonthlySpend:
           $ref: "#/components/schemas/Money"
         currentMonthlyIncome:
           $ref: "#/components/schemas/Money"
+        coreMonthlyCost:
+          $ref: "#/components/schemas/Money"
+        targetMonthlySpend:
+          $ref: "#/components/schemas/Money"
+        aggressiveMonthlySpend:
+          $ref: "#/components/schemas/Money"
+        targetInvestmentTransfer:
+          $ref: "#/components/schemas/Money"
+        aggressiveInvestmentTransfer:
+          $ref: "#/components/schemas/Money"
+        monthlyCutNeeded:
+          $ref: "#/components/schemas/Money"
+        emergencyFundMin:
+          $ref: "#/components/schemas/Money"
+        emergencyFundComfort:
+          $ref: "#/components/schemas/Money"
         categoryLimits:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/CategoryLimit"
+    CategoryLimit:
+      type: object
+      required: [category, bucket, currentMonthly, limit, potentialMonthly, potentialYearly, priority, action]
+      properties:
+        category:
+          type: string
+        bucket:
+          type: string
+        currentMonthly:
+          $ref: "#/components/schemas/Money"
+        limit:
+          $ref: "#/components/schemas/Money"
+        potentialMonthly:
+          $ref: "#/components/schemas/Money"
+        potentialYearly:
+          $ref: "#/components/schemas/Money"
+        priority:
+          type: string
+        action:
+          type: string
+    MonthControl:
+      type: object
+      required: [month, monthKey, elapsedDays, remainingDays, daysInMonth, incomeToDate, spendToDate, projectedSpend, targetSpend, remainingBudget, dailyAllowed, projectedDelta, categoryStatus, alerts, sinkingFunds]
+      properties:
+        month:
+          type: string
+        monthKey:
+          type: string
+        elapsedDays:
+          type: integer
+        remainingDays:
+          type: integer
+        daysInMonth:
+          type: integer
+        incomeToDate:
+          $ref: "#/components/schemas/Money"
+        spendToDate:
+          $ref: "#/components/schemas/Money"
+        projectedSpend:
+          $ref: "#/components/schemas/Money"
+        targetSpend:
+          $ref: "#/components/schemas/Money"
+        remainingBudget:
+          $ref: "#/components/schemas/Money"
+        dailyAllowed:
+          $ref: "#/components/schemas/Money"
+        projectedDelta:
+          $ref: "#/components/schemas/Money"
+        categoryStatus:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryStatus"
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Alert"
+        sinkingFunds:
+          type: array
+          items:
+            $ref: "#/components/schemas/SinkingFund"
+    CategoryStatus:
+      type: object
+      required: [category, bucket, currentMonthly, limit, potentialMonthly, potentialYearly, priority, action, currentMonthSpend, currentMonthProjection, remainingThisMonth, projectedDelta, usage]
+      properties:
+        category:
+          type: string
+        bucket:
+          type: string
+        currentMonthly:
+          $ref: "#/components/schemas/Money"
+        limit:
+          $ref: "#/components/schemas/Money"
+        potentialMonthly:
+          $ref: "#/components/schemas/Money"
+        potentialYearly:
+          $ref: "#/components/schemas/Money"
+        priority:
+          type: string
+        action:
+          type: string
+        currentMonthSpend:
+          $ref: "#/components/schemas/Money"
+        currentMonthProjection:
+          $ref: "#/components/schemas/Money"
+        remainingThisMonth:
+          $ref: "#/components/schemas/Money"
+        projectedDelta:
+          $ref: "#/components/schemas/Money"
+        usage:
+          $ref: "#/components/schemas/Ratio"
+    Alert:
+      type: object
+      required: [type, severity, message]
+      properties:
+        type:
+          type: string
+        severity:
+          type: string
+        message:
+          type: string
+    SinkingFund:
+      type: object
+      required: [name, category, monthlySetAside, yearlyNeed, note]
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        monthlySetAside:
+          $ref: "#/components/schemas/Money"
+        yearlyNeed:
+          $ref: "#/components/schemas/Money"
+        note:
+          type: string
+    FixednessSummary:
+      type: object
+      required: [type, spend, excludedOutgoing, monthlyAverage, count]
+      properties:
+        type:
+          type: string
+        spend:
+          $ref: "#/components/schemas/Money"
+        excludedOutgoing:
+          $ref: "#/components/schemas/Money"
+        monthlyAverage:
+          $ref: "#/components/schemas/Money"
+        count:
+          type: integer
+    MerchantSummary:
+      type: object
+      required: [merchant, category, sum, count, average]
+      properties:
+        merchant:
+          type: string
+        category:
+          type: string
+        sum:
+          $ref: "#/components/schemas/Money"
+        count:
+          type: integer
+        average:
+          $ref: "#/components/schemas/Money"
+    RecurringItem:
+      type: object
+      required: [merchant, category, bucket, sum, months, count, monthlyAverage, avgDay]
+      properties:
+        merchant:
+          type: string
+        category:
+          type: string
+        bucket:
+          type: string
+        sum:
+          $ref: "#/components/schemas/Money"
+        months:
+          type: integer
+        count:
+          type: integer
+        monthlyAverage:
+          $ref: "#/components/schemas/Money"
+        avgDay:
+          type: integer
+        lastDate:
+          type: string
+          format: date
+          nullable: true
+    LargeOneOff:
+      type: object
+      required: [date, merchant, category, bucket, amount, month, confidence, description]
+      properties:
+        date:
+          type: string
+          format: date
+        merchant:
+          type: string
+        category:
+          type: string
+        bucket:
+          type: string
+        amount:
+          $ref: "#/components/schemas/Money"
+        month:
+          type: string
+        confidence:
+          type: string
+        description:
+          type: string
     CalendarResponse:
       type: object
+      required: [year, month, days]
       properties:
         year:
           type: integer
@@ -431,6 +717,7 @@ components:
             $ref: "#/components/schemas/CalendarDay"
     CalendarDay:
       type: object
+      required: [date, day, spend, income, transactions]
       properties:
         date:
           type: string
@@ -447,6 +734,7 @@ components:
           $ref: "#/components/schemas/Transaction"
     AnalyticsResponse:
       type: object
+      required: [year, scope, spend, income, transactionCount, areaTop, groupTop, categoryTop, subcategoryTop, hierarchyTop, merchants, oneoffs]
       properties:
         year:
           type: integer
@@ -461,31 +749,99 @@ components:
         areaTop:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/AreaSpend"
         groupTop:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/GroupSpend"
         categoryTop:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/CategorySpend"
         subcategoryTop:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/SubcategorySpend"
         hierarchyTop:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/HierarchySpend"
         merchants:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/AnalyticsMerchantSpend"
         oneoffs:
           type: array
           items:
             $ref: "#/components/schemas/Transaction"
+    AreaSpend:
+      type: object
+      required: [area, spend, count]
+      properties:
+        area:
+          type: string
+        spend:
+          $ref: "#/components/schemas/Money"
+        count:
+          type: integer
+    GroupSpend:
+      type: object
+      required: [group, spend, count]
+      properties:
+        group:
+          type: string
+        spend:
+          $ref: "#/components/schemas/Money"
+        count:
+          type: integer
+    CategorySpend:
+      type: object
+      required: [category, spend, count]
+      properties:
+        category:
+          type: string
+        spend:
+          $ref: "#/components/schemas/Money"
+        count:
+          type: integer
+    SubcategorySpend:
+      type: object
+      required: [subcategory, category, spend, count]
+      properties:
+        subcategory:
+          type: string
+        category:
+          type: string
+        spend:
+          $ref: "#/components/schemas/Money"
+        count:
+          type: integer
+    HierarchySpend:
+      type: object
+      required: [area, group, category, subcategory, spend, count]
+      properties:
+        area:
+          type: string
+        group:
+          type: string
+        category:
+          type: string
+        subcategory:
+          type: string
+        spend:
+          $ref: "#/components/schemas/Money"
+        count:
+          type: integer
+    AnalyticsMerchantSpend:
+      type: object
+      required: [merchant, sum, count]
+      properties:
+        merchant:
+          type: string
+        sum:
+          $ref: "#/components/schemas/Money"
+        count:
+          type: integer
     TransactionPage:
       type: object
       required: [items, page, size, totalItems, totalPages, sort]
@@ -507,6 +863,7 @@ components:
           type: string
     Transaction:
       type: object
+      required: [id, lp, postedDate, month, merchant, description, account, bankCategory, correctedCategory, area, group, subcategory, bucket, fixedness, type, amount, income, spend, discretionary, excluded, excludedOutgoing, excludedIncoming, excludedNet, confidence, notes, matchedRule]
       properties:
         id:
           type: integer
@@ -546,6 +903,16 @@ components:
           $ref: "#/components/schemas/Money"
         spend:
           $ref: "#/components/schemas/Money"
+        discretionary:
+          $ref: "#/components/schemas/Money"
+        excluded:
+          $ref: "#/components/schemas/Money"
+        excludedOutgoing:
+          $ref: "#/components/schemas/Money"
+        excludedIncoming:
+          $ref: "#/components/schemas/Money"
+        excludedNet:
+          $ref: "#/components/schemas/Money"
         confidence:
           type: string
         notes:
@@ -554,6 +921,7 @@ components:
           type: string
     ImportSummary:
       type: object
+      required: [status, years, transactions, income, spend, message]
       properties:
         status:
           type: string
@@ -571,6 +939,7 @@ components:
           type: string
     ImportRun:
       type: object
+      required: [id, inputCsv, status, message, createdAt]
       properties:
         id:
           type: integer
@@ -586,6 +955,34 @@ components:
         createdAt:
           type: string
           format: date-time
+    BudgetSettings:
+      type: object
+      required: [targetMonthlySpend, aggressiveMonthlySpend, emergencyFundMinMonths, emergencyFundComfortMonths, categoryLimits]
+      properties:
+        targetMonthlySpend:
+          $ref: "#/components/schemas/Money"
+        aggressiveMonthlySpend:
+          $ref: "#/components/schemas/Money"
+        emergencyFundMinMonths:
+          type: integer
+          minimum: 1
+        emergencyFundComfortMonths:
+          type: integer
+          minimum: 1
+        categoryLimits:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryLimitSetting"
+    CategoryLimitSetting:
+      type: object
+      required: [category, limit, action]
+      properties:
+        category:
+          type: string
+        limit:
+          $ref: "#/components/schemas/Money"
+        action:
+          type: string
     ProblemDetail:
       type: object
       properties:

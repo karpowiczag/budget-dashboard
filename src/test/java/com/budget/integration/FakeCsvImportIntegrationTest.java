@@ -101,6 +101,22 @@ class FakeCsvImportIntegrationTest {
         var years = getList("/api/v1/years", Map.of());
         assertThat(years).anySatisfy(row -> assertThat(row).containsEntry("year", 2026));
 
+        var settings = getMap("/api/v1/settings/budget", Map.of());
+        assertThat(new BigDecimal(settings.get("targetMonthlySpend").toString())).isEqualByComparingTo(BigDecimal.valueOf(14_000));
+        var updatedSettings = putJson("/api/v1/settings/budget", """
+                {
+                  "targetMonthlySpend": 12500,
+                  "aggressiveMonthlySpend": 11500,
+                  "emergencyFundMinMonths": 4,
+                  "emergencyFundComfortMonths": 8,
+                  "categoryLimits": [
+                    {"category": "Jedzenie poza domem", "limit": 500, "action": "test"}
+                  ]
+                }
+                """);
+        assertThat(new BigDecimal(updatedSettings.get("targetMonthlySpend").toString())).isEqualByComparingTo(BigDecimal.valueOf(12_500));
+        assertThat(putStatus("/api/v1/settings/budget", "{")).isEqualTo(400);
+
         var dashboard = getMap("/api/v1/reports/2026/dashboard", Map.of());
         assertThat(dashboard).containsEntry("year", 2026);
         assertThat(dashboard).doesNotContainKey("transactions");
@@ -139,6 +155,34 @@ class FakeCsvImportIntegrationTest {
         )))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Only CSV-compatible content types are accepted");
+
+        assertThat(store.findImportRuns())
+                .anySatisfy(run -> {
+                    assertThat(run.status()).isEqualTo("error");
+                    assertThat(run.inputCsv()).isEqualTo("lista_operacji_260101_260331_fake.csv");
+                    assertThat(run.message()).contains("CSV-compatible");
+                });
+    }
+
+    @Test
+    void keepsFailedImportAuditWhenAcceptedCsvCannotBeParsed() {
+        var bytes = "not-a-bank-export".getBytes(StandardCharsets.UTF_8);
+
+        assertThatThrownBy(() -> importService.importUpload(new TransactionImportFile(
+                "broken.csv",
+                bytes.length,
+                "text/csv",
+                () -> new ByteArrayInputStream(bytes)
+        )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Import failed");
+
+        assertThat(store.findImportRuns())
+                .anySatisfy(run -> {
+                    assertThat(run.status()).isEqualTo("error");
+                    assertThat(run.inputCsv()).isEqualTo("broken.csv");
+                    assertThat(run.message()).contains("bank header");
+                });
     }
 
     private ImportSummary importFixture(String resourcePath, String fileName) throws IOException {
@@ -221,6 +265,28 @@ class FakeCsvImportIntegrationTest {
         var uri = URI.create("http://localhost:" + port + path + queryString(params));
         var request = HttpRequest.newBuilder(uri).GET().build();
         return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> putJson(String path, String body) throws Exception {
+        var uri = URI.create("http://localhost:" + port + path);
+        var request = HttpRequest.newBuilder(uri)
+                .header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+        var response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        assertThat(response.statusCode()).isEqualTo(200);
+        return objectMapper.readValue(response.body(), new TypeReference<>() {
+        });
+    }
+
+    private int putStatus(String path, String body) throws Exception {
+        var uri = URI.create("http://localhost:" + port + path);
+        var request = HttpRequest.newBuilder(uri)
+                .header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+        return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString()).statusCode();
     }
 
     private String queryString(Map<String, String> params) {

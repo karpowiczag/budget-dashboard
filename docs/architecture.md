@@ -8,6 +8,7 @@ com.budget
   application.categorization    category strategy chain and nested category decisions
   application.importing         CSV import use case, import settings, and input-reader port
   application.reporting         query use case and report-store port
+  application.settings          persisted budget assumptions and category-limit settings
   domain.category               immutable category value records
   domain.importjob              import audit model
   domain.report                 report input/result models
@@ -40,6 +41,7 @@ Current design choices:
 - Categorization uses a Chain of Responsibility. Regex rules run first, positive-flow fallback runs second, and manual-review fallback runs last.
 - Transaction normalization is separated from annual analysis, so classification confidence and excluded-flow logic can be tested independently.
 - Application services depend on ports such as `BudgetReportStore` and `BankTransactionReader`, not concrete JDBC or CSV adapter classes.
+- Savings recommendations read persisted budget settings through an application port, so target spend and category limits are not browser-only state.
 - Upload handling crosses the web boundary through `TransactionImportFile`; application code does not depend on `MultipartFile`.
 - Environment-backed import limits and local paths cross the config boundary through `ImportSettings`; application code does not depend on `BudgetProperties`.
 - Persistence uses Spring Data JDBC repositories and `JdbcAggregateTemplate` for aggregate inserts with assigned report-year IDs.
@@ -49,9 +51,9 @@ Current design choices:
 - `KnownCsvEndToEndIntegrationTest` runs against local ignored `2025/` and `2026/` CSV exports when they exist, without committing bank data or exact private totals.
 - `PackageBoundaryTest` enforces the package boundaries: domain cannot import outer layers, and application cannot import infrastructure, web, or config packages.
 - Frontend API access uses an Adapter-style boundary in `frontend/src/app/api`, while dashboard calculations live in pure selector functions and UI tabs are presenter components.
+- Household-specific categorization rules are configured outside public source through ignored local/prod settings.
 
 Next refactor targets:
 
 - Split `BudgetAnalysisService` further into monthly, category, recurring, and recommendation analyzers.
-- Move Polish presentation labels out of `NormalizedTransaction.toPayloadMap()` into a web mapper.
 - Introduce TypeScript API/view-model types for the React app.
