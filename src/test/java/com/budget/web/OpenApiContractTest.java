@@ -7,6 +7,7 @@ import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import java.nio.file.Path;
+import java.lang.reflect.ParameterizedType;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +51,7 @@ class OpenApiContractTest {
             if (!BudgetApiController.class.equals(handler.getBeanType())) {
                 return;
             }
+            assertWebDtoReturnType(handler.getMethod().getGenericReturnType());
             var expectedOperationId = OPERATION_IDS.get(handler.getMethod().getName());
             assertThat(expectedOperationId).as("operation id for " + handler.getMethod()).isNotBlank();
             mapping.getPatternValues().forEach(path -> {
@@ -81,6 +83,17 @@ class OpenApiContractTest {
             case DELETE -> pathItem.getDelete();
             default -> null;
         };
+    }
+
+    private void assertWebDtoReturnType(java.lang.reflect.Type returnType) {
+        if (returnType instanceof ParameterizedType parameterizedType) {
+            assertThat(parameterizedType.getRawType()).isEqualTo(java.util.List.class);
+            assertWebDtoReturnType(parameterizedType.getActualTypeArguments()[0]);
+            return;
+        }
+        if (returnType instanceof Class<?> type) {
+            assertThat(type.getPackageName()).startsWith("com.budget.web.dto");
+        }
     }
 
     private void assertRef(Schema<?> schema, String property, String target) {

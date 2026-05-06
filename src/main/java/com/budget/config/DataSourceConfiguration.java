@@ -21,8 +21,8 @@ public class DataSourceConfiguration {
         config.setMinimumIdle(0);
         config.setPoolName("budget-db");
 
-        if (isProd(environment) && !StringUtils.hasText(databaseUrl)) {
-            throw new IllegalStateException("DATABASE_URL must be configured when the prod profile is active");
+        if (isProd(environment)) {
+            requireProductionPostgresUrl(databaseUrl);
         }
 
         if (StringUtils.hasText(databaseUrl) && databaseUrl.startsWith("jdbc:")) {
@@ -42,6 +42,22 @@ public class DataSourceConfiguration {
         return java.util.Arrays.asList(environment.getActiveProfiles()).contains("prod");
     }
 
+    private void requireProductionPostgresUrl(String databaseUrl) {
+        if (!StringUtils.hasText(databaseUrl)) {
+            throw new IllegalStateException("DATABASE_URL must be configured when the prod profile is active");
+        }
+        if (!isProductionPostgresUrl(databaseUrl)) {
+            throw new IllegalStateException("DATABASE_URL must point to PostgreSQL when the prod profile is active");
+        }
+    }
+
+    static boolean isProductionPostgresUrl(String databaseUrl) {
+        return StringUtils.hasText(databaseUrl)
+                && (databaseUrl.startsWith("jdbc:postgresql:")
+                || databaseUrl.startsWith("postgres://")
+                || databaseUrl.startsWith("postgresql://"));
+    }
+
     private void configureJdbc(String jdbcUrl, HikariConfig config) {
         config.setJdbcUrl(jdbcUrl);
         if (jdbcUrl.startsWith("jdbc:h2:")) {
@@ -50,6 +66,8 @@ public class DataSourceConfiguration {
             config.setDriverClassName("org.h2.Driver");
         } else if (jdbcUrl.startsWith("jdbc:postgresql:")) {
             config.setDriverClassName("org.postgresql.Driver");
+        } else {
+            throw new IllegalArgumentException("Unsupported JDBC URL; use jdbc:postgresql or local jdbc:h2");
         }
     }
 

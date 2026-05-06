@@ -41,6 +41,8 @@ git push origin v2026.05.06-1
 
 Then run the `Deploy` workflow manually from `main`.
 
+Run the manual `UI Smoke` workflow before release when the branch changed dashboard navigation, CSV import, settings, or API response shape. It is kept out of normal CI so day-to-day PRs do not pay the browser-test cost.
+
 ## Hotfix
 
 ```powershell

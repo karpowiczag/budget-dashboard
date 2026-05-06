@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.ByteArrayInputStream;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +23,7 @@ class BankCsvReaderTest {
 
         assertThat(input.year()).isEqualTo(2026);
         assertThat(input.transactions()).hasSize(1);
-        assertThat(input.transactions().getFirst().amount()).isEqualTo(-123.45);
+        assertThat(input.transactions().getFirst().amount()).isEqualByComparingTo(BigDecimal.valueOf(-123.45));
     }
 
     @Test

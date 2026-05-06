@@ -209,16 +209,20 @@ export default function App() {
 
   async function handleSaveSettings() {
     const base = settingsDraft || budgetSettings || {};
+    const categoryLimits = Object.entries(customLimits).map(([category, limit]) => {
+      const row = model.planRows.find((item) => item.category === category);
+      return {
+        category,
+        limit: Number(limit || 0),
+        action: row?.action || "",
+      };
+    });
     const payload = {
       targetMonthlySpend: Number(base.targetMonthlySpend || data.savingsPlan.targetMonthlySpend),
       aggressiveMonthlySpend: Number(base.aggressiveMonthlySpend || data.savingsPlan.aggressiveMonthlySpend),
       emergencyFundMinMonths: Number(base.emergencyFundMinMonths || 3),
       emergencyFundComfortMonths: Number(base.emergencyFundComfortMonths || 6),
-      categoryLimits: model.planRows.map((row) => ({
-        category: row.category,
-        limit: Number(row.limit || 0),
-        action: row.action || "",
-      })),
+      categoryLimits,
     };
     try {
       setSettingsDraft(await saveBudgetSettings(payload));

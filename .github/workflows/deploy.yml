@@ -53,10 +53,14 @@ jobs:
           KOYEB_APP: ${{ secrets.KOYEB_APP }}
           KOYEB_SERVICE: ${{ secrets.KOYEB_SERVICE }}
           KOYEB_PUBLIC_URL: ${{ secrets.KOYEB_PUBLIC_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          APP_ALLOWED_GOOGLE_EMAIL: ${{ secrets.APP_ALLOWED_GOOGLE_EMAIL }}
         run: |
           set -euo pipefail
           missing=0
-          for name in KOYEB_TOKEN KOYEB_APP KOYEB_SERVICE KOYEB_PUBLIC_URL; do
+          for name in KOYEB_TOKEN KOYEB_APP KOYEB_SERVICE KOYEB_PUBLIC_URL DATABASE_URL GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET APP_ALLOWED_GOOGLE_EMAIL; do
             if [ -z "${!name:-}" ]; then
               echo "::error::$name is required for a release deployment"
               missing=1
@@ -90,6 +94,10 @@ jobs:
           KOYEB_APP: ${{ secrets.KOYEB_APP }}
           KOYEB_SERVICE: ${{ secrets.KOYEB_SERVICE }}
           KOYEB_GHCR_SECRET: ${{ secrets.KOYEB_GHCR_SECRET }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          APP_ALLOWED_GOOGLE_EMAIL: ${{ secrets.APP_ALLOWED_GOOGLE_EMAIL }}
           IMAGE: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
         run: |
           set -euo pipefail
@@ -101,6 +109,11 @@ jobs:
             --checks "8080:http:/actuator/health"
             --env "PORT=8080"
             --env "SPRING_PROFILES_ACTIVE=prod"
+            --env "DATABASE_URL=$DATABASE_URL"
+            --env "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID"
+            --env "GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET"
+            --env "APP_ALLOWED_GOOGLE_EMAIL=$APP_ALLOWED_GOOGLE_EMAIL"
+            --env "APP_LOCAL_REBUILD_ENABLED=false"
           )
 
           if [ -n "$KOYEB_GHCR_SECRET" ]; then

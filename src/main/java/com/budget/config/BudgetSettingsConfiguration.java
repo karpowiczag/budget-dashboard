@@ -1,7 +1,6 @@
 package com.budget.config;
 
 import com.budget.application.settings.BudgetSettingsDefaults;
-import java.math.BigDecimal;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -11,8 +10,8 @@ public class BudgetSettingsConfiguration {
     BudgetSettingsDefaults budgetSettingsDefaults(BudgetProperties properties) {
         var settings = properties.budgetSettings();
         return new BudgetSettingsDefaults(
-                BigDecimal.valueOf(settings.targetMonthlySpend()),
-                BigDecimal.valueOf(settings.aggressiveMonthlySpend()),
+                settings.targetMonthlySpend(),
+                settings.aggressiveMonthlySpend(),
                 settings.emergencyFundMinMonths(),
                 settings.emergencyFundComfortMonths()
         );

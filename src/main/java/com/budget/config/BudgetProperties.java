@@ -2,6 +2,7 @@ package com.budget.config;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
+import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
@@ -27,7 +28,7 @@ public record BudgetProperties(
         if (database == null) database = new Database("");
         if (upload == null) upload = new Upload(12_582_912L);
         if (localImport == null) localImport = new LocalImport(".", true);
-        if (budgetSettings == null) budgetSettings = new BudgetSettings(14_000d, 13_000d, 3, 6);
+        if (budgetSettings == null) budgetSettings = new BudgetSettings(BigDecimal.valueOf(14_000), BigDecimal.valueOf(13_000), 3, 6);
         if (categorization == null) categorization = new Categorization(List.of());
     }
 
@@ -53,11 +54,15 @@ public record BudgetProperties(
     }
 
     public record BudgetSettings(
-            @Positive double targetMonthlySpend,
-            @Positive double aggressiveMonthlySpend,
+            @Positive BigDecimal targetMonthlySpend,
+            @Positive BigDecimal aggressiveMonthlySpend,
             @Positive int emergencyFundMinMonths,
             @Positive int emergencyFundComfortMonths
     ) {
+        public BudgetSettings {
+            if (targetMonthlySpend == null) targetMonthlySpend = BigDecimal.valueOf(14_000);
+            if (aggressiveMonthlySpend == null) aggressiveMonthlySpend = BigDecimal.valueOf(13_000);
+        }
     }
 
     public record Categorization(List<Rule> personalRules) {

@@ -16,6 +16,7 @@ com.budget
   infrastructure.csv            bank CSV reader adapter
   infrastructure.persistence.jdbc Spring Data JDBC repositories and entities
   web.controller                REST and SPA controllers
+  web.dto                       stable API DTO records and domain-to-contract mappers
   web.error                     API exception mapping
   config                        Spring Boot configuration, security, data source, and adapter beans
 ```
@@ -52,6 +53,7 @@ Current design choices:
 - `PackageBoundaryTest` enforces the package boundaries: domain cannot import outer layers, and application cannot import infrastructure, web, or config packages.
 - Frontend API access uses an Adapter-style boundary in `frontend/src/app/api`, while dashboard calculations live in pure selector functions and UI tabs are presenter components.
 - Household-specific categorization rules are configured outside public source through ignored local/prod settings.
+- REST controllers return `web.dto` contract records rather than domain/application records directly, so the `/api/v1` contract can evolve deliberately.
 
 Next refactor targets:
 

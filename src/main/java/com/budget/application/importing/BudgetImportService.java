@@ -11,9 +11,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class BudgetImportService {
@@ -24,22 +26,24 @@ public class BudgetImportService {
     private final BudgetAnalysisService analysisService;
     private final BudgetReportStore repository;
     private final ImportAuditService auditService;
+    private final TransactionTemplate transactionTemplate;
 
     public BudgetImportService(
             ImportSettings settings,
             BankTransactionReader csvReader,
             BudgetAnalysisService analysisService,
             BudgetReportStore repository,
-            ImportAuditService auditService
+            ImportAuditService auditService,
+            PlatformTransactionManager transactionManager
     ) {
         this.settings = settings;
         this.csvReader = csvReader;
         this.analysisService = analysisService;
         this.repository = repository;
         this.auditService = auditService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
-    @Transactional
     public ImportSummary importUpload(TransactionImportFile file) {
         var fileName = sanitize(file.originalFileName());
         try {
@@ -53,7 +57,6 @@ public class BudgetImportService {
         }
     }
 
-    @Transactional
     public ImportSummary rebuildLocal(Integer requestedYear) {
         if (!settings.localRebuildEnabled()) {
             throw new IllegalArgumentException("Local CSV rebuild is disabled in this environment");
@@ -69,7 +72,7 @@ public class BudgetImportService {
         for (var path : files) {
             try (var input = Files.newInputStream(path)) {
                 var year = requestedYear != null ? requestedYear : inferYearFromPath(path);
-                var result = importStream(input, path.getFileName().toString(), year);
+                var result = importStreamInTransaction(input, path.getFileName().toString(), year);
                 auditService.record(result.year(), path.toString(), "ok", "local rebuild");
                 years.add(result.year());
                 transactions += result.transactionCount();
@@ -92,8 +95,18 @@ public class BudgetImportService {
 
     private BudgetAnalysisResult importUploadStream(TransactionImportFile file, String fileName) throws IOException {
         try (var input = file.openStream()) {
-            return importStream(input, fileName, null);
+            return importStreamInTransaction(input, fileName, null);
         }
+    }
+
+    private BudgetAnalysisResult importStreamInTransaction(InputStream input, String fileName, Integer requestedYear) {
+        return Objects.requireNonNull(transactionTemplate.execute(status -> {
+            try {
+                return importStream(input, fileName, requestedYear);
+            } catch (IOException e) {
+                throw new IllegalArgumentException("Cannot read CSV: " + e.getMessage(), e);
+            }
+        }));
     }
 
     private void validateUpload(TransactionImportFile file, String fileName) {

@@ -5,7 +5,7 @@ import java.util.Optional;
 final class PositiveFlowCategoryMatcher implements CategoryRuleMatcher {
     @Override
     public Optional<CategoryDecision> match(CategoryInput input) {
-        if (input.amount() > 0) {
+        if (input.positiveAmount()) {
             return Optional.of(new CategoryDecision("Zwroty i korekty", "positive-flow-fallback", true));
         }
         return Optional.empty();

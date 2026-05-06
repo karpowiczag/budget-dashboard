@@ -112,6 +112,7 @@ paths:
           schema:
             type: integer
             minimum: 0
+            maximum: 100000
             default: 0
         - name: size
           in: query
@@ -140,10 +141,12 @@ paths:
           in: query
           schema:
             type: string
+            maxLength: 160
         - name: bucket
           in: query
           schema:
             type: string
+            maxLength: 160
         - $ref: "#/components/parameters/AreaFilter"
         - $ref: "#/components/parameters/GroupFilter"
         - $ref: "#/components/parameters/CategoryFilter"
@@ -255,21 +258,25 @@ components:
       in: query
       schema:
         type: string
+        maxLength: 160
     GroupFilter:
       name: group
       in: query
       schema:
         type: string
+        maxLength: 160
     CategoryFilter:
       name: category
       in: query
       schema:
         type: string
+        maxLength: 160
     SubcategoryFilter:
       name: subcategory
       in: query
       schema:
         type: string
+        maxLength: 160
   responses:
     Problem:
       description: RFC 9457 problem detail.

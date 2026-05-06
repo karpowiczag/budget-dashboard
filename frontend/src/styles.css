@@ -716,6 +716,33 @@ footer {
   width: 100%;
 }
 
+.emergencyInputs {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.emergencyInputs label {
+  color: #64748b;
+  display: grid;
+  font-size: 11px;
+  font-weight: 800;
+  gap: 4px;
+  text-transform: uppercase;
+}
+
+.monthInput {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  color: #172033;
+  font-size: 18px;
+  font-weight: 800;
+  height: 34px;
+  padding: 0 8px;
+  width: 100%;
+}
+
 .planCards p {
   color: #64748b;
   line-height: 1.35;

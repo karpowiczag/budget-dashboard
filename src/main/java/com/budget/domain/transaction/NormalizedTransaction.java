@@ -1,5 +1,6 @@
 package com.budget.domain.transaction;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record NormalizedTransaction(
@@ -17,14 +18,14 @@ public record NormalizedTransaction(
         String budgetBucket,
         String fixedness,
         String type,
-        double amount,
-        double income,
-        double analysisSpend,
-        double discretionary,
-        double excluded,
-        double excludedOutgoing,
-        double excludedIncoming,
-        double excludedNet,
+        BigDecimal amount,
+        BigDecimal income,
+        BigDecimal analysisSpend,
+        BigDecimal discretionary,
+        BigDecimal excluded,
+        BigDecimal excludedOutgoing,
+        BigDecimal excludedIncoming,
+        BigDecimal excludedNet,
         String confidence,
         String notes,
         String matchedRule

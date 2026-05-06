@@ -16,21 +16,29 @@ public record TransactionQuery(
         String category,
         String subcategory
 ) {
+    private static final int DEFAULT_SIZE = 50;
+    private static final int MAX_SIZE = 200;
+    private static final int MAX_PAGE = 100_000;
+    private static final int MAX_FILTER_LENGTH = 160;
+
     public TransactionQuery {
         page = Math.max(0, page);
-        size = size <= 0 ? 50 : Math.min(size, 200);
+        if (page > MAX_PAGE) {
+            throw new IllegalArgumentException("page cannot be greater than " + MAX_PAGE);
+        }
+        size = size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
         sort = sanitizeSort(sort);
-        month = blankToNull(month);
-        query = blankToNull(query);
-        bucket = blankToNull(bucket);
-        area = blankToNull(area);
-        group = blankToNull(group);
-        category = blankToNull(category);
-        subcategory = blankToNull(subcategory);
+        month = trimToNull(month, "month");
+        query = trimToNull(query, "query");
+        bucket = trimToNull(bucket, "bucket");
+        area = trimToNull(area, "area");
+        group = trimToNull(group, "group");
+        category = trimToNull(category, "category");
+        subcategory = trimToNull(subcategory, "subcategory");
     }
 
-    public int offset() {
-        return page * size;
+    public long offset() {
+        return Math.multiplyExact((long) page, (long) size);
     }
 
     public String orderByClause() {
@@ -66,7 +74,14 @@ public record TransactionQuery(
         return field + "," + direction;
     }
 
-    private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value;
+    private static String trimToNull(String value, String parameterName) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        var trimmed = value.trim();
+        if (trimmed.length() > MAX_FILTER_LENGTH) {
+            throw new IllegalArgumentException(parameterName + " cannot be longer than " + MAX_FILTER_LENGTH + " characters");
+        }
+        return trimmed;
     }
 }

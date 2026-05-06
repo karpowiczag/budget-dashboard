@@ -1,6 +1,7 @@
 package com.budget.application.categorization;
 
 import com.budget.domain.category.CategoryMatch;
+import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -29,16 +30,24 @@ public class CategoryClassifier {
     }
 
     public CategoryMatch matchRule(String description) {
-        return regexMatcher.match(new CategoryInput("", description, 0))
+        return regexMatcher.match(new CategoryInput("", description, BigDecimal.ZERO))
                 .map(decision -> new CategoryMatch(decision.category(), decision.pattern()))
                 .orElseGet(CategoryMatch::none);
     }
 
     public String classify(String bankCategory, String description, double amount) {
+        return classify(bankCategory, description, BigDecimal.valueOf(amount));
+    }
+
+    public String classify(String bankCategory, String description, BigDecimal amount) {
         return classifyDecision(bankCategory, description, amount).category();
     }
 
     public CategoryDecision classifyDecision(String bankCategory, String description, double amount) {
+        return classifyDecision(bankCategory, description, BigDecimal.valueOf(amount));
+    }
+
+    public CategoryDecision classifyDecision(String bankCategory, String description, BigDecimal amount) {
         var input = new CategoryInput(bankCategory, description, amount);
         return matchers.stream()
                 .map(matcher -> matcher.match(input))

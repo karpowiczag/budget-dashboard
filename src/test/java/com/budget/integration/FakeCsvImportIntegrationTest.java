@@ -140,6 +140,8 @@ class FakeCsvImportIntegrationTest {
         assertThat(getStatus("/api/v1/reports/2026/analytics", Map.of("scope", "month"))).isEqualTo(400);
         assertThat(getStatus("/api/v1/reports/2026/analytics", Map.of("scope", "day", "month", "2026-01"))).isEqualTo(400);
         assertThat(getStatus("/api/v1/reports/2026/transactions", Map.of("month", "bad"))).isEqualTo(400);
+        assertThat(getStatus("/api/v1/reports/2026/transactions", Map.of("page", "100001"))).isEqualTo(400);
+        assertThat(getStatus("/api/v1/reports/2026/transactions", Map.of("query", "x".repeat(161)))).isEqualTo(400);
         assertThat(getStatus("/api/budget/2026", Map.of())).isEqualTo(404);
     }
 
