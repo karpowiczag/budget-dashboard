@@ -80,5 +80,21 @@ class BudgetReportRepositoryTest {
             assertThat(run.year()).isEqualTo(2099);
             assertThat(run.status()).isEqualTo("ok");
         });
+
+        var replacement = analysisService.analyze(new BudgetInput(2099, "replacement.csv", List.of(
+                new BankTransaction(LocalDate.of(2099, 2, 1), "konto", "PRZELEW EXPRESS ELIXIR PRZYCH. TEST EMPLOYER WYNAGRODZENIE", "", 11_000),
+                new BankTransaction(LocalDate.of(2099, 2, 2), "konto", "LIDL ZAKUP", "Bez kategorii", -50)
+        )));
+        store.save(replacement);
+
+        var replacedDashboard = store.findDashboard(2099);
+        assertThat(replacedDashboard.kpis().transactions()).isEqualTo(2);
+        assertThat(replacedDashboard.kpis().spend()).isEqualByComparingTo(BigDecimal.valueOf(50));
+        var replacedPage = store.findTransactions(new TransactionQuery(2099, 0, 50, "postedDate,desc", null, null, null, null, null, null, null, null));
+        assertThat(replacedPage.totalItems()).isEqualTo(2);
+        assertThat(replacedPage.items()).extracting(row -> row.description()).containsExactly(
+                "LIDL ZAKUP",
+                "PRZELEW EXPRESS ELIXIR PRZYCH. TEST EMPLOYER WYNAGRODZENIE"
+        );
     }
 }

@@ -13,4 +13,7 @@ public record BudgetAnalysisResult(
         BigDecimal income,
         BigDecimal spend
 ) {
+    public BudgetAnalysisResult {
+        transactions = transactions == null ? List.of() : List.copyOf(transactions);
+    }
 }
