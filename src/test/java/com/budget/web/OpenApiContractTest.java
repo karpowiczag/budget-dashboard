@@ -34,6 +34,19 @@ class OpenApiContractTest {
             Map.entry("budgetSettings", "getBudgetSettings"),
             Map.entry("saveBudgetSettings", "updateBudgetSettings")
     );
+    private static final Map<String, String> SUCCESS_SCHEMAS = Map.ofEntries(
+            Map.entry("getSession", "SessionResponse"),
+            Map.entry("listYears", "[YearSummary]"),
+            Map.entry("getReportDashboard", "DashboardResponse"),
+            Map.entry("getReportCalendar", "CalendarResponse"),
+            Map.entry("getReportAnalytics", "AnalyticsResponse"),
+            Map.entry("listReportTransactions", "TransactionPage"),
+            Map.entry("uploadImportCsv", "ImportSummary"),
+            Map.entry("rebuildImports", "ImportSummary"),
+            Map.entry("listImportRuns", "[ImportRun]"),
+            Map.entry("getBudgetSettings", "BudgetSettings"),
+            Map.entry("updateBudgetSettings", "BudgetSettings")
+    );
 
     @Autowired
     @Qualifier("requestMappingHandlerMapping")
@@ -60,6 +73,7 @@ class OpenApiContractTest {
                     var operation = operation(openApi.getPaths().get(path), method);
                     assertThat(operation).as(path + " " + method).isNotNull();
                     assertThat(operation.getOperationId()).isEqualTo(expectedOperationId);
+                    assertSuccessSchema(operation, SUCCESS_SCHEMAS.get(expectedOperationId));
                 });
             });
         });
@@ -104,5 +118,19 @@ class OpenApiContractTest {
     private void assertArrayItemRef(Schema<?> schema, String property, String target) {
         var propertySchema = (Schema<?>) schema.getProperties().get(property);
         assertThat(propertySchema.getItems().get$ref()).isEqualTo("#/components/schemas/" + target);
+    }
+
+    private void assertSuccessSchema(io.swagger.v3.oas.models.Operation operation, String expectedSchema) {
+        assertThat(expectedSchema).as("success schema for " + operation.getOperationId()).isNotBlank();
+        var response = operation.getResponses().get("200");
+        assertThat(response).as("200 response for " + operation.getOperationId()).isNotNull();
+        var schema = response.getContent().get("application/json").getSchema();
+        if (expectedSchema.startsWith("[")) {
+            var itemSchema = expectedSchema.substring(1, expectedSchema.length() - 1);
+            assertThat(schema.getItems()).as("array items for " + operation.getOperationId()).isNotNull();
+            assertThat(schema.getItems().get$ref()).isEqualTo("#/components/schemas/" + itemSchema);
+            return;
+        }
+        assertThat(schema.get$ref()).isEqualTo("#/components/schemas/" + expectedSchema);
     }
 }

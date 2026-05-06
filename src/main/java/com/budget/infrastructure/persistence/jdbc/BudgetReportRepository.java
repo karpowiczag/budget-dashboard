@@ -30,6 +30,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class BudgetReportRepository implements BudgetReportStore {
@@ -54,6 +55,7 @@ public class BudgetReportRepository implements BudgetReportStore {
     }
 
     @Override
+    @Transactional
     public void save(BudgetAnalysisResult result) {
         reports.deleteById(result.year());
         var snapshot = result.snapshot();

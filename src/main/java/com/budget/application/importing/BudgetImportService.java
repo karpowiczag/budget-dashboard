@@ -70,17 +70,18 @@ public class BudgetImportService {
         var income = BigDecimal.ZERO;
         var spend = BigDecimal.ZERO;
         for (var path : files) {
+            var auditName = displayName(path);
+            var year = requestedYear != null ? requestedYear : inferYearFromPath(path);
             try (var input = Files.newInputStream(path)) {
-                var year = requestedYear != null ? requestedYear : inferYearFromPath(path);
                 var result = importStreamInTransaction(input, path.getFileName().toString(), year);
-                auditService.record(result.year(), path.toString(), "ok", "local rebuild");
+                auditService.record(result.year(), auditName, "ok", "local rebuild");
                 years.add(result.year());
                 transactions += result.transactionCount();
                 income = income.add(result.income());
                 spend = spend.add(result.spend());
             } catch (Exception e) {
-                auditService.record(requestedYear, path.toString(), "error", e.getMessage());
-                throw new IllegalArgumentException("Rebuild failed for " + path + ": " + e.getMessage(), e);
+                auditService.record(year, auditName, "error", e.getMessage());
+                throw new IllegalArgumentException("Rebuild failed for " + auditName + ": " + e.getMessage(), e);
             }
         }
         return new ImportSummary("ok", years, transactions, income, spend, "Local CSV rebuild completed");
@@ -176,6 +177,10 @@ public class BudgetImportService {
     private String sanitize(String fileName) {
         var value = fileName == null || fileName.isBlank() ? "upload.csv" : fileName;
         return Path.of(value).getFileName().toString();
+    }
+
+    private String displayName(Path path) {
+        return sanitize(path == null ? null : path.getFileName().toString());
     }
 
     private boolean isCsvCompatibleContentType(String contentType) {

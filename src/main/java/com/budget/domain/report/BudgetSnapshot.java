@@ -22,6 +22,17 @@ public record BudgetSnapshot(
         List<RecurringItem> recurring,
         List<LargeOneOff> largeOneoffs
 ) {
+    public BudgetSnapshot {
+        monthly = copy(monthly);
+        categories = copy(categories);
+        hierarchy = copy(hierarchy);
+        budgetMix = copy(budgetMix);
+        fixedness = copy(fixedness);
+        topMerchants = copy(topMerchants);
+        recurring = copy(recurring);
+        largeOneoffs = copy(largeOneoffs);
+    }
+
     public record Kpis(
             BigDecimal income,
             BigDecimal spend,
@@ -107,6 +118,9 @@ public record BudgetSnapshot(
             BigDecimal emergencyFundComfort,
             List<CategoryLimit> categoryLimits
     ) {
+        public SavingsPlan {
+            categoryLimits = BudgetSnapshot.copy(categoryLimits);
+        }
     }
 
     public record CategoryLimit(
@@ -138,6 +152,11 @@ public record BudgetSnapshot(
             List<Alert> alerts,
             List<SinkingFund> sinkingFunds
     ) {
+        public MonthControl {
+            categoryStatus = BudgetSnapshot.copy(categoryStatus);
+            alerts = BudgetSnapshot.copy(alerts);
+            sinkingFunds = BudgetSnapshot.copy(sinkingFunds);
+        }
     }
 
     public record CategoryStatus(
@@ -210,5 +229,9 @@ public record BudgetSnapshot(
             String confidence,
             String description
     ) {
+    }
+
+    private static <T> List<T> copy(List<T> rows) {
+        return rows == null ? List.of() : List.copyOf(rows);
     }
 }
