@@ -19,12 +19,20 @@ com.budget
   config                        Spring Boot configuration, security, data source, and adapter beans
 ```
 
-Frontend structure is intentionally shallow for now:
+Frontend follows a container/presenter split with pure selectors:
 
 ```text
-src/main.jsx      Vite/React entrypoint only
-src/app/App.jsx   dashboard application shell and current view logic
-src/styles.css    shared app styling
+src/main.jsx                Vite/React entrypoint only
+src/app/App.jsx             dashboard composition, view selection, and local UI state
+src/app/api                 browser API adapters and CSRF handling
+src/app/domain              pure formatters, chart constants, and budget selectors
+src/app/hooks               data-loading and dashboard view-model hooks
+src/app/components/charts   reusable Recharts wrappers
+src/app/components/layout   shell, tabs, global time filter, KPI strip, footer
+src/app/components/tables   reusable table components
+src/app/components/ui       small UI primitives
+src/app/views               one component per dashboard tab
+src/styles.css              shared app styling
 ```
 
 Current design choices:
@@ -40,9 +48,10 @@ Current design choices:
 - OAuth sessions use cookie-backed CSRF protection for state-changing browser requests.
 - `KnownCsvEndToEndIntegrationTest` runs against local ignored `2025/` and `2026/` CSV exports when they exist, without committing bank data or exact private totals.
 - `PackageBoundaryTest` enforces the package boundaries: domain cannot import outer layers, and application cannot import infrastructure, web, or config packages.
+- Frontend API access uses an Adapter-style boundary in `src/app/api`, while dashboard calculations live in pure selector functions and UI tabs are presenter components.
 
 Next refactor targets:
 
 - Split `BudgetAnalysisService` further into monthly, category, recurring, and recommendation analyzers.
 - Move Polish presentation labels out of `NormalizedTransaction.toPayloadMap()` into a web mapper.
-- Split `src/app/App.jsx` into React feature folders and introduce TypeScript API types.
+- Introduce TypeScript API/view-model types for the React app.
