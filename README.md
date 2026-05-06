@@ -63,8 +63,8 @@ The raw CSV upload is processed in memory and not retained. The app persists nor
 
 GitHub Actions:
 
-- `ci.yml` builds React, syncs the frontend into Spring static resources, and runs Java tests.
-- `deploy.yml` builds the GraalVM native binary, packages a minimal Docker image, pushes it to GHCR, and creates or updates Koyeb when `KOYEB_TOKEN`, `KOYEB_APP`, and `KOYEB_SERVICE` are configured.
+- `ci.yml` builds React, syncs the frontend into Spring static resources, and runs Java tests for application-code changes only. It cancels older in-progress runs on the same branch.
+- `deploy.yml` is manual-only because the GraalVM native build is expensive. It builds the native binary, packages a minimal Docker image, pushes it to GHCR, and creates or updates Koyeb when `KOYEB_TOKEN`, `KOYEB_APP`, and `KOYEB_SERVICE` are configured.
 
 For private GHCR images, create a Koyeb private-registry secret and expose its name to GitHub Actions as `KOYEB_GHCR_SECRET`. Production database and OAuth values should be configured directly in Koyeb secrets/environment variables.
 

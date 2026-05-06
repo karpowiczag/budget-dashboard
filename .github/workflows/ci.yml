@@ -1,9 +1,30 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
+    paths:
+      - '.github/workflows/ci.yml'
+      - 'pom.xml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/**'
+      - 'src/**'
+      - 'index.html'
   push:
     branches: [main]
+    paths:
+      - '.github/workflows/ci.yml'
+      - 'pom.xml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/**'
+      - 'src/**'
+      - 'index.html'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
