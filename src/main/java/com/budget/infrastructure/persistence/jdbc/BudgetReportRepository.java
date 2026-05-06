@@ -606,8 +606,6 @@ public class BudgetReportRepository implements BudgetReportStore {
             sql.append(" LIMIT :limit OFFSET :offset");
             params.addValue("limit", query.size());
             params.addValue("offset", query.offset());
-        } else {
-            sql.append(" LIMIT 10000");
         }
         return query(sql.toString(), params, this::mapTransaction);
     }

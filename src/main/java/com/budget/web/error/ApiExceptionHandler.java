@@ -2,6 +2,7 @@ package com.budget.web.error;
 
 import com.budget.application.reporting.ReportNotFoundException;
 import jakarta.validation.ConstraintViolationException;
+import java.time.DateTimeException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler({
             IllegalArgumentException.class,
+            DateTimeException.class,
             ConstraintViolationException.class,
             MethodArgumentNotValidException.class,
             MethodArgumentTypeMismatchException.class,

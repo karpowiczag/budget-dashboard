@@ -43,6 +43,9 @@ public class BudgetImportService {
         if (!fileName.toLowerCase().endsWith(".csv")) {
             throw new IllegalArgumentException("Only CSV files are accepted");
         }
+        if (!isCsvCompatibleContentType(file.contentType())) {
+            throw new IllegalArgumentException("Only CSV-compatible content types are accepted");
+        }
         try (var input = file.openStream()) {
             var result = importStream(input, fileName, null);
             repository.recordImportRun(result.year(), fileName, "ok", "uploaded and imported");
@@ -139,6 +142,16 @@ public class BudgetImportService {
     private String sanitize(String fileName) {
         var value = fileName == null || fileName.isBlank() ? "upload.csv" : fileName;
         return Path.of(value).getFileName().toString();
+    }
+
+    private boolean isCsvCompatibleContentType(String contentType) {
+        var value = contentType == null ? "" : contentType.split(";", 2)[0].trim().toLowerCase();
+        return value.isBlank()
+                || "text/csv".equals(value)
+                || "text/plain".equals(value)
+                || "application/csv".equals(value)
+                || "application/vnd.ms-excel".equals(value)
+                || "application/octet-stream".equals(value);
     }
 
 }
