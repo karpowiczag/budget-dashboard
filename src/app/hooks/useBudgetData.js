@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchBudget, fetchYears, uploadTransactions } from "../api/budgetApi.js";
+import { fetchDashboard, fetchYears, uploadTransactions } from "../api/budgetApi.js";
 
 export function useBudgetData() {
   const [years, setYears] = useState([]);
@@ -34,7 +34,7 @@ export function useBudgetData() {
     if (!year) return undefined;
     let cancelled = false;
     setStatus("loading");
-    fetchBudget(year)
+    fetchDashboard(year)
       .then((payload) => {
         if (!cancelled) {
           setData(payload);
@@ -61,7 +61,7 @@ export function useBudgetData() {
       setImportStatus({ type: "success", message: `Zaimportowano ${payload.transactions} transakcji dla ${importedYear}.` });
       if (importedYear) {
         setYear(String(importedYear));
-        setData(await fetchBudget(importedYear));
+        setData(await fetchDashboard(importedYear));
         setStatus("ready");
       }
     } catch (error) {

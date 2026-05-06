@@ -69,11 +69,11 @@ export function RecurringView({ monthControl, oneoffs, recurring, recurringCalen
             </thead>
             <tbody>
               {oneoffs.map((row) => (
-                <tr key={`${row.date || row.Data}-${row.merchant || row.Sprzedawca}-${row.amount || row.Lp}`}>
-                  <td>{row.date || row.Data}</td>
+                <tr key={`${row.date || row.postedDate || row.Data}-${row.merchant || row.Sprzedawca}-${row.amount || row.spend || row.id}`}>
+                  <td>{row.date || row.postedDate || row.Data}</td>
                   <td>{row.merchant || row.Sprzedawca}</td>
-                  <td>{row.category || row["Kategoria skorygowana"]}</td>
-                  <td className="num">{money(row.amount || row["Wydatek analizy"])}</td>
+                  <td>{row.category || row.correctedCategory || row["Kategoria skorygowana"]}</td>
+                  <td className="num">{money(row.amount || row.spend || row["Wydatek analizy"])}</td>
                 </tr>
               ))}
             </tbody>

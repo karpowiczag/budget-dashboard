@@ -3,7 +3,9 @@ package com.budget.application.analysis;
 import com.budget.application.categorization.CategoryClassifier;
 import com.budget.domain.report.BudgetAnalysisResult;
 import com.budget.domain.report.BudgetInput;
+import com.budget.domain.report.BudgetSnapshot;
 import com.budget.domain.transaction.NormalizedTransaction;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -22,20 +24,20 @@ import org.springframework.stereotype.Service;
 public class BudgetAnalysisService {
     private static final DateTimeFormatter MONTH_LABEL = DateTimeFormatter.ofPattern("MM.yyyy");
     private static final Set<String> REAL_SAVING_CATEGORIES = Set.of("Oszczędności i inwestycje", "Nadpłata kredytu");
-    private static final Map<String, CategoryLimit> CATEGORY_LIMITS = Map.ofEntries(
-            Map.entry("Żywność i chemia", new CategoryLimit(2400, "Plan posiłków, większe zakupy z listą, mniej awaryjnych wizyt.")),
-            Map.entry("Jedzenie poza domem", new CategoryLimit(600, "Limit na restauracje, kawę i dostawy; zostawić tylko celowe wyjścia.")),
-            Map.entry("Odzież i obuwie", new CategoryLimit(800, "Limit kwartalny i lista braków zamiast zakupów impulsowych.")),
-            Map.entry("Marketplace i zakupy online", new CategoryLimit(400, "Rozbijać Allegro/Amazon/Temu po historii zamówień; limit koszyka online.")),
-            Map.entry("Podróże i wyjazdy", new CategoryLimit(1500, "Traktować jako fundusz celowy, nie zwykły koszt miesiąca.")),
-            Map.entry("Wyjścia i wydarzenia", new CategoryLimit(500, "Roczny limit biletów/eventów, decyzje przed zakupem.")),
-            Map.entry("Sport i hobby", new CategoryLimit(500, "Limit na hobby i sprzęt; większe zakupy tylko z funduszu celowego.")),
-            Map.entry("Elektronika", new CategoryLimit(300, "Tylko planowane zakupy; większe rzeczy osobny fundusz.")),
-            Map.entry("Prezenty i wsparcie", new CategoryLimit(300, "Miesięczny fundusz prezentowy, nie zakup ad hoc.")),
-            Map.entry("Zdrowie i uroda", new CategoryLimit(1400, "Oddzielić leczenie od kosmetyków/usług i ciąć tylko część uznaniową.")),
-            Map.entry("Zwierzęta", new CategoryLimit(650, "Stały fundusz na karmę/weterynarza; porównać większe opakowania.")),
-            Map.entry("Multimedia, książki i prasa", new CategoryLimit(250, "Przegląd subskrypcji i zakupów cyfrowych.")),
-            Map.entry("Dom i wyposażenie", new CategoryLimit(500, "Zakupy domowe tylko z listy; większe rzeczy jako fundusz celowy."))
+    private static final Map<String, ConfiguredCategoryLimit> CATEGORY_LIMITS = Map.ofEntries(
+            Map.entry("Żywność i chemia", new ConfiguredCategoryLimit(2400, "Plan posiłków, większe zakupy z listą, mniej awaryjnych wizyt.")),
+            Map.entry("Jedzenie poza domem", new ConfiguredCategoryLimit(600, "Limit na restauracje, kawę i dostawy; zostawić tylko celowe wyjścia.")),
+            Map.entry("Odzież i obuwie", new ConfiguredCategoryLimit(800, "Limit kwartalny i lista braków zamiast zakupów impulsowych.")),
+            Map.entry("Marketplace i zakupy online", new ConfiguredCategoryLimit(400, "Rozbijać Allegro/Amazon/Temu po historii zamówień; limit koszyka online.")),
+            Map.entry("Podróże i wyjazdy", new ConfiguredCategoryLimit(1500, "Traktować jako fundusz celowy, nie zwykły koszt miesiąca.")),
+            Map.entry("Wyjścia i wydarzenia", new ConfiguredCategoryLimit(500, "Roczny limit biletów/eventów, decyzje przed zakupem.")),
+            Map.entry("Sport i hobby", new ConfiguredCategoryLimit(500, "Limit na hobby i sprzęt; większe zakupy tylko z funduszu celowego.")),
+            Map.entry("Elektronika", new ConfiguredCategoryLimit(300, "Tylko planowane zakupy; większe rzeczy osobny fundusz.")),
+            Map.entry("Prezenty i wsparcie", new ConfiguredCategoryLimit(300, "Miesięczny fundusz prezentowy, nie zakup ad hoc.")),
+            Map.entry("Zdrowie i uroda", new ConfiguredCategoryLimit(1400, "Oddzielić leczenie od kosmetyków/usług i ciąć tylko część uznaniową.")),
+            Map.entry("Zwierzęta", new ConfiguredCategoryLimit(650, "Stały fundusz na karmę/weterynarza; porównać większe opakowania.")),
+            Map.entry("Multimedia, książki i prasa", new ConfiguredCategoryLimit(250, "Przegląd subskrypcji i zakupów cyfrowych.")),
+            Map.entry("Dom i wyposażenie", new ConfiguredCategoryLimit(500, "Zakupy domowe tylko z listy; większe rzeczy jako fundusz celowy."))
     );
 
     private final TransactionNormalizer normalizer;
@@ -57,114 +59,119 @@ public class BudgetAnalysisService {
         var months = months(input.year());
         var monthLabels = monthLabels(input.year());
         var activeMonths = months.stream().filter(month -> transactions.stream().anyMatch(tx -> tx.month().equals(month))).toList();
-        int activeMonthCount = Math.max(1, activeMonths.size());
+        var activeMonthCount = Math.max(1, activeMonths.size());
 
         var monthly = monthlyRows(transactions, months, monthLabels, periodStart, periodEnd);
         var categories = categoryRows(transactions, months, monthLabels, activeMonthCount);
         var hierarchy = hierarchyRows(transactions, activeMonthCount);
         var topMerchants = topMerchants(transactions);
 
-        double incomeTotal = sum(transactions, NormalizedTransaction::income);
-        double spendTotal = sum(transactions, NormalizedTransaction::analysisSpend);
-        double discretionaryTotal = sum(transactions, NormalizedTransaction::discretionary);
-        double excludedTotal = sum(transactions, NormalizedTransaction::excluded);
-        double excludedOutgoingTotal = sum(transactions, NormalizedTransaction::excludedOutgoing);
-        double excludedIncomingTotal = sum(transactions, NormalizedTransaction::excludedIncoming);
-        double excludedNetTotal = sum(transactions, NormalizedTransaction::excludedNet);
-        double realSavingsOut = sum(transactions.stream().filter(tx -> REAL_SAVING_CATEGORIES.contains(tx.correctedCategory())).toList(), NormalizedTransaction::excludedOutgoing);
-        double operatingSurplus = round2(incomeTotal - spendTotal);
-        double surplusRatio = incomeTotal == 0 ? 0 : operatingSurplus / incomeTotal;
-        double unassignedSurplus = round2(incomeTotal - spendTotal - realSavingsOut);
-        int corrections = (int) transactions.stream().filter(tx -> !tx.notes().isBlank()).count();
-        int lowConfidenceCount = (int) transactions.stream().filter(tx -> "Niska".equals(tx.confidence())).count();
-        int checkCount = (int) transactions.stream().filter(tx -> "Do sprawdzenia".equals(tx.correctedCategory())).count();
-        double checkAmount = round2(transactions.stream()
+        var incomeTotal = sum(transactions, NormalizedTransaction::income);
+        var spendTotal = sum(transactions, NormalizedTransaction::analysisSpend);
+        var discretionaryTotal = sum(transactions, NormalizedTransaction::discretionary);
+        var excludedTotal = sum(transactions, NormalizedTransaction::excluded);
+        var excludedOutgoingTotal = sum(transactions, NormalizedTransaction::excludedOutgoing);
+        var excludedIncomingTotal = sum(transactions, NormalizedTransaction::excludedIncoming);
+        var excludedNetTotal = sum(transactions, NormalizedTransaction::excludedNet);
+        var realSavingsOut = sum(transactions.stream()
+                .filter(tx -> REAL_SAVING_CATEGORIES.contains(tx.correctedCategory()))
+                .toList(), NormalizedTransaction::excludedOutgoing);
+        var operatingSurplus = round2(incomeTotal - spendTotal);
+        var surplusRatio = incomeTotal == 0 ? 0 : operatingSurplus / incomeTotal;
+        var unassignedSurplus = round2(incomeTotal - spendTotal - realSavingsOut);
+        var corrections = (int) transactions.stream().filter(tx -> !tx.notes().isBlank()).count();
+        var lowConfidenceCount = (int) transactions.stream().filter(tx -> "Niska".equals(tx.confidence())).count();
+        var checkCount = (int) transactions.stream().filter(tx -> "Do sprawdzenia".equals(tx.correctedCategory())).count();
+        var checkAmount = round2(transactions.stream()
                 .filter(tx -> "Do sprawdzenia".equals(tx.correctedCategory()))
                 .mapToDouble(tx -> Math.abs(tx.amount()))
                 .sum());
 
-        var budgetMixRows = budgetMixRows(transactions, incomeTotal, activeMonthCount, spendTotal, realSavingsOut, unassignedSurplus);
+        var budgetMixRows = budgetMixRows(transactions, incomeTotal, activeMonthCount, realSavingsOut, unassignedSurplus);
         var categoryPlanRows = categoryPlanRows(categories);
 
-        double avgIncome = round2(incomeTotal / activeMonthCount);
-        double avgSpend = round2(spendTotal / activeMonthCount);
-        double needsTotal = sum(transactions.stream().filter(tx -> "Potrzeby".equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
-        double mixedNeedsTotal = sum(transactions.stream().filter(tx -> "Potrzeby mieszane".equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
-        double coreMonthlyCost = round2((needsTotal + mixedNeedsTotal) / activeMonthCount);
-        double targetMonthlySpend = 14_000;
-        double aggressiveMonthlySpend = 13_000;
+        var avgIncome = round2(incomeTotal / activeMonthCount);
+        var avgSpend = round2(spendTotal / activeMonthCount);
+        var needsTotal = sum(transactions.stream().filter(tx -> "Potrzeby".equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
+        var mixedNeedsTotal = sum(transactions.stream().filter(tx -> "Potrzeby mieszane".equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
+        var coreMonthlyCost = round2((needsTotal + mixedNeedsTotal) / activeMonthCount);
+        var targetMonthlySpend = 14_000d;
+        var aggressiveMonthlySpend = 13_000d;
         var latestMonthKey = activeMonths.getLast();
         var monthControl = monthControl(latestMonthKey, transactions, categoryPlanRows, targetMonthlySpend, periodStart, periodEnd, checkAmount, checkCount, categories);
 
-        var payload = new LinkedHashMap<String, Object>();
-        payload.put("year", input.year());
-        payload.put("period", periodStart + " - " + periodEnd);
-        payload.put("activeMonths", activeMonthCount);
-        payload.put("kpis", mapOf(
-                "income", incomeTotal,
-                "spend", spendTotal,
-                "discretionary", discretionaryTotal,
-                "operatingSurplus", operatingSurplus,
-                "savingsRate", surplusRatio,
-                "excludedGross", excludedTotal,
-                "excludedOutgoing", excludedOutgoingTotal,
-                "excludedIncoming", excludedIncomingTotal,
-                "excludedNet", excludedNetTotal,
-                "realSavingsOutgoing", realSavingsOut,
-                "unassignedSurplus", unassignedSurplus,
-                "transactions", transactions.size(),
-                "corrections", corrections,
-                "lowConfidence", lowConfidenceCount,
-                "toCheck", checkCount,
-                "toCheckAmount", checkAmount
-        ));
-        payload.put("monthly", monthly);
-        payload.put("categories", categories.stream().map(CategoryRow::toMap).toList());
-        payload.put("hierarchy", hierarchy);
-        payload.put("budgetMix", budgetMixRows);
-        payload.put("savingsPlan", mapOf(
-                "currentMonthlySpend", avgSpend,
-                "currentMonthlyIncome", avgIncome,
-                "coreMonthlyCost", coreMonthlyCost,
-                "targetMonthlySpend", targetMonthlySpend,
-                "aggressiveMonthlySpend", aggressiveMonthlySpend,
-                "targetInvestmentTransfer", round2(Math.max(0, avgIncome - targetMonthlySpend)),
-                "aggressiveInvestmentTransfer", round2(Math.max(0, avgIncome - aggressiveMonthlySpend)),
-                "monthlyCutNeeded", round2(Math.max(0, avgSpend - targetMonthlySpend)),
-                "emergencyFundMin", round2(coreMonthlyCost * 3),
-                "emergencyFundComfort", round2(coreMonthlyCost * 6),
-                "categoryLimits", categoryPlanRows
-        ));
-        payload.put("monthControl", monthControl.toMap());
-        payload.put("fixedness", fixednessRows(transactions, activeMonthCount));
-        payload.put("topMerchants", topMerchants);
-        payload.put("recurring", recurringRows(transactions, activeMonthCount));
-        payload.put("largeOneoffs", largeOneoffs(transactions));
-        payload.put("transactions", transactions.stream().map(NormalizedTransaction::toPayloadMap).toList());
+        var snapshot = new BudgetSnapshot(
+                input.year(),
+                periodStart + " - " + periodEnd,
+                periodStart,
+                periodEnd,
+                activeMonthCount,
+                new BudgetSnapshot.Kpis(
+                        money(incomeTotal),
+                        money(spendTotal),
+                        money(discretionaryTotal),
+                        money(operatingSurplus),
+                        ratio(surplusRatio),
+                        money(excludedTotal),
+                        money(excludedOutgoingTotal),
+                        money(excludedIncomingTotal),
+                        money(excludedNetTotal),
+                        money(realSavingsOut),
+                        money(unassignedSurplus),
+                        transactions.size(),
+                        corrections,
+                        lowConfidenceCount,
+                        checkCount,
+                        money(checkAmount)
+                ),
+                monthly,
+                categories.stream().map(CategoryRow::toSnapshot).toList(),
+                hierarchy,
+                budgetMixRows,
+                new BudgetSnapshot.SavingsPlan(
+                        money(avgSpend),
+                        money(avgIncome),
+                        money(coreMonthlyCost),
+                        money(targetMonthlySpend),
+                        money(aggressiveMonthlySpend),
+                        money(Math.max(0, avgIncome - targetMonthlySpend)),
+                        money(Math.max(0, avgIncome - aggressiveMonthlySpend)),
+                        money(Math.max(0, avgSpend - targetMonthlySpend)),
+                        money(coreMonthlyCost * 3),
+                        money(coreMonthlyCost * 6),
+                        categoryPlanRows
+                ),
+                monthControl,
+                fixednessRows(transactions, activeMonthCount),
+                topMerchants,
+                recurringRows(transactions, activeMonthCount),
+                largeOneoffs(transactions)
+        );
 
-        return new BudgetAnalysisResult(input.year(), input.fileName(), payload, transactions, transactions.size(), incomeTotal, spendTotal);
+        return new BudgetAnalysisResult(input.year(), input.fileName(), snapshot, transactions, transactions.size(), money(incomeTotal), money(spendTotal));
     }
 
-    private List<Map<String, Object>> monthlyRows(List<NormalizedTransaction> transactions, List<String> months, List<String> labels, LocalDate periodStart, LocalDate periodEnd) {
-        var rows = new ArrayList<Map<String, Object>>();
-        for (int i = 0; i < months.size(); i++) {
+    private List<BudgetSnapshot.MonthlySummary> monthlyRows(List<NormalizedTransaction> transactions, List<String> months, List<String> labels, LocalDate periodStart, LocalDate periodEnd) {
+        var rows = new ArrayList<BudgetSnapshot.MonthlySummary>();
+        for (var i = 0; i < months.size(); i++) {
             var month = months.get(i);
             var items = transactions.stream().filter(tx -> tx.month().equals(month)).toList();
-            double income = sum(items, NormalizedTransaction::income);
-            double spend = sum(items, NormalizedTransaction::analysisSpend);
-            double excluded = sum(items, NormalizedTransaction::excluded);
-            double savings = sum(items.stream().filter(tx -> "Oszczędności i inwestycje".equals(tx.correctedCategory())).toList(), NormalizedTransaction::excluded);
-            rows.add(mapOf(
-                    "month", labels.get(i),
-                    "income", income,
-                    "spend", spend,
-                    "discretionary", sum(items, NormalizedTransaction::discretionary),
-                    "excluded", excluded,
-                    "savingsInvestments", savings,
-                    "netFlow", round2(income - spend),
-                    "savingsRate", income == 0 ? 0 : (income - spend) / income,
-                    "transactions", items.size(),
-                    "spendPerDay", round2(spend / analysisDays(month, periodStart, periodEnd))
+            var income = sum(items, NormalizedTransaction::income);
+            var spend = sum(items, NormalizedTransaction::analysisSpend);
+            var excluded = sum(items, NormalizedTransaction::excluded);
+            var savings = sum(items.stream().filter(tx -> "Oszczędności i inwestycje".equals(tx.correctedCategory())).toList(), NormalizedTransaction::excluded);
+            rows.add(new BudgetSnapshot.MonthlySummary(
+                    labels.get(i),
+                    month,
+                    money(income),
+                    money(spend),
+                    money(sum(items, NormalizedTransaction::discretionary)),
+                    money(excluded),
+                    money(savings),
+                    money(income - spend),
+                    ratio(income == 0 ? 0 : (income - spend) / income),
+                    items.size(),
+                    money(spend / analysisDays(month, periodStart, periodEnd))
             ));
         }
         return rows;
@@ -179,18 +186,19 @@ public class BudgetAnalysisService {
             var monthValues = months.stream()
                     .map(month -> sum(items.stream().filter(tx -> tx.month().equals(month)).toList(), NormalizedTransaction::analysisSpend))
                     .toList();
-            double maxValue = monthValues.stream().mapToDouble(Double::doubleValue).max().orElse(0);
+            var maxValue = monthValues.stream().mapToDouble(Double::doubleValue).max().orElse(0);
             var maxMonth = maxValue == 0 ? "" : labels.get(monthValues.indexOf(maxValue));
+            var spend = sum(items, NormalizedTransaction::analysisSpend);
             rows.add(new CategoryRow(
                     category,
                     classifier.group(category),
-                    sum(items, NormalizedTransaction::analysisSpend),
+                    spend,
                     sum(items, NormalizedTransaction::income),
                     sum(items, NormalizedTransaction::excluded),
-                    round2(sum(items, NormalizedTransaction::analysisSpend) / activeMonthCount),
+                    round2(spend / activeMonthCount),
                     maxMonth,
                     maxValue,
-                    classifier.isDiscretionary(category) ? "Tak" : "Nie",
+                    classifier.isDiscretionary(category),
                     items.size()
             ));
         }
@@ -198,39 +206,39 @@ public class BudgetAnalysisService {
         return rows;
     }
 
-    private List<Map<String, Object>> hierarchyRows(List<NormalizedTransaction> transactions, int activeMonthCount) {
+    private List<BudgetSnapshot.HierarchySummary> hierarchyRows(List<NormalizedTransaction> transactions, int activeMonthCount) {
         var keys = new TreeSet<String>();
         transactions.forEach(tx -> keys.add(tx.budgetArea() + "\u001F" + tx.group() + "\u001F" + tx.correctedCategory() + "\u001F" + tx.subcategory()));
-        var rows = new ArrayList<Map<String, Object>>();
+        var rows = new ArrayList<BudgetSnapshot.HierarchySummary>();
         for (var key : keys) {
             var parts = key.split("\u001F", -1);
             var items = transactions.stream()
                     .filter(tx -> tx.budgetArea().equals(parts[0]) && tx.group().equals(parts[1]) && tx.correctedCategory().equals(parts[2]) && tx.subcategory().equals(parts[3]))
                     .toList();
-            double spend = sum(items, NormalizedTransaction::analysisSpend);
-            rows.add(mapOf(
-                    "area", parts[0],
-                    "group", parts[1],
-                    "category", parts[2],
-                    "subcategory", parts[3],
-                    "spend", spend,
-                    "income", sum(items, NormalizedTransaction::income),
-                    "excluded", sum(items, NormalizedTransaction::excluded),
-                    "monthlyAverage", round2(spend / activeMonthCount),
-                    "count", items.size(),
-                    "discretionary", classifier.isDiscretionary(parts[2]) ? "Tak" : "Nie"
+            var spend = sum(items, NormalizedTransaction::analysisSpend);
+            rows.add(new BudgetSnapshot.HierarchySummary(
+                    parts[0],
+                    parts[1],
+                    parts[2],
+                    parts[3],
+                    money(spend),
+                    money(sum(items, NormalizedTransaction::income)),
+                    money(sum(items, NormalizedTransaction::excluded)),
+                    money(spend / activeMonthCount),
+                    items.size(),
+                    classifier.isDiscretionary(parts[2])
             ));
         }
         rows.sort(Comparator
-                .comparing((Map<String, Object> row) -> String.valueOf(row.get("area")))
-                .thenComparing(row -> -((Number) row.get("spend")).doubleValue())
-                .thenComparing(row -> String.valueOf(row.get("group")))
-                .thenComparing(row -> String.valueOf(row.get("category")))
-                .thenComparing(row -> String.valueOf(row.get("subcategory"))));
+                .comparing(BudgetSnapshot.HierarchySummary::area)
+                .thenComparing((BudgetSnapshot.HierarchySummary row) -> row.spend().negate())
+                .thenComparing(BudgetSnapshot.HierarchySummary::group)
+                .thenComparing(BudgetSnapshot.HierarchySummary::category)
+                .thenComparing(BudgetSnapshot.HierarchySummary::subcategory));
         return rows;
     }
 
-    private List<Map<String, Object>> topMerchants(List<NormalizedTransaction> transactions) {
+    private List<BudgetSnapshot.MerchantSummary> topMerchants(List<NormalizedTransaction> transactions) {
         var agg = new LinkedHashMap<String, MerchantAgg>();
         for (var tx : transactions) {
             if (tx.analysisSpend() <= 0) {
@@ -242,23 +250,23 @@ public class BudgetAnalysisService {
             entry.category = tx.correctedCategory();
         }
         return agg.entrySet().stream()
-                .map(entry -> mapOf(
-                        "merchant", entry.getKey(),
-                        "category", entry.getValue().category,
-                        "sum", round2(entry.getValue().sum),
-                        "count", entry.getValue().count,
-                        "average", round2(entry.getValue().sum / entry.getValue().count)
+                .map(entry -> new BudgetSnapshot.MerchantSummary(
+                        entry.getKey(),
+                        entry.getValue().category,
+                        money(entry.getValue().sum),
+                        entry.getValue().count,
+                        money(entry.getValue().sum / entry.getValue().count)
                 ))
-                .sorted(Comparator.comparingDouble((Map<String, Object> row) -> ((Number) row.get("sum")).doubleValue()).reversed())
+                .sorted(Comparator.comparing(BudgetSnapshot.MerchantSummary::sum).reversed())
                 .limit(20)
                 .toList();
     }
 
-    private List<Map<String, Object>> budgetMixRows(List<NormalizedTransaction> transactions, double incomeTotal, int activeMonthCount, double spendTotal, double realSavingsOut, double unassignedSurplus) {
-        double needs = sum(transactions.stream().filter(tx -> "Potrzeby".equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
-        double mixedNeeds = sum(transactions.stream().filter(tx -> "Potrzeby mieszane".equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
-        double wants = sum(transactions.stream().filter(tx -> Set.of("Zachcianki", "Zachcianki do rozbicia").contains(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
-        double unclear = sum(transactions.stream().filter(tx -> "Zachcianki do rozbicia".equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
+    private List<BudgetSnapshot.BudgetMixItem> budgetMixRows(List<NormalizedTransaction> transactions, double incomeTotal, int activeMonthCount, double realSavingsOut, double unassignedSurplus) {
+        var needs = sum(transactions.stream().filter(tx -> "Potrzeby".equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
+        var mixedNeeds = sum(transactions.stream().filter(tx -> "Potrzeby mieszane".equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
+        var wants = sum(transactions.stream().filter(tx -> Set.of("Zachcianki", "Zachcianki do rozbicia").contains(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
+        var unclear = sum(transactions.stream().filter(tx -> "Zachcianki do rozbicia".equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
         return List.of(
                 mixRow("Potrzeby", needs, activeMonthCount, incomeTotal, "Cel bazowy: do 50% dochodu netto"),
                 mixRow("Potrzeby mieszane", mixedNeeds, activeMonthCount, incomeTotal, "Do ręcznego rozbicia: część może być konieczna, część uznaniowa"),
@@ -269,12 +277,12 @@ public class BudgetAnalysisService {
         );
     }
 
-    private Map<String, Object> mixRow(String bucket, double sum, int activeMonthCount, double incomeTotal, String note) {
-        return mapOf("bucket", bucket, "sum", sum, "monthlyAverage", round2(sum / activeMonthCount), "incomeShare", incomeTotal == 0 ? 0 : sum / incomeTotal, "note", note);
+    private BudgetSnapshot.BudgetMixItem mixRow(String bucket, double sum, int activeMonthCount, double incomeTotal, String note) {
+        return new BudgetSnapshot.BudgetMixItem(bucket, money(sum), money(sum / activeMonthCount), ratio(incomeTotal == 0 ? 0 : sum / incomeTotal), note);
     }
 
-    private List<Map<String, Object>> categoryPlanRows(List<CategoryRow> categories) {
-        var rows = new ArrayList<Map<String, Object>>();
+    private List<BudgetSnapshot.CategoryLimit> categoryPlanRows(List<CategoryRow> categories) {
+        var rows = new ArrayList<BudgetSnapshot.CategoryLimit>();
         for (var category : categories) {
             if (category.monthlyAverage() <= 0) {
                 continue;
@@ -285,7 +293,7 @@ public class BudgetAnalysisService {
             if (configured != null) {
                 limit = configured.limit();
                 action = configured.action();
-            } else if ("Tak".equals(category.discretionary())) {
+            } else if (category.discretionary()) {
                 limit = round2(category.monthlyAverage() * 0.82);
                 action = "Ustawić limit miesięczny i opóźnić zakupy uznaniowe o 24-48 godzin.";
             } else if ("Potrzeby".equals(classifier.budgetBucket(category.category()))) {
@@ -295,69 +303,98 @@ public class BudgetAnalysisService {
                 limit = round2(category.monthlyAverage() * 0.95);
                 action = "Sprawdzić największe transakcje i powtarzalność.";
             }
-            double potential = round2(Math.max(0, category.monthlyAverage() - limit));
-            rows.add(mapOf(
-                    "category", category.category(),
-                    "bucket", classifier.budgetBucket(category.category()),
-                    "currentMonthly", category.monthlyAverage(),
-                    "limit", limit,
-                    "potentialMonthly", potential,
-                    "potentialYearly", round2(potential * 12),
-                    "priority", potential >= 500 ? "Wysoki" : potential >= 150 ? "Średni" : "Niski",
-                    "action", action
+            var potential = round2(Math.max(0, category.monthlyAverage() - limit));
+            rows.add(new BudgetSnapshot.CategoryLimit(
+                    category.category(),
+                    classifier.budgetBucket(category.category()),
+                    money(category.monthlyAverage()),
+                    money(limit),
+                    money(potential),
+                    money(potential * 12),
+                    potential >= 500 ? "Wysoki" : potential >= 150 ? "Średni" : "Niski",
+                    action
             ));
         }
-        rows.sort(Comparator.comparingDouble((Map<String, Object> row) -> ((Number) row.get("potentialMonthly")).doubleValue()).reversed());
+        rows.sort(Comparator.comparing(BudgetSnapshot.CategoryLimit::potentialMonthly).reversed());
         return rows;
     }
 
-    private MonthControl monthControl(String latestMonthKey, List<NormalizedTransaction> transactions, List<Map<String, Object>> categoryPlanRows, double targetMonthlySpend, LocalDate periodStart, LocalDate periodEnd, double checkAmount, int checkCount, List<CategoryRow> categories) {
+    private BudgetSnapshot.MonthControl monthControl(
+            String latestMonthKey,
+            List<NormalizedTransaction> transactions,
+            List<BudgetSnapshot.CategoryLimit> categoryPlanRows,
+            double targetMonthlySpend,
+            LocalDate periodStart,
+            LocalDate periodEnd,
+            double checkAmount,
+            int checkCount,
+            List<CategoryRow> categories
+    ) {
         var latest = YearMonth.parse(latestMonthKey);
-        int daysTotal = latest.lengthOfMonth();
-        int elapsedDays = analysisDays(latestMonthKey, periodStart, periodEnd);
-        int remainingDays = Math.max(0, daysTotal - elapsedDays);
+        var daysTotal = latest.lengthOfMonth();
+        var elapsedDays = analysisDays(latestMonthKey, periodStart, periodEnd);
+        var remainingDays = Math.max(0, daysTotal - elapsedDays);
         var latestItems = transactions.stream().filter(tx -> tx.month().equals(latestMonthKey)).toList();
-        double spend = sum(latestItems, NormalizedTransaction::analysisSpend);
-        double income = sum(latestItems, NormalizedTransaction::income);
-        double projection = elapsedDays == 0 ? spend : round2(spend / elapsedDays * daysTotal);
-        double remainingBudget = round2(targetMonthlySpend - spend);
-        double dailyAllowed = remainingDays == 0 ? 0 : round2(Math.max(0, remainingBudget) / remainingDays);
-        double projectedDelta = round2(targetMonthlySpend - projection);
+        var spend = sum(latestItems, NormalizedTransaction::analysisSpend);
+        var income = sum(latestItems, NormalizedTransaction::income);
+        var projection = elapsedDays == 0 ? spend : round2(spend / elapsedDays * daysTotal);
+        var remainingBudget = round2(targetMonthlySpend - spend);
+        var dailyAllowed = remainingDays == 0 ? 0 : round2(Math.max(0, remainingBudget) / remainingDays);
+        var projectedDelta = round2(targetMonthlySpend - projection);
 
-        var statuses = new ArrayList<Map<String, Object>>();
+        var statuses = new ArrayList<BudgetSnapshot.CategoryStatus>();
         for (var row : categoryPlanRows) {
-            var category = String.valueOf(row.get("category"));
-            double current = sum(latestItems.stream().filter(tx -> tx.correctedCategory().equals(category)).toList(), NormalizedTransaction::analysisSpend);
-            double projected = elapsedDays == 0 ? current : round2(current / elapsedDays * daysTotal);
-            double limit = ((Number) row.get("limit")).doubleValue();
-            var copy = new LinkedHashMap<>(row);
-            copy.put("currentMonthSpend", current);
-            copy.put("currentMonthProjection", projected);
-            copy.put("remainingThisMonth", round2(limit - current));
-            copy.put("projectedDelta", round2(limit - projected));
-            copy.put("usage", limit == 0 ? 0 : current / limit);
-            statuses.add(copy);
+            var current = sum(latestItems.stream().filter(tx -> tx.correctedCategory().equals(row.category())).toList(), NormalizedTransaction::analysisSpend);
+            var projected = elapsedDays == 0 ? current : round2(current / elapsedDays * daysTotal);
+            var limit = row.limit().doubleValue();
+            statuses.add(new BudgetSnapshot.CategoryStatus(
+                    row.category(),
+                    row.bucket(),
+                    row.currentMonthly(),
+                    row.limit(),
+                    row.potentialMonthly(),
+                    row.potentialYearly(),
+                    row.priority(),
+                    row.action(),
+                    money(current),
+                    money(projected),
+                    money(limit - current),
+                    money(limit - projected),
+                    ratio(limit == 0 ? 0 : current / limit)
+            ));
         }
 
-        var alerts = new ArrayList<Map<String, Object>>();
+        var alerts = new ArrayList<BudgetSnapshot.Alert>();
         if (projection > targetMonthlySpend) {
-            alerts.add(mapOf("type", "Ryzyko przekroczenia targetu", "severity", "Wysoki", "message", "Prognoza " + latest.format(MONTH_LABEL) + " to " + roundedPln(projection) + " zł przy celu " + roundedPln(targetMonthlySpend) + " zł."));
+            alerts.add(new BudgetSnapshot.Alert(
+                    "Ryzyko przekroczenia targetu",
+                    "Wysoki",
+                    "Prognoza " + latest.format(MONTH_LABEL) + " to " + roundedPln(projection) + " zł przy celu " + roundedPln(targetMonthlySpend) + " zł."
+            ));
         }
         statuses.stream().limit(14).forEach(row -> {
-            double projected = ((Number) row.get("currentMonthProjection")).doubleValue();
-            double limit = ((Number) row.get("limit")).doubleValue();
-            double delta = ((Number) row.get("projectedDelta")).doubleValue();
+            var projected = row.currentMonthProjection().doubleValue();
+            var limit = row.limit().doubleValue();
+            var delta = row.projectedDelta().doubleValue();
             if (projected > limit && limit > 0) {
-                alerts.add(mapOf("type", "Kategoria ponad limitem", "severity", delta > -500 ? "Średni" : "Wysoki", "message", row.get("category") + ": prognoza " + roundedPln(projected) + " zł vs limit " + roundedPln(limit) + " zł."));
+                alerts.add(new BudgetSnapshot.Alert(
+                        "Kategoria ponad limitem",
+                        delta > -500 ? "Średni" : "Wysoki",
+                        row.category() + ": prognoza " + roundedPln(projected) + " zł vs limit " + roundedPln(limit) + " zł."
+                ));
             }
         });
         if (checkAmount > 0) {
-            alerts.add(mapOf("type", "Dane do sprawdzenia", "severity", "Średni", "message", checkCount + " transakcji (" + roundedPln(checkAmount) + " zł) wymaga ręcznej decyzji."));
+            alerts.add(new BudgetSnapshot.Alert(
+                    "Dane do sprawdzenia",
+                    "Średni",
+                    checkCount + " transakcji (" + roundedPln(checkAmount) + " zł) wymaga ręcznej decyzji."
+            ));
         }
 
         var categoryAverages = new LinkedHashMap<String, Double>();
         categories.forEach(row -> categoryAverages.put(row.category(), row.monthlyAverage()));
-        var sinkingFunds = new ArrayList<Map<String, Object>>();
+        var sinkingFunds = new ArrayList<BudgetSnapshot.SinkingFund>();
         for (var entry : Map.of(
                 "Podróże i wyjazdy", "Podróże",
                 "Ubezpieczenia", "Ubezpieczenia",
@@ -366,29 +403,51 @@ public class BudgetAnalysisService {
                 "Elektronika", "Elektronika",
                 "Zdrowie i uroda", "Zdrowie/uroda"
         ).entrySet()) {
-            double avg = categoryAverages.getOrDefault(entry.getKey(), 0.0);
+            var avg = categoryAverages.getOrDefault(entry.getKey(), 0.0);
             if (avg > 0) {
-                sinkingFunds.add(mapOf("name", entry.getValue(), "category", entry.getKey(), "monthlySetAside", avg, "yearlyNeed", round2(avg * 12), "note", "Fundusz celowy na koszty nierówne w czasie."));
+                sinkingFunds.add(new BudgetSnapshot.SinkingFund(
+                        entry.getValue(),
+                        entry.getKey(),
+                        money(avg),
+                        money(avg * 12),
+                        "Fundusz celowy na koszty nierówne w czasie."
+                ));
             }
         }
 
-        return new MonthControl(latest.format(MONTH_LABEL), latestMonthKey, elapsedDays, remainingDays, daysTotal, income, spend, projection, targetMonthlySpend, remainingBudget, dailyAllowed, projectedDelta, statuses, alerts, sinkingFunds);
+        return new BudgetSnapshot.MonthControl(
+                latest.format(MONTH_LABEL),
+                latestMonthKey,
+                elapsedDays,
+                remainingDays,
+                daysTotal,
+                money(income),
+                money(spend),
+                money(projection),
+                money(targetMonthlySpend),
+                money(remainingBudget),
+                money(dailyAllowed),
+                money(projectedDelta),
+                statuses,
+                alerts,
+                sinkingFunds
+        );
     }
 
-    private List<Map<String, Object>> fixednessRows(List<NormalizedTransaction> transactions, int activeMonthCount) {
-        var rows = new ArrayList<Map<String, Object>>();
+    private List<BudgetSnapshot.FixednessSummary> fixednessRows(List<NormalizedTransaction> transactions, int activeMonthCount) {
+        var rows = new ArrayList<BudgetSnapshot.FixednessSummary>();
         for (var label : List.of("Stałe", "Zmienne konieczne", "Uznaniowe", "Oszczędności", "Transfer/wyłączone", "Do oceny")) {
             var items = transactions.stream().filter(tx -> tx.fixedness().equals(label)).toList();
-            double spend = sum(items, NormalizedTransaction::analysisSpend);
-            double excludedOutgoing = sum(items, NormalizedTransaction::excludedOutgoing);
+            var spend = sum(items, NormalizedTransaction::analysisSpend);
+            var excludedOutgoing = sum(items, NormalizedTransaction::excludedOutgoing);
             if (spend != 0 || excludedOutgoing != 0) {
-                rows.add(mapOf("type", label, "spend", spend, "excludedOutgoing", excludedOutgoing, "monthlyAverage", round2(spend / activeMonthCount), "count", items.size()));
+                rows.add(new BudgetSnapshot.FixednessSummary(label, money(spend), money(excludedOutgoing), money(spend / activeMonthCount), items.size()));
             }
         }
         return rows;
     }
 
-    private List<Map<String, Object>> recurringRows(List<NormalizedTransaction> transactions, int activeMonthCount) {
+    private List<BudgetSnapshot.RecurringItem> recurringRows(List<NormalizedTransaction> transactions, int activeMonthCount) {
         var merchantMonths = new LinkedHashMap<String, RecurringAgg>();
         for (var tx : transactions) {
             if (tx.analysisSpend() <= 0) {
@@ -402,39 +461,39 @@ public class BudgetAnalysisService {
             agg.days.add(tx.date().getDayOfMonth());
             agg.lastDate = agg.lastDate == null || tx.date().isAfter(agg.lastDate) ? tx.date() : agg.lastDate;
         }
-        int threshold = Math.max(3, Math.min(4, activeMonthCount));
+        var threshold = Math.max(3, Math.min(4, activeMonthCount));
         return merchantMonths.values().stream()
                 .filter(agg -> agg.months.size() >= threshold || (agg.amount >= 1000 && agg.months.size() >= 2))
-                .map(agg -> mapOf(
-                        "merchant", agg.merchant,
-                        "category", agg.category,
-                        "bucket", agg.bucket,
-                        "sum", round2(agg.amount),
-                        "months", agg.months.size(),
-                        "count", agg.count,
-                        "monthlyAverage", round2(agg.amount / agg.months.size()),
-                        "avgDay", Math.round((float) agg.days.stream().mapToInt(Integer::intValue).average().orElse(0)),
-                        "lastDate", agg.lastDate == null ? null : agg.lastDate.toString()
+                .map(agg -> new BudgetSnapshot.RecurringItem(
+                        agg.merchant,
+                        agg.category,
+                        agg.bucket,
+                        money(agg.amount),
+                        agg.months.size(),
+                        agg.count,
+                        money(agg.amount / agg.months.size()),
+                        Math.round((float) agg.days.stream().mapToInt(Integer::intValue).average().orElse(0)),
+                        agg.lastDate
                 ))
-                .sorted(Comparator.comparingDouble((Map<String, Object> row) -> ((Number) row.get("sum")).doubleValue()).reversed())
+                .sorted(Comparator.comparing(BudgetSnapshot.RecurringItem::sum).reversed())
                 .limit(120)
                 .toList();
     }
 
-    private List<Map<String, Object>> largeOneoffs(List<NormalizedTransaction> transactions) {
+    private List<BudgetSnapshot.LargeOneOff> largeOneoffs(List<NormalizedTransaction> transactions) {
         return transactions.stream()
                 .filter(tx -> tx.analysisSpend() >= 1000)
-                .map(tx -> mapOf(
-                        "date", tx.date().toString(),
-                        "merchant", tx.merchant(),
-                        "category", tx.correctedCategory(),
-                        "bucket", tx.budgetBucket(),
-                        "amount", tx.analysisSpend(),
-                        "month", tx.month(),
-                        "confidence", tx.confidence(),
-                        "description", tx.description().length() > 120 ? tx.description().substring(0, 120) : tx.description()
+                .map(tx -> new BudgetSnapshot.LargeOneOff(
+                        tx.date(),
+                        tx.merchant(),
+                        tx.correctedCategory(),
+                        tx.budgetBucket(),
+                        money(tx.analysisSpend()),
+                        tx.month(),
+                        tx.confidence(),
+                        tx.description().length() > 120 ? tx.description().substring(0, 120) : tx.description()
                 ))
-                .sorted(Comparator.comparingDouble((Map<String, Object> row) -> ((Number) row.get("amount")).doubleValue()).reversed())
+                .sorted(Comparator.comparing(BudgetSnapshot.LargeOneOff::amount).reversed())
                 .limit(160)
                 .toList();
     }
@@ -451,7 +510,7 @@ public class BudgetAnalysisService {
 
     private List<String> months(int year) {
         var months = new ArrayList<String>();
-        for (int month = 1; month <= 12; month++) {
+        for (var month = 1; month <= 12; month++) {
             months.add("%04d-%02d".formatted(year, month));
         }
         return months;
@@ -459,7 +518,7 @@ public class BudgetAnalysisService {
 
     private List<String> monthLabels(int year) {
         var labels = new ArrayList<String>();
-        for (int month = 1; month <= 12; month++) {
+        for (var month = 1; month <= 12; month++) {
             labels.add("%02d.%04d".formatted(month, year));
         }
         return labels;
@@ -473,35 +532,46 @@ public class BudgetAnalysisService {
         return Math.round(value * 100.0) / 100.0;
     }
 
+    private BigDecimal money(double value) {
+        return BigDecimal.valueOf(round2(value));
+    }
+
+    private BigDecimal ratio(double value) {
+        return BigDecimal.valueOf(Math.round(value * 10_000.0) / 10_000.0);
+    }
+
     private String roundedPln(double value) {
         return String.format("%,.0f", value).replace(",", " ");
     }
 
-    private Map<String, Object> mapOf(Object... values) {
-        var map = new LinkedHashMap<String, Object>();
-        for (int i = 0; i < values.length; i += 2) {
-            map.put(String.valueOf(values[i]), values[i + 1]);
-        }
-        return map;
+    private record ConfiguredCategoryLimit(double limit, String action) {
     }
 
-    private record CategoryLimit(double limit, String action) {
-    }
-
-    private record CategoryRow(String category, String group, double spend, double income, double excluded, double monthlyAverage, String maxMonth, double maxAmount, String discretionary, int count) {
-        Map<String, Object> toMap() {
-            var map = new LinkedHashMap<String, Object>();
-            map.put("category", category);
-            map.put("group", group);
-            map.put("spend", spend);
-            map.put("income", income);
-            map.put("excluded", excluded);
-            map.put("monthlyAverage", monthlyAverage);
-            map.put("maxMonth", maxMonth);
-            map.put("maxAmount", maxAmount);
-            map.put("discretionary", discretionary);
-            map.put("count", count);
-            return map;
+    private record CategoryRow(
+            String category,
+            String group,
+            double spend,
+            double income,
+            double excluded,
+            double monthlyAverage,
+            String maxMonth,
+            double maxAmount,
+            boolean discretionary,
+            int count
+    ) {
+        BudgetSnapshot.CategorySummary toSnapshot() {
+            return new BudgetSnapshot.CategorySummary(
+                    category,
+                    group,
+                    BigDecimal.valueOf(spend),
+                    BigDecimal.valueOf(income),
+                    BigDecimal.valueOf(excluded),
+                    BigDecimal.valueOf(monthlyAverage),
+                    maxMonth,
+                    BigDecimal.valueOf(maxAmount),
+                    discretionary,
+                    count
+            );
         }
     }
 
@@ -529,44 +599,6 @@ public class BudgetAnalysisService {
             this.merchant = merchant;
             this.category = category;
             this.bucket = bucket;
-        }
-    }
-
-    private record MonthControl(
-            String month,
-            String monthKey,
-            int elapsedDays,
-            int remainingDays,
-            int daysInMonth,
-            double incomeToDate,
-            double spendToDate,
-            double projectedSpend,
-            double targetSpend,
-            double remainingBudget,
-            double dailyAllowed,
-            double projectedDelta,
-            List<Map<String, Object>> categoryStatus,
-            List<Map<String, Object>> alerts,
-            List<Map<String, Object>> sinkingFunds
-    ) {
-        Map<String, Object> toMap() {
-            var map = new LinkedHashMap<String, Object>();
-            map.put("month", month);
-            map.put("monthKey", monthKey);
-            map.put("elapsedDays", elapsedDays);
-            map.put("remainingDays", remainingDays);
-            map.put("daysInMonth", daysInMonth);
-            map.put("incomeToDate", incomeToDate);
-            map.put("spendToDate", spendToDate);
-            map.put("projectedSpend", projectedSpend);
-            map.put("targetSpend", targetSpend);
-            map.put("remainingBudget", remainingBudget);
-            map.put("dailyAllowed", dailyAllowed);
-            map.put("projectedDelta", projectedDelta);
-            map.put("categoryStatus", categoryStatus);
-            map.put("alerts", alerts);
-            map.put("sinkingFunds", sinkingFunds);
-            return map;
         }
     }
 }

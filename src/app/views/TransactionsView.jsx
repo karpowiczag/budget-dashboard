@@ -10,10 +10,16 @@ export function TransactionsView({
   drillFilteredTransactions,
   filteredTransactions,
   query,
+  transactionPage,
   visibleSpend,
   onBucketChange,
+  onPageChange,
   onQueryChange,
 }) {
+  const totalItems = transactionPage?.totalItems || filteredTransactions.length;
+  const page = transactionPage?.page || 0;
+  const totalPages = transactionPage?.totalPages || 0;
+
   return (
     <Panel
       title="Transakcje"
@@ -37,9 +43,9 @@ export function TransactionsView({
     >
       <div className="tableMeta">
         <span>
-          <SlidersHorizontal size={15} /> Widoczne: {filteredTransactions.length}
+          <SlidersHorizontal size={15} /> Strona: {filteredTransactions.length} z {totalItems}
         </span>
-        <span>Zakres po filtrach: {drillFilteredTransactions.length}</span>
+        <span>Zakres po filtrach: {totalItems}</span>
         <span>
           <CircleDollarSign size={15} /> Suma wydatków widocznych: {money(visibleSpend)}
         </span>
@@ -48,6 +54,13 @@ export function TransactionsView({
         </span>
       </div>
       <TransactionsTable transactions={filteredTransactions} />
+      <div className="pager">
+        <button disabled={page <= 0} onClick={() => onPageChange(page - 1)}>Poprzednia</button>
+        <span>
+          Strona {totalPages ? page + 1 : 0} / {totalPages}
+        </span>
+        <button disabled={!totalPages || page >= totalPages - 1} onClick={() => onPageChange(page + 1)}>Następna</button>
+      </div>
     </Panel>
   );
 }

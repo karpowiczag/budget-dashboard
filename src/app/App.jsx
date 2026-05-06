@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { fetchAnalytics, fetchCalendar, fetchTransactions } from "./api/budgetApi.js";
 import { DashboardFooter } from "./components/layout/DashboardFooter.jsx";
 import { DashboardHeader } from "./components/layout/DashboardHeader.jsx";
 import { DashboardTabs } from "./components/layout/DashboardTabs.jsx";
@@ -7,6 +8,7 @@ import { KpiStrip } from "./components/layout/KpiStrip.jsx";
 import { StateScreen } from "./components/ui/StateScreen.jsx";
 import { useBudgetData } from "./hooks/useBudgetData.js";
 import { useDashboardModel } from "./hooks/useDashboardModel.js";
+import { monthKeyFromLabel } from "./domain/budgetSelectors.js";
 import { CategoriesView } from "./views/CategoriesView.jsx";
 import { ImportView } from "./views/ImportView.jsx";
 import { MonthControlView } from "./views/MonthControlView.jsx";
@@ -27,6 +29,10 @@ export default function App() {
   const [selectedDay, setSelectedDay] = useState("");
   const [timeScope, setTimeScope] = useState("all");
   const [drillFilter, setDrillFilter] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
+  const [calendar, setCalendar] = useState(null);
+  const [transactionPage, setTransactionPage] = useState(null);
+  const [transactionPageIndex, setTransactionPageIndex] = useState(0);
 
   useEffect(() => {
     if (!data?.monthly?.length) return;
@@ -41,7 +47,70 @@ export default function App() {
   useEffect(() => {
     setCustomLimits({});
     setDrillFilter(null);
+    setAnalytics(null);
+    setCalendar(null);
+    setTransactionPage(null);
+    setTransactionPageIndex(0);
   }, [year]);
+
+  useEffect(() => {
+    setTransactionPageIndex(0);
+  }, [year, selectedMonth, selectedDay, timeScope, drillFilter, query, bucket]);
+
+  useEffect(() => {
+    if (!data || !year || !selectedMonth) return undefined;
+    let cancelled = false;
+    const month = monthKeyFromLabel(selectedMonth);
+    fetchCalendar(year, month)
+      .then((payload) => {
+        if (!cancelled) setCalendar(payload);
+      })
+      .catch(() => {
+        if (!cancelled) setCalendar(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [data, year, selectedMonth]);
+
+  useEffect(() => {
+    if (!data || !year) return undefined;
+    let cancelled = false;
+    const filters = apiFilters({ timeScope, selectedMonth, selectedDay, drillFilter });
+    fetchAnalytics(year, filters)
+      .then((payload) => {
+        if (!cancelled) setAnalytics(payload);
+      })
+      .catch(() => {
+        if (!cancelled) setAnalytics(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [data, year, timeScope, selectedMonth, selectedDay, drillFilter]);
+
+  useEffect(() => {
+    if (!data || !year) return undefined;
+    let cancelled = false;
+    const filters = {
+      ...apiFilters({ timeScope, selectedMonth, selectedDay, drillFilter }),
+      page: transactionPageIndex,
+      size: 50,
+      sort: "postedDate,desc",
+      query,
+      bucket,
+    };
+    fetchTransactions(year, filters)
+      .then((payload) => {
+        if (!cancelled) setTransactionPage(payload);
+      })
+      .catch(() => {
+        if (!cancelled) setTransactionPage(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [data, year, timeScope, selectedMonth, selectedDay, drillFilter, query, bucket, transactionPageIndex]);
 
   const model = useDashboardModel({
     data,
@@ -53,6 +122,9 @@ export default function App() {
     drillFilter,
     query,
     bucket,
+    analytics,
+    calendar,
+    transactionPage,
     customLimits,
   });
 
@@ -188,8 +260,10 @@ export default function App() {
           drillFilteredTransactions={model.drillFilteredTransactions}
           filteredTransactions={model.filteredTransactions}
           query={query}
+          transactionPage={model.transactionPage}
           visibleSpend={model.visibleSpend}
           onBucketChange={setBucket}
+          onPageChange={setTransactionPageIndex}
           onQueryChange={setQuery}
         />
       )}
@@ -201,4 +275,25 @@ export default function App() {
       <DashboardFooter />
     </main>
   );
+}
+
+function apiFilters({ timeScope, selectedMonth, selectedDay, drillFilter }) {
+  const month = monthKeyFromLabel(selectedMonth);
+  const filters = {
+    scope: timeScope === "all" ? "year" : timeScope,
+  };
+  if (timeScope !== "all" && month) {
+    filters.month = month;
+  }
+  if (timeScope === "day" && month) {
+    const day = String(selectedDay || "").padStart(2, "0");
+    if (day.trim() && day !== "00") {
+      filters.date = `${month}-${day}`;
+    }
+  }
+  if (drillFilter?.type === "area") filters.area = drillFilter.value;
+  if (drillFilter?.type === "group") filters.group = drillFilter.value;
+  if (drillFilter?.type === "category") filters.category = drillFilter.value;
+  if (drillFilter?.type === "subcategory") filters.subcategory = drillFilter.value;
+  return filters;
 }

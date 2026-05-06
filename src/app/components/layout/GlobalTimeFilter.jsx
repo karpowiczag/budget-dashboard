@@ -56,7 +56,7 @@ export function GlobalTimeFilter({
                 >
                   <span>{cell.day}</span>
                   <strong>{cell.spend ? money(cell.spend) : ""}</strong>
-                  <em>{cell.transactions.length ? `${cell.transactions.length} tx` : ""}</em>
+                  <em>{cell.transactions ? `${cell.transactions} tx` : ""}</em>
                 </button>
               ),
             )}

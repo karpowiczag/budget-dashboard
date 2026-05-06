@@ -1,5 +1,6 @@
 package com.budget.infrastructure.persistence.jdbc;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
@@ -22,33 +23,48 @@ public class BudgetTransactionEntity {
     private String merchant;
     @Column("description")
     private String description;
+    @Column("account")
+    private String account;
+    @Column("bank_category")
+    private String bankCategory;
     @Column("corrected_category")
     private String correctedCategory;
+    @Column("budget_area")
+    private String budgetArea;
+    @Column("budget_group")
+    private String budgetGroup;
     @Column("subcategory")
     private String subcategory;
+    @Column("budget_bucket")
+    private String budgetBucket;
+    @Column("fixedness")
+    private String fixedness;
+    @Column("transaction_type")
+    private String transactionType;
     @Column("amount")
-    private double amount;
+    private BigDecimal amount;
+    @Column("income")
+    private BigDecimal income;
     @Column("analysis_spend")
-    private double analysisSpend;
-    @Column("payload_json")
-    private String payloadJson;
+    private BigDecimal analysisSpend;
+    @Column("discretionary")
+    private BigDecimal discretionary;
+    @Column("excluded")
+    private BigDecimal excluded;
+    @Column("excluded_outgoing")
+    private BigDecimal excludedOutgoing;
+    @Column("excluded_incoming")
+    private BigDecimal excludedIncoming;
+    @Column("excluded_net")
+    private BigDecimal excludedNet;
+    @Column("confidence")
+    private String confidence;
+    @Column("notes")
+    private String notes;
+    @Column("matched_rule")
+    private String matchedRule;
 
     public BudgetTransactionEntity() {
-    }
-
-    public BudgetTransactionEntity(Long id, int reportYear, int lp, LocalDate postedDate, String monthKey, String merchant, String description, String correctedCategory, String subcategory, double amount, double analysisSpend, String payloadJson) {
-        this.id = id;
-        this.reportYear = reportYear;
-        this.lp = lp;
-        this.postedDate = postedDate;
-        this.monthKey = monthKey;
-        this.merchant = merchant;
-        this.description = description;
-        this.correctedCategory = correctedCategory;
-        this.subcategory = subcategory;
-        this.amount = amount;
-        this.analysisSpend = analysisSpend;
-        this.payloadJson = payloadJson;
     }
 
     public Long getId() {
@@ -107,12 +123,44 @@ public class BudgetTransactionEntity {
         this.description = description;
     }
 
+    public String getAccount() {
+        return account;
+    }
+
+    public void setAccount(String account) {
+        this.account = account;
+    }
+
+    public String getBankCategory() {
+        return bankCategory;
+    }
+
+    public void setBankCategory(String bankCategory) {
+        this.bankCategory = bankCategory;
+    }
+
     public String getCorrectedCategory() {
         return correctedCategory;
     }
 
     public void setCorrectedCategory(String correctedCategory) {
         this.correctedCategory = correctedCategory;
+    }
+
+    public String getBudgetArea() {
+        return budgetArea;
+    }
+
+    public void setBudgetArea(String budgetArea) {
+        this.budgetArea = budgetArea;
+    }
+
+    public String getBudgetGroup() {
+        return budgetGroup;
+    }
+
+    public void setBudgetGroup(String budgetGroup) {
+        this.budgetGroup = budgetGroup;
     }
 
     public String getSubcategory() {
@@ -123,27 +171,115 @@ public class BudgetTransactionEntity {
         this.subcategory = subcategory;
     }
 
-    public double getAmount() {
+    public String getBudgetBucket() {
+        return budgetBucket;
+    }
+
+    public void setBudgetBucket(String budgetBucket) {
+        this.budgetBucket = budgetBucket;
+    }
+
+    public String getFixedness() {
+        return fixedness;
+    }
+
+    public void setFixedness(String fixedness) {
+        this.fixedness = fixedness;
+    }
+
+    public String getTransactionType() {
+        return transactionType;
+    }
+
+    public void setTransactionType(String transactionType) {
+        this.transactionType = transactionType;
+    }
+
+    public BigDecimal getAmount() {
         return amount;
     }
 
-    public void setAmount(double amount) {
+    public void setAmount(BigDecimal amount) {
         this.amount = amount;
     }
 
-    public double getAnalysisSpend() {
+    public BigDecimal getIncome() {
+        return income;
+    }
+
+    public void setIncome(BigDecimal income) {
+        this.income = income;
+    }
+
+    public BigDecimal getAnalysisSpend() {
         return analysisSpend;
     }
 
-    public void setAnalysisSpend(double analysisSpend) {
+    public void setAnalysisSpend(BigDecimal analysisSpend) {
         this.analysisSpend = analysisSpend;
     }
 
-    public String getPayloadJson() {
-        return payloadJson;
+    public BigDecimal getDiscretionary() {
+        return discretionary;
     }
 
-    public void setPayloadJson(String payloadJson) {
-        this.payloadJson = payloadJson;
+    public void setDiscretionary(BigDecimal discretionary) {
+        this.discretionary = discretionary;
+    }
+
+    public BigDecimal getExcluded() {
+        return excluded;
+    }
+
+    public void setExcluded(BigDecimal excluded) {
+        this.excluded = excluded;
+    }
+
+    public BigDecimal getExcludedOutgoing() {
+        return excludedOutgoing;
+    }
+
+    public void setExcludedOutgoing(BigDecimal excludedOutgoing) {
+        this.excludedOutgoing = excludedOutgoing;
+    }
+
+    public BigDecimal getExcludedIncoming() {
+        return excludedIncoming;
+    }
+
+    public void setExcludedIncoming(BigDecimal excludedIncoming) {
+        this.excludedIncoming = excludedIncoming;
+    }
+
+    public BigDecimal getExcludedNet() {
+        return excludedNet;
+    }
+
+    public void setExcludedNet(BigDecimal excludedNet) {
+        this.excludedNet = excludedNet;
+    }
+
+    public String getConfidence() {
+        return confidence;
+    }
+
+    public void setConfidence(String confidence) {
+        this.confidence = confidence;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
+    }
+
+    public String getMatchedRule() {
+        return matchedRule;
+    }
+
+    public void setMatchedRule(String matchedRule) {
+        this.matchedRule = matchedRule;
     }
 }

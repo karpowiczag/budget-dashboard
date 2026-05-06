@@ -16,7 +16,7 @@ export function DashboardHeader({ data, year, years, onYearChange }) {
             </button>
           ))}
         </div>
-        <a className="iconButton" href={`/api/budget/${year}`} title="Otwórz JSON API">
+        <a className="iconButton" href={`/api/v1/reports/${year}/dashboard`} title="Otwórz JSON API">
           <Download size={18} />
         </a>
       </div>

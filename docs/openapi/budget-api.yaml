@@ -1,0 +1,593 @@
+openapi: 3.1.0
+info:
+  title: Budget Dashboard API
+  version: 1.0.0
+  description: Contract-first API for the household budget dashboard.
+servers:
+  - url: /
+paths:
+  /api/v1/session:
+    get:
+      operationId: getSession
+      responses:
+        "200":
+          description: Current authenticated session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+  /api/v1/years:
+    get:
+      operationId: listYears
+      responses:
+        "200":
+          description: Imported report years.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/YearSummary"
+  /api/v1/reports/{year}/dashboard:
+    get:
+      operationId: getReportDashboard
+      parameters:
+        - $ref: "#/components/parameters/Year"
+      responses:
+        "200":
+          description: Snapshot dashboard without embedded transactions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardResponse"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /api/v1/reports/{year}/calendar:
+    get:
+      operationId: getReportCalendar
+      parameters:
+        - $ref: "#/components/parameters/Year"
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^\\d{4}-\\d{2}$"
+      responses:
+        "200":
+          description: Day-level month calendar.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarResponse"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /api/v1/reports/{year}/analytics:
+    get:
+      operationId: getReportAnalytics
+      parameters:
+        - $ref: "#/components/parameters/Year"
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [year, month, day]
+            default: year
+        - name: month
+          in: query
+          schema:
+            type: string
+            pattern: "^\\d{4}-\\d{2}$"
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - $ref: "#/components/parameters/AreaFilter"
+        - $ref: "#/components/parameters/GroupFilter"
+        - $ref: "#/components/parameters/CategoryFilter"
+        - $ref: "#/components/parameters/SubcategoryFilter"
+      responses:
+        "200":
+          description: Scoped analytics and drilldown aggregates.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsResponse"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /api/v1/reports/{year}/transactions:
+    get:
+      operationId: listReportTransactions
+      parameters:
+        - $ref: "#/components/parameters/Year"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: postedDate,desc
+            enum: [postedDate,desc, postedDate,asc, amount,desc, amount,asc, spend,desc, spend,asc, merchant,asc, merchant,desc, category,asc, category,desc]
+        - name: month
+          in: query
+          schema:
+            type: string
+            pattern: "^\\d{4}-\\d{2}$"
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: query
+          in: query
+          schema:
+            type: string
+        - name: bucket
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/AreaFilter"
+        - $ref: "#/components/parameters/GroupFilter"
+        - $ref: "#/components/parameters/CategoryFilter"
+        - $ref: "#/components/parameters/SubcategoryFilter"
+      responses:
+        "200":
+          description: Paginated normalized transactions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionPage"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /api/v1/imports/uploads:
+    post:
+      operationId: uploadImportCsv
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Import result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportSummary"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/imports/rebuild:
+    post:
+      operationId: rebuildImports
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+            minimum: 2000
+            maximum: 2100
+      responses:
+        "200":
+          description: Rebuild result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportSummary"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/imports/runs:
+    get:
+      operationId: listImportRuns
+      responses:
+        "200":
+          description: Recent import audit runs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ImportRun"
+components:
+  parameters:
+    Year:
+      name: year
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 2000
+        maximum: 2100
+    AreaFilter:
+      name: area
+      in: query
+      schema:
+        type: string
+    GroupFilter:
+      name: group
+      in: query
+      schema:
+        type: string
+    CategoryFilter:
+      name: category
+      in: query
+      schema:
+        type: string
+    SubcategoryFilter:
+      name: subcategory
+      in: query
+      schema:
+        type: string
+  responses:
+    Problem:
+      description: RFC 9457 problem detail.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+  schemas:
+    Money:
+      type: number
+      multipleOf: 0.01
+    Ratio:
+      type: number
+      multipleOf: 0.0001
+    SessionResponse:
+      type: object
+      required: [authenticated, name]
+      properties:
+        authenticated:
+          type: boolean
+        name:
+          type: string
+    YearSummary:
+      type: object
+      required: [year, importedAt, transactions, income, spend]
+      properties:
+        year:
+          type: integer
+        importedAt:
+          type: string
+          format: date-time
+        transactions:
+          type: integer
+        income:
+          $ref: "#/components/schemas/Money"
+        spend:
+          $ref: "#/components/schemas/Money"
+        inputCsv:
+          type: string
+    DashboardResponse:
+      type: object
+      required: [year, period, periodStart, periodEnd, activeMonths, kpis, monthly, categories, hierarchy, budgetMix, savingsPlan, monthControl, fixedness, topMerchants, recurring, largeOneoffs]
+      properties:
+        year:
+          type: integer
+        period:
+          type: string
+        periodStart:
+          type: string
+          format: date
+        periodEnd:
+          type: string
+          format: date
+        activeMonths:
+          type: integer
+        kpis:
+          $ref: "#/components/schemas/Kpis"
+        monthly:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlySummary"
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategorySummary"
+        hierarchy:
+          type: array
+          items:
+            $ref: "#/components/schemas/HierarchySummary"
+        budgetMix:
+          type: array
+          items:
+            $ref: "#/components/schemas/BudgetMixItem"
+        savingsPlan:
+          $ref: "#/components/schemas/SavingsPlan"
+        monthControl:
+          type: object
+        fixedness:
+          type: array
+          items:
+            type: object
+        topMerchants:
+          type: array
+          items:
+            type: object
+        recurring:
+          type: array
+          items:
+            type: object
+        largeOneoffs:
+          type: array
+          items:
+            type: object
+    Kpis:
+      type: object
+      properties:
+        income:
+          $ref: "#/components/schemas/Money"
+        spend:
+          $ref: "#/components/schemas/Money"
+        savingsRate:
+          $ref: "#/components/schemas/Ratio"
+        transactions:
+          type: integer
+        toCheck:
+          type: integer
+        toCheckAmount:
+          $ref: "#/components/schemas/Money"
+    MonthlySummary:
+      type: object
+      properties:
+        month:
+          type: string
+        monthKey:
+          type: string
+        income:
+          $ref: "#/components/schemas/Money"
+        spend:
+          $ref: "#/components/schemas/Money"
+        transactions:
+          type: integer
+    CategorySummary:
+      type: object
+      properties:
+        category:
+          type: string
+        group:
+          type: string
+        spend:
+          $ref: "#/components/schemas/Money"
+        monthlyAverage:
+          $ref: "#/components/schemas/Money"
+        discretionary:
+          type: boolean
+        count:
+          type: integer
+    HierarchySummary:
+      type: object
+      properties:
+        area:
+          type: string
+        group:
+          type: string
+        category:
+          type: string
+        subcategory:
+          type: string
+        spend:
+          $ref: "#/components/schemas/Money"
+        count:
+          type: integer
+    BudgetMixItem:
+      type: object
+      properties:
+        bucket:
+          type: string
+        sum:
+          $ref: "#/components/schemas/Money"
+        monthlyAverage:
+          $ref: "#/components/schemas/Money"
+        incomeShare:
+          $ref: "#/components/schemas/Ratio"
+        note:
+          type: string
+    SavingsPlan:
+      type: object
+      properties:
+        currentMonthlySpend:
+          $ref: "#/components/schemas/Money"
+        currentMonthlyIncome:
+          $ref: "#/components/schemas/Money"
+        categoryLimits:
+          type: array
+          items:
+            type: object
+    CalendarResponse:
+      type: object
+      properties:
+        year:
+          type: integer
+        month:
+          type: string
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalendarDay"
+    CalendarDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        day:
+          type: integer
+        spend:
+          $ref: "#/components/schemas/Money"
+        income:
+          $ref: "#/components/schemas/Money"
+        transactions:
+          type: integer
+        biggest:
+          $ref: "#/components/schemas/Transaction"
+    AnalyticsResponse:
+      type: object
+      properties:
+        year:
+          type: integer
+        scope:
+          type: string
+        spend:
+          $ref: "#/components/schemas/Money"
+        income:
+          $ref: "#/components/schemas/Money"
+        transactionCount:
+          type: integer
+        areaTop:
+          type: array
+          items:
+            type: object
+        groupTop:
+          type: array
+          items:
+            type: object
+        categoryTop:
+          type: array
+          items:
+            type: object
+        subcategoryTop:
+          type: array
+          items:
+            type: object
+        hierarchyTop:
+          type: array
+          items:
+            type: object
+        merchants:
+          type: array
+          items:
+            type: object
+        oneoffs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+    TransactionPage:
+      type: object
+      required: [items, page, size, totalItems, totalPages, sort]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+        page:
+          type: integer
+        size:
+          type: integer
+        totalItems:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        sort:
+          type: string
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        lp:
+          type: integer
+        postedDate:
+          type: string
+          format: date
+        month:
+          type: string
+        merchant:
+          type: string
+        description:
+          type: string
+        account:
+          type: string
+        bankCategory:
+          type: string
+        correctedCategory:
+          type: string
+        area:
+          type: string
+        group:
+          type: string
+        subcategory:
+          type: string
+        bucket:
+          type: string
+        fixedness:
+          type: string
+        type:
+          type: string
+        amount:
+          $ref: "#/components/schemas/Money"
+        income:
+          $ref: "#/components/schemas/Money"
+        spend:
+          $ref: "#/components/schemas/Money"
+        confidence:
+          type: string
+        notes:
+          type: string
+        matchedRule:
+          type: string
+    ImportSummary:
+      type: object
+      properties:
+        status:
+          type: string
+        years:
+          type: array
+          items:
+            type: integer
+        transactions:
+          type: integer
+        income:
+          $ref: "#/components/schemas/Money"
+        spend:
+          $ref: "#/components/schemas/Money"
+        message:
+          type: string
+    ImportRun:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        year:
+          type: integer
+        inputCsv:
+          type: string
+        status:
+          type: string
+        message:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string

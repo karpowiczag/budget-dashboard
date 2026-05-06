@@ -17,15 +17,15 @@ export function TransactionsTable({ transactions }) {
         </thead>
         <tbody>
           {transactions.map((tx) => (
-            <tr key={tx.Lp}>
-              <td>{tx.Data}</td>
-              <td>{tx.Sprzedawca}</td>
-              <td>{tx["Kategoria skorygowana"]}</td>
-              <td>{tx.Podkategoria}</td>
-              <td>{tx["Koszyk budżetu"]}</td>
-              <td className={`num ${Number(tx.Kwota) < 0 ? "neg" : "pos"}`}>{moneyDec(tx.Kwota)}</td>
+            <tr key={tx.id || tx.lp}>
+              <td>{tx.postedDate || tx.date}</td>
+              <td>{tx.merchant}</td>
+              <td>{tx.correctedCategory || tx.category}</td>
+              <td>{tx.subcategory}</td>
+              <td>{tx.bucket}</td>
+              <td className={`num ${Number(tx.amount) < 0 ? "neg" : "pos"}`}>{moneyDec(tx.amount)}</td>
               <td>
-                <span className={`badge ${tx["Pewność kategorii"]}`}>{tx["Pewność kategorii"]}</span>
+                <span className={`badge ${tx.confidence}`}>{tx.confidence}</span>
               </td>
             </tr>
           ))}
