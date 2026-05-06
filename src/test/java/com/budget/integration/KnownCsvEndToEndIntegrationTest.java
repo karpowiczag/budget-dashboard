@@ -3,9 +3,9 @@ package com.budget.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-import com.budget.application.BudgetAnalysisService;
-import com.budget.application.BudgetReportStore;
-import com.budget.infrastructure.BankCsvReader;
+import com.budget.application.analysis.BudgetAnalysisService;
+import com.budget.application.reporting.BudgetReportStore;
+import com.budget.infrastructure.csv.BankCsvReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
