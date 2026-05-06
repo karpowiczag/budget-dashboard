@@ -4,7 +4,7 @@ These instructions apply to the whole repository.
 
 ## Project Context
 
-This is a private household budget dashboard. It imports bank CSV exports, classifies transactions, stores normalized data in PostgreSQL/H2 through Spring Data JDBC, and serves a React dashboard from Spring Boot.
+This is a household budget dashboard with public source code and private local/production data. It imports bank CSV exports, classifies transactions, stores normalized data in PostgreSQL/H2 through Spring Data JDBC, and serves a React dashboard from Spring Boot.
 
 The default branch is `develop`. Production releases flow from `develop` to `main`.
 
@@ -23,9 +23,10 @@ Use the solo GitFlow process:
 2. Create a branch named `feature/<short-name>`, `fix/<short-name>`, `refactor/<short-name>`, or `hotfix/<short-name>`.
 3. Link every PR to a GitHub issue when practical.
 4. Open PRs into `develop`, not directly into `main`.
-5. Wait for CI before merge.
-6. Squash merge feature/fix/refactor PRs and delete the branch.
-7. Release by merging `develop` into `main` and running the manual deploy workflow.
+5. Wait for CI and Codex review signals before merge.
+6. Merge only after GitHub branch protection shows required checks passing and all review conversations resolved.
+7. Squash merge feature/fix/refactor PRs and delete the branch.
+8. Release through a PR from `develop` into `main`, then run the manual deploy workflow.
 
 Do not commit directly to `develop` or `main` unless the user explicitly asks for a direct commit.
 
@@ -56,6 +57,8 @@ npm run sync:frontend
 .\mvnw.cmd test
 ```
 
+Do not merge until GitHub branch protection allows it: all required PR checks are green, every review conversation is resolved, and no current-head review requests changes. Codex should review the current head or react to the current `@codex review` request before merge.
+
 Native/GraalVM builds are expensive. Do not run `native:compile` locally or in normal CI unless the user explicitly requests a native release validation.
 
 ## Review Expectations
@@ -70,3 +73,8 @@ When reviewing a PR, focus on:
 - UI regressions for desktop dashboard workflows.
 
 If a review finds issues, fix them on the same PR branch, rerun tests, and update the PR.
+
+## Review Guidelines
+
+- Treat broad `.gitignore` exceptions that can re-enable private bank data as P1.
+- Treat merge attempts with unresolved conversations, non-green CI, or missing current Codex signal as P1 process failures.

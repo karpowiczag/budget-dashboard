@@ -21,22 +21,22 @@ git switch -c feature/category-rule
 After the change is done:
 
 ```powershell
-git switch develop
-git merge --no-ff feature/category-rule
-git branch -d feature/category-rule
-git push origin develop
+git push -u origin feature/category-rule
+gh pr create --base develop --head feature/category-rule --fill
+gh pr checks --watch
+gh pr merge --squash --delete-branch
 ```
 
 ## Release
 
 ```powershell
-git switch develop
-git pull --ff-only
+gh pr create --base main --head develop --title "Release v2026.05.06-1" --body "Release from develop."
+gh pr checks --watch
+gh pr merge --merge
 git switch main
 git pull --ff-only
-git merge --no-ff develop
 git tag v2026.05.06-1
-git push origin main develop --tags
+git push origin v2026.05.06-1
 ```
 
 Then run the `Deploy` workflow manually from `main`.
@@ -52,11 +52,16 @@ git switch -c hotfix/oauth-config
 After the fix:
 
 ```powershell
-git switch main
-git merge --no-ff hotfix/oauth-config
-git switch develop
-git merge --no-ff hotfix/oauth-config
-git push origin main develop
+git push -u origin hotfix/oauth-config
+gh pr create --base main --head hotfix/oauth-config --fill
+gh pr checks --watch
+gh pr merge --squash --delete-branch
+git switch -c fix/backport-oauth-config origin/develop
+git cherry-pick <hotfix-merge-commit>
+git push -u origin fix/backport-oauth-config
+gh pr create --base develop --head fix/backport-oauth-config --fill
+gh pr checks --watch
+gh pr merge --squash --delete-branch
 ```
 
 Run manual deploy from `main` if the hotfix must go live immediately.
