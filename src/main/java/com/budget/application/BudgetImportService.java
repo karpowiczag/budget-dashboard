@@ -35,7 +35,7 @@ public class BudgetImportService {
 
     @Transactional
     public ImportSummary importUpload(MultipartFile file) {
-        String fileName = sanitize(file.getOriginalFilename());
+        var fileName = sanitize(file.getOriginalFilename());
         if (file.isEmpty()) {
             throw new IllegalArgumentException("Upload is empty");
         }
@@ -45,8 +45,8 @@ public class BudgetImportService {
         if (!fileName.toLowerCase().endsWith(".csv")) {
             throw new IllegalArgumentException("Only CSV files are accepted");
         }
-        try (InputStream input = file.getInputStream()) {
-            BudgetAnalysisResult result = importStream(input, fileName, null);
+        try (var input = file.getInputStream()) {
+            var result = importStream(input, fileName, null);
             repository.recordImportRun(result.year(), fileName, "ok", "uploaded and imported");
             return new ImportSummary("ok", List.of(result.year()), result.transactionCount(), result.income(), result.spend(), "CSV imported; raw file was not retained");
         } catch (Exception e) {
@@ -57,18 +57,18 @@ public class BudgetImportService {
 
     @Transactional
     public ImportSummary rebuildLocal(Integer requestedYear) {
-        List<Path> files = findLocalCsvs(requestedYear);
+        var files = findLocalCsvs(requestedYear);
         if (files.isEmpty()) {
             throw new IllegalArgumentException("No local CSV files found for rebuild");
         }
-        List<Integer> years = new ArrayList<>();
+        var years = new ArrayList<Integer>();
         int transactions = 0;
         double income = 0;
         double spend = 0;
-        for (Path path : files) {
-            try (InputStream input = Files.newInputStream(path)) {
-                Integer year = requestedYear != null ? requestedYear : inferYearFromPath(path);
-                BudgetAnalysisResult result = importStream(input, path.getFileName().toString(), year);
+        for (var path : files) {
+            try (var input = Files.newInputStream(path)) {
+                var year = requestedYear != null ? requestedYear : inferYearFromPath(path);
+                var result = importStream(input, path.getFileName().toString(), year);
                 repository.recordImportRun(result.year(), path.toString(), "ok", "local rebuild");
                 years.add(result.year());
                 transactions += result.transactionCount();
@@ -83,16 +83,16 @@ public class BudgetImportService {
     }
 
     private BudgetAnalysisResult importStream(InputStream input, String fileName, Integer requestedYear) throws IOException {
-        BudgetInput budgetInput = csvReader.read(input, fileName, requestedYear);
-        BudgetAnalysisResult result = analysisService.analyze(budgetInput);
+        var budgetInput = csvReader.read(input, fileName, requestedYear);
+        var result = analysisService.analyze(budgetInput);
         repository.save(result);
         return result;
     }
 
     private List<Path> findLocalCsvs(Integer requestedYear) {
-        Path root = Path.of(properties.localImport().root());
+        var root = Path.of(properties.localImport().root());
         if (requestedYear != null) {
-            Path folder = root.resolve(String.valueOf(requestedYear));
+            var folder = root.resolve(String.valueOf(requestedYear));
             if (!Files.isDirectory(folder)) {
                 return List.of();
             }
@@ -129,8 +129,8 @@ public class BudgetImportService {
     }
 
     private Integer inferYearFromPath(Path path) {
-        for (Path part : path) {
-            String value = part.toString();
+        for (var part : path) {
+            var value = part.toString();
             if (YEAR_FOLDER.matcher(value).matches()) {
                 return Integer.parseInt(value);
             }
@@ -139,7 +139,7 @@ public class BudgetImportService {
     }
 
     private String sanitize(String fileName) {
-        String value = fileName == null || fileName.isBlank() ? "upload.csv" : fileName;
+        var value = fileName == null || fileName.isBlank() ? "upload.csv" : fileName;
         return Path.of(value).getFileName().toString();
     }
 

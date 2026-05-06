@@ -14,8 +14,8 @@ import org.springframework.util.StringUtils;
 public class DataSourceConfiguration {
     @Bean
     DataSource dataSource(BudgetProperties properties) {
-        String databaseUrl = properties.database().url();
-        HikariConfig config = new HikariConfig();
+        var databaseUrl = properties.database().url();
+        var config = new HikariConfig();
         config.setMaximumPoolSize(4);
         config.setMinimumIdle(0);
         config.setPoolName("budget-db");
@@ -32,17 +32,17 @@ public class DataSourceConfiguration {
     }
 
     private void configurePostgres(String databaseUrl, HikariConfig config) {
-        URI uri = URI.create(databaseUrl);
-        String userInfo = uri.getRawUserInfo();
-        String username = "";
-        String password = "";
+        var uri = URI.create(databaseUrl);
+        var userInfo = uri.getRawUserInfo();
+        var username = "";
+        var password = "";
         if (StringUtils.hasText(userInfo)) {
-            String[] parts = userInfo.split(":", 2);
+            var parts = userInfo.split(":", 2);
             username = decode(parts[0]);
             password = parts.length > 1 ? decode(parts[1]) : "";
         }
-        String path = uri.getPath() == null ? "" : uri.getPath();
-        String query = StringUtils.hasText(uri.getRawQuery()) ? "?" + uri.getRawQuery() : "?sslmode=require";
+        var path = uri.getPath() == null ? "" : uri.getPath();
+        var query = StringUtils.hasText(uri.getRawQuery()) ? "?" + uri.getRawQuery() : "?sslmode=require";
         if (!query.contains("sslmode=")) {
             query = query + "&sslmode=require";
         }

@@ -3,7 +3,6 @@ package com.budget.application;
 import com.budget.domain.BankTransaction;
 import com.budget.domain.BudgetAnalysisResult;
 import com.budget.domain.BudgetInput;
-import com.budget.domain.CategoryMatch;
 import com.budget.domain.NormalizedTransaction;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -48,22 +47,22 @@ public class BudgetAnalysisService {
     }
 
     public BudgetAnalysisResult analyze(BudgetInput input) {
-        List<NormalizedTransaction> transactions = normalize(input.transactions());
+        var transactions = normalize(input.transactions());
         if (transactions.isEmpty()) {
             throw new IllegalArgumentException("No transactions to analyze");
         }
 
-        LocalDate periodStart = transactions.stream().map(NormalizedTransaction::date).min(LocalDate::compareTo).orElseThrow();
-        LocalDate periodEnd = transactions.stream().map(NormalizedTransaction::date).max(LocalDate::compareTo).orElseThrow();
-        List<String> months = months(input.year());
-        List<String> monthLabels = monthLabels(input.year());
-        List<String> activeMonths = months.stream().filter(month -> transactions.stream().anyMatch(tx -> tx.month().equals(month))).toList();
+        var periodStart = transactions.stream().map(NormalizedTransaction::date).min(LocalDate::compareTo).orElseThrow();
+        var periodEnd = transactions.stream().map(NormalizedTransaction::date).max(LocalDate::compareTo).orElseThrow();
+        var months = months(input.year());
+        var monthLabels = monthLabels(input.year());
+        var activeMonths = months.stream().filter(month -> transactions.stream().anyMatch(tx -> tx.month().equals(month))).toList();
         int activeMonthCount = Math.max(1, activeMonths.size());
 
-        List<Map<String, Object>> monthly = monthlyRows(transactions, months, monthLabels, periodStart, periodEnd);
-        List<CategoryRow> categories = categoryRows(transactions, months, monthLabels, activeMonthCount);
-        List<Map<String, Object>> hierarchy = hierarchyRows(transactions, activeMonthCount);
-        List<Map<String, Object>> topMerchants = topMerchants(transactions);
+        var monthly = monthlyRows(transactions, months, monthLabels, periodStart, periodEnd);
+        var categories = categoryRows(transactions, months, monthLabels, activeMonthCount);
+        var hierarchy = hierarchyRows(transactions, activeMonthCount);
+        var topMerchants = topMerchants(transactions);
 
         double incomeTotal = sum(transactions, NormalizedTransaction::income);
         double spendTotal = sum(transactions, NormalizedTransaction::analysisSpend);
@@ -84,8 +83,8 @@ public class BudgetAnalysisService {
                 .mapToDouble(tx -> Math.abs(tx.amount()))
                 .sum());
 
-        List<Map<String, Object>> budgetMixRows = budgetMixRows(transactions, incomeTotal, activeMonthCount, spendTotal, realSavingsOut, unassignedSurplus);
-        List<Map<String, Object>> categoryPlanRows = categoryPlanRows(categories);
+        var budgetMixRows = budgetMixRows(transactions, incomeTotal, activeMonthCount, spendTotal, realSavingsOut, unassignedSurplus);
+        var categoryPlanRows = categoryPlanRows(categories);
 
         double avgIncome = round2(incomeTotal / activeMonthCount);
         double avgSpend = round2(spendTotal / activeMonthCount);
@@ -94,10 +93,10 @@ public class BudgetAnalysisService {
         double coreMonthlyCost = round2((needsTotal + mixedNeedsTotal) / activeMonthCount);
         double targetMonthlySpend = 14_000;
         double aggressiveMonthlySpend = 13_000;
-        String latestMonthKey = activeMonths.getLast();
-        MonthControl monthControl = monthControl(latestMonthKey, transactions, categoryPlanRows, targetMonthlySpend, periodStart, periodEnd, checkAmount, checkCount, categories);
+        var latestMonthKey = activeMonths.getLast();
+        var monthControl = monthControl(latestMonthKey, transactions, categoryPlanRows, targetMonthlySpend, periodStart, periodEnd, checkAmount, checkCount, categories);
 
-        Map<String, Object> payload = new LinkedHashMap<>();
+        var payload = new LinkedHashMap<String, Object>();
         payload.put("year", input.year());
         payload.put("period", periodStart + " - " + periodEnd);
         payload.put("activeMonths", activeMonthCount);
@@ -147,14 +146,14 @@ public class BudgetAnalysisService {
     }
 
     private List<NormalizedTransaction> normalize(List<BankTransaction> bankTransactions) {
-        List<NormalizedTransaction> normalized = new ArrayList<>();
+        var normalized = new ArrayList<NormalizedTransaction>();
         int lp = 1;
-        for (BankTransaction row : bankTransactions) {
+        for (var row : bankTransactions) {
             double value = row.amount();
-            String description = clean(row.description());
-            String bankCategory = clean(row.bankCategory());
-            CategoryMatch match = classifier.matchRule(description);
-            String correctedCategory = classifier.classify(bankCategory, description, value);
+            var description = clean(row.description());
+            var bankCategory = clean(row.bankCategory());
+            var match = classifier.matchRule(description);
+            var correctedCategory = classifier.classify(bankCategory, description, value);
             boolean matchedByTitle = value > 0 || match.matched();
             String confidence;
             if ("Do sprawdzenia".equals(correctedCategory) || (Math.abs(value) >= 500 && "Marketplace i zakupy online".equals(correctedCategory))) {
@@ -164,7 +163,7 @@ public class BudgetAnalysisService {
             } else {
                 confidence = "Wysoka";
             }
-            List<String> notes = new ArrayList<>();
+            var notes = new ArrayList<String>();
             if (!bankCategory.equals(correctedCategory)) {
                 notes.add("Własna kategoria z tytułu/opisu");
             }
@@ -177,7 +176,7 @@ public class BudgetAnalysisService {
             double excluded = excludedFlow ? Math.abs(value) : 0;
             double excludedOutgoing = excludedFlow && value < 0 ? -value : 0;
             double excludedIncoming = excludedFlow && value > 0 ? value : 0;
-            String month = row.date().toString().substring(0, 7);
+            var month = row.date().toString().substring(0, 7);
             normalized.add(new NormalizedTransaction(
                     lp++,
                     row.date(),
@@ -210,10 +209,10 @@ public class BudgetAnalysisService {
     }
 
     private List<Map<String, Object>> monthlyRows(List<NormalizedTransaction> transactions, List<String> months, List<String> labels, LocalDate periodStart, LocalDate periodEnd) {
-        List<Map<String, Object>> rows = new ArrayList<>();
+        var rows = new ArrayList<Map<String, Object>>();
         for (int i = 0; i < months.size(); i++) {
-            String month = months.get(i);
-            List<NormalizedTransaction> items = transactions.stream().filter(tx -> tx.month().equals(month)).toList();
+            var month = months.get(i);
+            var items = transactions.stream().filter(tx -> tx.month().equals(month)).toList();
             double income = sum(items, NormalizedTransaction::income);
             double spend = sum(items, NormalizedTransaction::analysisSpend);
             double excluded = sum(items, NormalizedTransaction::excluded);
@@ -235,16 +234,16 @@ public class BudgetAnalysisService {
     }
 
     private List<CategoryRow> categoryRows(List<NormalizedTransaction> transactions, List<String> months, List<String> labels, int activeMonthCount) {
-        Set<String> names = new TreeSet<>();
+        var names = new TreeSet<String>();
         transactions.forEach(tx -> names.add(tx.correctedCategory()));
-        List<CategoryRow> rows = new ArrayList<>();
-        for (String category : names) {
-            List<NormalizedTransaction> items = transactions.stream().filter(tx -> tx.correctedCategory().equals(category)).toList();
-            List<Double> monthValues = months.stream()
+        var rows = new ArrayList<CategoryRow>();
+        for (var category : names) {
+            var items = transactions.stream().filter(tx -> tx.correctedCategory().equals(category)).toList();
+            var monthValues = months.stream()
                     .map(month -> sum(items.stream().filter(tx -> tx.month().equals(month)).toList(), NormalizedTransaction::analysisSpend))
                     .toList();
             double maxValue = monthValues.stream().mapToDouble(Double::doubleValue).max().orElse(0);
-            String maxMonth = maxValue == 0 ? "" : labels.get(monthValues.indexOf(maxValue));
+            var maxMonth = maxValue == 0 ? "" : labels.get(monthValues.indexOf(maxValue));
             rows.add(new CategoryRow(
                     category,
                     classifier.group(category),
@@ -263,12 +262,12 @@ public class BudgetAnalysisService {
     }
 
     private List<Map<String, Object>> hierarchyRows(List<NormalizedTransaction> transactions, int activeMonthCount) {
-        Set<String> keys = new TreeSet<>();
+        var keys = new TreeSet<String>();
         transactions.forEach(tx -> keys.add(tx.budgetArea() + "\u001F" + tx.group() + "\u001F" + tx.correctedCategory() + "\u001F" + tx.subcategory()));
-        List<Map<String, Object>> rows = new ArrayList<>();
-        for (String key : keys) {
-            String[] parts = key.split("\u001F", -1);
-            List<NormalizedTransaction> items = transactions.stream()
+        var rows = new ArrayList<Map<String, Object>>();
+        for (var key : keys) {
+            var parts = key.split("\u001F", -1);
+            var items = transactions.stream()
                     .filter(tx -> tx.budgetArea().equals(parts[0]) && tx.group().equals(parts[1]) && tx.correctedCategory().equals(parts[2]) && tx.subcategory().equals(parts[3]))
                     .toList();
             double spend = sum(items, NormalizedTransaction::analysisSpend);
@@ -295,12 +294,12 @@ public class BudgetAnalysisService {
     }
 
     private List<Map<String, Object>> topMerchants(List<NormalizedTransaction> transactions) {
-        Map<String, MerchantAgg> agg = new LinkedHashMap<>();
-        for (NormalizedTransaction tx : transactions) {
+        var agg = new LinkedHashMap<String, MerchantAgg>();
+        for (var tx : transactions) {
             if (tx.analysisSpend() <= 0) {
                 continue;
             }
-            MerchantAgg entry = agg.computeIfAbsent(tx.merchant(), key -> new MerchantAgg(tx.correctedCategory()));
+            var entry = agg.computeIfAbsent(tx.merchant(), key -> new MerchantAgg(tx.correctedCategory()));
             entry.sum += tx.analysisSpend();
             entry.count++;
             entry.category = tx.correctedCategory();
@@ -338,12 +337,12 @@ public class BudgetAnalysisService {
     }
 
     private List<Map<String, Object>> categoryPlanRows(List<CategoryRow> categories) {
-        List<Map<String, Object>> rows = new ArrayList<>();
-        for (CategoryRow category : categories) {
+        var rows = new ArrayList<Map<String, Object>>();
+        for (var category : categories) {
             if (category.monthlyAverage() <= 0) {
                 continue;
             }
-            CategoryLimit configured = CATEGORY_LIMITS.get(category.category());
+            var configured = CATEGORY_LIMITS.get(category.category());
             double limit;
             String action;
             if (configured != null) {
@@ -376,11 +375,11 @@ public class BudgetAnalysisService {
     }
 
     private MonthControl monthControl(String latestMonthKey, List<NormalizedTransaction> transactions, List<Map<String, Object>> categoryPlanRows, double targetMonthlySpend, LocalDate periodStart, LocalDate periodEnd, double checkAmount, int checkCount, List<CategoryRow> categories) {
-        YearMonth latest = YearMonth.parse(latestMonthKey);
+        var latest = YearMonth.parse(latestMonthKey);
         int daysTotal = latest.lengthOfMonth();
         int elapsedDays = analysisDays(latestMonthKey, periodStart, periodEnd);
         int remainingDays = Math.max(0, daysTotal - elapsedDays);
-        List<NormalizedTransaction> latestItems = transactions.stream().filter(tx -> tx.month().equals(latestMonthKey)).toList();
+        var latestItems = transactions.stream().filter(tx -> tx.month().equals(latestMonthKey)).toList();
         double spend = sum(latestItems, NormalizedTransaction::analysisSpend);
         double income = sum(latestItems, NormalizedTransaction::income);
         double projection = elapsedDays == 0 ? spend : round2(spend / elapsedDays * daysTotal);
@@ -388,13 +387,13 @@ public class BudgetAnalysisService {
         double dailyAllowed = remainingDays == 0 ? 0 : round2(Math.max(0, remainingBudget) / remainingDays);
         double projectedDelta = round2(targetMonthlySpend - projection);
 
-        List<Map<String, Object>> statuses = new ArrayList<>();
-        for (Map<String, Object> row : categoryPlanRows) {
-            String category = String.valueOf(row.get("category"));
+        var statuses = new ArrayList<Map<String, Object>>();
+        for (var row : categoryPlanRows) {
+            var category = String.valueOf(row.get("category"));
             double current = sum(latestItems.stream().filter(tx -> tx.correctedCategory().equals(category)).toList(), NormalizedTransaction::analysisSpend);
             double projected = elapsedDays == 0 ? current : round2(current / elapsedDays * daysTotal);
             double limit = ((Number) row.get("limit")).doubleValue();
-            Map<String, Object> copy = new LinkedHashMap<>(row);
+            var copy = new LinkedHashMap<>(row);
             copy.put("currentMonthSpend", current);
             copy.put("currentMonthProjection", projected);
             copy.put("remainingThisMonth", round2(limit - current));
@@ -403,7 +402,7 @@ public class BudgetAnalysisService {
             statuses.add(copy);
         }
 
-        List<Map<String, Object>> alerts = new ArrayList<>();
+        var alerts = new ArrayList<Map<String, Object>>();
         if (projection > targetMonthlySpend) {
             alerts.add(mapOf("type", "Ryzyko przekroczenia targetu", "severity", "Wysoki", "message", "Prognoza " + latest.format(MONTH_LABEL) + " to " + roundedPln(projection) + " zł przy celu " + roundedPln(targetMonthlySpend) + " zł."));
         }
@@ -419,10 +418,10 @@ public class BudgetAnalysisService {
             alerts.add(mapOf("type", "Dane do sprawdzenia", "severity", "Średni", "message", checkCount + " transakcji (" + roundedPln(checkAmount) + " zł) wymaga ręcznej decyzji."));
         }
 
-        Map<String, Double> categoryAverages = new LinkedHashMap<>();
+        var categoryAverages = new LinkedHashMap<String, Double>();
         categories.forEach(row -> categoryAverages.put(row.category(), row.monthlyAverage()));
-        List<Map<String, Object>> sinkingFunds = new ArrayList<>();
-        for (Map.Entry<String, String> entry : Map.of(
+        var sinkingFunds = new ArrayList<Map<String, Object>>();
+        for (var entry : Map.of(
                 "Podróże i wyjazdy", "Podróże",
                 "Ubezpieczenia", "Ubezpieczenia",
                 "Zwierzęta", "Zwierzęta",
@@ -440,9 +439,9 @@ public class BudgetAnalysisService {
     }
 
     private List<Map<String, Object>> fixednessRows(List<NormalizedTransaction> transactions, int activeMonthCount) {
-        List<Map<String, Object>> rows = new ArrayList<>();
-        for (String label : List.of("Stałe", "Zmienne konieczne", "Uznaniowe", "Oszczędności", "Transfer/wyłączone", "Do oceny")) {
-            List<NormalizedTransaction> items = transactions.stream().filter(tx -> tx.fixedness().equals(label)).toList();
+        var rows = new ArrayList<Map<String, Object>>();
+        for (var label : List.of("Stałe", "Zmienne konieczne", "Uznaniowe", "Oszczędności", "Transfer/wyłączone", "Do oceny")) {
+            var items = transactions.stream().filter(tx -> tx.fixedness().equals(label)).toList();
             double spend = sum(items, NormalizedTransaction::analysisSpend);
             double excludedOutgoing = sum(items, NormalizedTransaction::excludedOutgoing);
             if (spend != 0 || excludedOutgoing != 0) {
@@ -453,13 +452,13 @@ public class BudgetAnalysisService {
     }
 
     private List<Map<String, Object>> recurringRows(List<NormalizedTransaction> transactions, int activeMonthCount) {
-        Map<String, RecurringAgg> merchantMonths = new LinkedHashMap<>();
-        for (NormalizedTransaction tx : transactions) {
+        var merchantMonths = new LinkedHashMap<String, RecurringAgg>();
+        for (var tx : transactions) {
             if (tx.analysisSpend() <= 0) {
                 continue;
             }
-            String key = tx.merchant() + "\u001F" + tx.correctedCategory();
-            RecurringAgg agg = merchantMonths.computeIfAbsent(key, ignored -> new RecurringAgg(tx.merchant(), tx.correctedCategory(), tx.budgetBucket()));
+            var key = tx.merchant() + "\u001F" + tx.correctedCategory();
+            var agg = merchantMonths.computeIfAbsent(key, ignored -> new RecurringAgg(tx.merchant(), tx.correctedCategory(), tx.budgetBucket()));
             agg.months.add(tx.month());
             agg.amount += tx.analysisSpend();
             agg.count++;
@@ -504,9 +503,9 @@ public class BudgetAnalysisService {
     }
 
     private int analysisDays(String monthKey, LocalDate periodStart, LocalDate periodEnd) {
-        YearMonth month = YearMonth.parse(monthKey);
-        LocalDate start = periodStart.isAfter(month.atDay(1)) ? periodStart : month.atDay(1);
-        LocalDate end = periodEnd.isBefore(month.atEndOfMonth()) ? periodEnd : month.atEndOfMonth();
+        var month = YearMonth.parse(monthKey);
+        var start = periodStart.isAfter(month.atDay(1)) ? periodStart : month.atDay(1);
+        var end = periodEnd.isBefore(month.atEndOfMonth()) ? periodEnd : month.atEndOfMonth();
         if (end.isBefore(start)) {
             return month.lengthOfMonth();
         }
@@ -514,7 +513,7 @@ public class BudgetAnalysisService {
     }
 
     private List<String> months(int year) {
-        List<String> months = new ArrayList<>();
+        var months = new ArrayList<String>();
         for (int month = 1; month <= 12; month++) {
             months.add("%04d-%02d".formatted(year, month));
         }
@@ -522,7 +521,7 @@ public class BudgetAnalysisService {
     }
 
     private List<String> monthLabels(int year) {
-        List<String> labels = new ArrayList<>();
+        var labels = new ArrayList<String>();
         for (int month = 1; month <= 12; month++) {
             labels.add("%02d.%04d".formatted(month, year));
         }
@@ -530,8 +529,8 @@ public class BudgetAnalysisService {
     }
 
     private String merchant(String description) {
-        String[] parts = MERCHANT_SPLIT.split(description, 2);
-        String value = parts.length > 0 && !parts[0].isBlank() ? parts[0] : description;
+        var parts = MERCHANT_SPLIT.split(description, 2);
+        var value = parts.length > 0 && !parts[0].isBlank() ? parts[0] : description;
         return value.length() > 60 ? value.substring(0, 60).trim() : value.trim();
     }
 
@@ -552,7 +551,7 @@ public class BudgetAnalysisService {
     }
 
     private Map<String, Object> mapOf(Object... values) {
-        Map<String, Object> map = new LinkedHashMap<>();
+        var map = new LinkedHashMap<String, Object>();
         for (int i = 0; i < values.length; i += 2) {
             map.put(String.valueOf(values[i]), values[i + 1]);
         }
@@ -564,7 +563,7 @@ public class BudgetAnalysisService {
 
     private record CategoryRow(String category, String group, double spend, double income, double excluded, double monthlyAverage, String maxMonth, double maxAmount, String discretionary, int count) {
         Map<String, Object> toMap() {
-            Map<String, Object> map = new LinkedHashMap<>();
+            var map = new LinkedHashMap<String, Object>();
             map.put("category", category);
             map.put("group", group);
             map.put("spend", spend);
@@ -624,7 +623,7 @@ public class BudgetAnalysisService {
             List<Map<String, Object>> sinkingFunds
     ) {
         Map<String, Object> toMap() {
-            Map<String, Object> map = new LinkedHashMap<>();
+            var map = new LinkedHashMap<String, Object>();
             map.put("month", month);
             map.put("monthKey", monthKey);
             map.put("elapsedDays", elapsedDays);

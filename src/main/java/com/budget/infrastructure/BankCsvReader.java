@@ -11,8 +11,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
@@ -22,7 +20,7 @@ public class BankCsvReader {
 
     public BudgetInput read(InputStream inputStream, String fileName, Integer requestedYear) throws IOException {
         List<String> lines;
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+        try (var reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
             lines = reader.lines().toList();
         }
         if (!lines.isEmpty() && lines.getFirst().startsWith("\uFEFF")) {
@@ -40,18 +38,18 @@ public class BankCsvReader {
             throw new IllegalArgumentException("CSV does not contain bank header '#Data operacji'");
         }
 
-        List<String> headers = parseLine(lines.get(headerIndex));
-        List<BankTransaction> transactions = new ArrayList<>();
+        var headers = parseLine(lines.get(headerIndex));
+        var transactions = new ArrayList<BankTransaction>();
         for (int i = headerIndex + 1; i < lines.size(); i++) {
-            List<String> values = parseLine(lines.get(i));
+            var values = parseLine(lines.get(i));
             if (values.size() < headers.size()) {
                 continue;
             }
-            Map<String, String> row = new LinkedHashMap<>();
+            var row = new LinkedHashMap<String, String>();
             for (int c = 0; c < headers.size(); c++) {
                 row.put(headers.get(c), values.get(c));
             }
-            String rawDate = row.getOrDefault("#Data operacji", "");
+            var rawDate = row.getOrDefault("#Data operacji", "");
             if (!rawDate.matches("\\d{4}-\\d{2}-\\d{2}")) {
                 continue;
             }
@@ -71,7 +69,7 @@ public class BankCsvReader {
     }
 
     private int inferYear(String fileName, List<BankTransaction> transactions) {
-        Matcher matcher = YEAR_IN_NAME.matcher(fileName == null ? "" : fileName);
+        var matcher = YEAR_IN_NAME.matcher(fileName == null ? "" : fileName);
         if (matcher.find()) {
             return 2000 + Integer.parseInt(matcher.group(1));
         }
@@ -79,8 +77,8 @@ public class BankCsvReader {
     }
 
     private List<String> parseLine(String line) {
-        List<String> values = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
+        var values = new ArrayList<String>();
+        var current = new StringBuilder();
         boolean quoted = false;
         for (int i = 0; i < line.length(); i++) {
             char ch = line.charAt(i);
@@ -110,7 +108,7 @@ public class BankCsvReader {
         if (raw == null || raw.isBlank()) {
             return 0;
         }
-        String normalized = raw.replace("PLN", "").replace(" ", "").replace(",", ".").trim();
+        var normalized = raw.replace("PLN", "").replace(" ", "").replace(",", ".").trim();
         return round2(Double.parseDouble(normalized));
     }
 

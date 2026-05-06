@@ -11,7 +11,7 @@ class BankCsvReaderTest {
 
     @Test
     void readsBankCsvAfterMetadataRows() throws Exception {
-        String csv = """
+        var csv = """
                 ignored;metadata
                 #Data operacji;#Rachunek;#Opis operacji;#Kategoria;#Kwota
                 2026-01-05;123;BIEDRONKA ZAKUP;Bez kategorii;-123,45 PLN

@@ -25,7 +25,7 @@ public class BudgetReportRepository {
     }
 
     public void save(BudgetAnalysisResult result) {
-        String payloadJson = toJson(result.payload());
+        var payloadJson = toJson(result.payload());
         jdbc.sql("DELETE FROM reports WHERE report_year = :year")
                 .param("year", result.year())
                 .update();
@@ -82,7 +82,7 @@ public class BudgetReportRepository {
     }
 
     public Map<String, Object> findPayload(int year) {
-        String json = jdbc.sql("SELECT payload_json FROM reports WHERE report_year = :year")
+        var json = jdbc.sql("SELECT payload_json FROM reports WHERE report_year = :year")
                 .param("year", year)
                 .query(String.class)
                 .optional()

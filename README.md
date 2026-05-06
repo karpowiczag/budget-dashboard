@@ -14,6 +14,8 @@ Private household budget dashboard for recurring bank CSV exports.
 - PostgreSQL in production, local H2 file database for development
 - GitHub OAuth in production, allowlisted to one GitHub login
 
+Java 25 usage is documented in [docs/java-25.md](docs/java-25.md).
+
 ## Local Development
 
 Install frontend dependencies:

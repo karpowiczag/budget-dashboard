@@ -9,8 +9,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class CategoryClassifier {
     public CategoryMatch matchRule(String description) {
-        String source = normalize(description).toUpperCase();
-        for (CategoryRule rule : BudgetCatalog.RULES) {
+        var source = normalize(description).toUpperCase();
+        for (var rule : BudgetCatalog.RULES) {
             if (rule.matches(source)) {
                 return new CategoryMatch(rule.category(), rule.sourcePattern());
             }
@@ -19,7 +19,7 @@ public class CategoryClassifier {
     }
 
     public String classify(String bankCategory, String description, double amount) {
-        CategoryMatch match = matchRule(description);
+        var match = matchRule(description);
         if (match.matched()) {
             return match.category();
         }
@@ -55,8 +55,8 @@ public class CategoryClassifier {
     }
 
     public String subcategory(String category, String description) {
-        String source = normalize(description).toUpperCase();
-        for (SubcategoryRule rule : subcategoryRules(category)) {
+        var source = normalize(description).toUpperCase();
+        for (var rule : subcategoryRules(category)) {
             if (rule.pattern().matcher(source).find()) {
                 return rule.label();
             }

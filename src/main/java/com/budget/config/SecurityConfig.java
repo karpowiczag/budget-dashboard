@@ -1,6 +1,5 @@
 package com.budget.config;
 
-import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -38,19 +37,19 @@ public class SecurityConfig {
 
     @Bean
     OAuth2UserService<OAuth2UserRequest, OAuth2User> githubAllowlistUserService(BudgetProperties properties) {
-        DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
+        var delegate = new DefaultOAuth2UserService();
         return request -> {
-            OAuth2User user = delegate.loadUser(request);
+            var user = delegate.loadUser(request);
             if (!"github".equals(request.getClientRegistration().getRegistrationId())) {
                 return user;
             }
-            String allowed = properties.security().allowedGithubLogin();
-            String login = String.valueOf(user.getAttributes().getOrDefault("login", ""));
+            var allowed = properties.security().allowedGithubLogin();
+            var login = String.valueOf(user.getAttributes().getOrDefault("login", ""));
             if (!StringUtils.hasText(allowed) || !allowed.equalsIgnoreCase(login)) {
-                OAuth2Error error = new OAuth2Error("access_denied", "GitHub account is not allowlisted", null);
+                var error = new OAuth2Error("access_denied", "GitHub account is not allowlisted", null);
                 throw new OAuth2AuthenticationException(error);
             }
-            Map<String, Object> attributes = user.getAttributes();
+            var attributes = user.getAttributes();
             return new DefaultOAuth2User(AuthorityUtils.createAuthorityList("ROLE_USER"), attributes, "login");
         };
     }

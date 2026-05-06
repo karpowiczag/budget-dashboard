@@ -13,7 +13,7 @@ class BudgetAnalysisServiceTest {
 
     @Test
     void buildsDashboardCompatiblePayload() {
-        BudgetInput input = new BudgetInput(2026, "fixture.csv", List.of(
+        var input = new BudgetInput(2026, "fixture.csv", List.of(
                 new BankTransaction(LocalDate.of(2026, 1, 2), "konto", "PRZELEW EXPRESS ELIXIR PRZYCH. ALEKSANDER KARPOWICZ SOFTWARE WYNAGRODZENIE", "", 18000),
                 new BankTransaction(LocalDate.of(2026, 1, 3), "konto", "BIEDRONKA ZAKUP", "Bez kategorii", -200),
                 new BankTransaction(LocalDate.of(2026, 1, 4), "konto", "RĘCZNA SPŁATA KARTY KREDYT", "", -65000)
