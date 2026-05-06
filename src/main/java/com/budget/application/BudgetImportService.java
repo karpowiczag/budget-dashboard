@@ -4,7 +4,6 @@ import com.budget.config.BudgetProperties;
 import com.budget.domain.BudgetAnalysisResult;
 import com.budget.domain.BudgetInput;
 import com.budget.infrastructure.BankCsvReader;
-import com.budget.infrastructure.BudgetReportRepository;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -24,9 +23,9 @@ public class BudgetImportService {
     private final BudgetProperties properties;
     private final BankCsvReader csvReader;
     private final BudgetAnalysisService analysisService;
-    private final BudgetReportRepository repository;
+    private final BudgetReportStore repository;
 
-    public BudgetImportService(BudgetProperties properties, BankCsvReader csvReader, BudgetAnalysisService analysisService, BudgetReportRepository repository) {
+    public BudgetImportService(BudgetProperties properties, BankCsvReader csvReader, BudgetAnalysisService analysisService, BudgetReportStore repository) {
         this.properties = properties;
         this.csvReader = csvReader;
         this.analysisService = analysisService;

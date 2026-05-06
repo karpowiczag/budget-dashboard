@@ -1,6 +1,5 @@
 package com.budget.application;
 
-import com.budget.domain.BankTransaction;
 import com.budget.domain.BudgetAnalysisResult;
 import com.budget.domain.BudgetInput;
 import com.budget.domain.NormalizedTransaction;
@@ -16,13 +15,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.ToDoubleFunction;
-import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 
 @Service
 public class BudgetAnalysisService {
     private static final DateTimeFormatter MONTH_LABEL = DateTimeFormatter.ofPattern("MM.yyyy");
-    private static final Pattern MERCHANT_SPLIT = Pattern.compile(" ZAKUP| BLIK| PRZELEW| PŁATNOŚĆ| PLATNOSC| WPŁATA| WPLATA| DATA ", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     private static final Set<String> REAL_SAVING_CATEGORIES = Set.of("Oszczędności i inwestycje", "Nadpłata kredytu");
     private static final Map<String, CategoryLimit> CATEGORY_LIMITS = Map.ofEntries(
             Map.entry("Żywność i chemia", new CategoryLimit(2400, "Plan posiłków, większe zakupy z listą, mniej awaryjnych wizyt.")),
@@ -40,14 +37,16 @@ public class BudgetAnalysisService {
             Map.entry("Dom i wyposażenie", new CategoryLimit(500, "Zakupy domowe tylko z listy; większe rzeczy jako fundusz celowy."))
     );
 
+    private final TransactionNormalizer normalizer;
     private final CategoryClassifier classifier;
 
-    public BudgetAnalysisService(CategoryClassifier classifier) {
+    public BudgetAnalysisService(TransactionNormalizer normalizer, CategoryClassifier classifier) {
+        this.normalizer = normalizer;
         this.classifier = classifier;
     }
 
     public BudgetAnalysisResult analyze(BudgetInput input) {
-        var transactions = normalize(input.transactions());
+        var transactions = normalizer.normalize(input.transactions());
         if (transactions.isEmpty()) {
             throw new IllegalArgumentException("No transactions to analyze");
         }
@@ -143,69 +142,6 @@ public class BudgetAnalysisService {
         payload.put("transactions", transactions.stream().map(NormalizedTransaction::toPayloadMap).toList());
 
         return new BudgetAnalysisResult(input.year(), input.fileName(), payload, transactions, transactions.size(), incomeTotal, spendTotal);
-    }
-
-    private List<NormalizedTransaction> normalize(List<BankTransaction> bankTransactions) {
-        var normalized = new ArrayList<NormalizedTransaction>();
-        int lp = 1;
-        for (var row : bankTransactions) {
-            double value = row.amount();
-            var description = clean(row.description());
-            var bankCategory = clean(row.bankCategory());
-            var match = classifier.matchRule(description);
-            var correctedCategory = classifier.classify(bankCategory, description, value);
-            boolean matchedByTitle = value > 0 || match.matched();
-            String confidence;
-            if ("Do sprawdzenia".equals(correctedCategory) || (Math.abs(value) >= 500 && "Marketplace i zakupy online".equals(correctedCategory))) {
-                confidence = "Niska";
-            } else if ("Marketplace i zakupy online".equals(correctedCategory) || !matchedByTitle) {
-                confidence = "Średnia";
-            } else {
-                confidence = "Wysoka";
-            }
-            var notes = new ArrayList<String>();
-            if (!bankCategory.equals(correctedCategory)) {
-                notes.add("Własna kategoria z tytułu/opisu");
-            }
-            if ("Niska".equals(confidence)) {
-                notes.add("Do ręcznego sprawdzenia");
-            }
-            boolean realIncome = value > 0 && classifier.isRealIncome(correctedCategory);
-            boolean spend = value < 0 && !classifier.isExcluded(correctedCategory);
-            boolean excludedFlow = classifier.isExcluded(correctedCategory) || (value > 0 && !realIncome);
-            double excluded = excludedFlow ? Math.abs(value) : 0;
-            double excludedOutgoing = excludedFlow && value < 0 ? -value : 0;
-            double excludedIncoming = excludedFlow && value > 0 ? value : 0;
-            var month = row.date().toString().substring(0, 7);
-            normalized.add(new NormalizedTransaction(
-                    lp++,
-                    row.date(),
-                    month,
-                    merchant(description),
-                    description,
-                    row.account(),
-                    bankCategory,
-                    correctedCategory,
-                    classifier.budgetArea(correctedCategory),
-                    classifier.group(correctedCategory),
-                    classifier.subcategory(correctedCategory, description),
-                    classifier.budgetBucket(correctedCategory),
-                    classifier.fixedness(correctedCategory),
-                    value >= 0 ? "Wpływ" : "Wydatek",
-                    value,
-                    realIncome ? value : 0,
-                    spend ? -value : 0,
-                    spend && classifier.isDiscretionary(correctedCategory) ? -value : 0,
-                    round2(excluded),
-                    round2(excludedOutgoing),
-                    round2(excludedIncoming),
-                    round2(excludedIncoming - excludedOutgoing),
-                    confidence,
-                    String.join("; ", notes),
-                    match.pattern()
-            ));
-        }
-        return normalized;
     }
 
     private List<Map<String, Object>> monthlyRows(List<NormalizedTransaction> transactions, List<String> months, List<String> labels, LocalDate periodStart, LocalDate periodEnd) {
@@ -526,16 +462,6 @@ public class BudgetAnalysisService {
             labels.add("%02d.%04d".formatted(month, year));
         }
         return labels;
-    }
-
-    private String merchant(String description) {
-        var parts = MERCHANT_SPLIT.split(description, 2);
-        var value = parts.length > 0 && !parts[0].isBlank() ? parts[0] : description;
-        return value.length() > 60 ? value.substring(0, 60).trim() : value.trim();
-    }
-
-    private String clean(String value) {
-        return value == null ? "" : value.replaceAll("\\s+", " ").trim();
     }
 
     private double sum(List<NormalizedTransaction> items, ToDoubleFunction<NormalizedTransaction> extractor) {

@@ -11,10 +11,11 @@ Private household budget dashboard for recurring bank CSV exports.
 - Spring Boot 4 backend
 - Java 25 LTS
 - GraalVM native image for production
-- PostgreSQL in production, local H2 file database for development
-- GitHub OAuth in production, allowlisted to one GitHub login
+- Spring Data JDBC repositories over PostgreSQL in production and local H2 for development
+- Google OAuth in production, allowlisted to one verified Google email
 
 Java 25 usage is documented in [docs/java-25.md](docs/java-25.md).
+Current backend architecture is documented in [docs/architecture.md](docs/architecture.md).
 
 ## Local Development
 
@@ -56,9 +57,9 @@ Required Koyeb environment variables:
 ```text
 SPRING_PROFILES_ACTIVE=prod
 DATABASE_URL=postgres://...
-GITHUB_CLIENT_ID=...
-GITHUB_CLIENT_SECRET=...
-APP_ALLOWED_GITHUB_LOGIN=your-github-login
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+APP_ALLOWED_GOOGLE_EMAIL=you@example.com
 PORT=8080
 ```
 
@@ -70,6 +71,7 @@ GitHub Actions:
 
 - `ci.yml` builds React, syncs the frontend into Spring static resources, and runs Java tests for application-code changes on `develop` and `main`. It cancels older in-progress runs on the same branch.
 - `deploy.yml` is manual-only and runs only from `main` because the GraalVM native build is expensive. It builds the native binary, packages a minimal Docker image, pushes it to GHCR, and creates or updates Koyeb when `KOYEB_TOKEN`, `KOYEB_APP`, and `KOYEB_SERVICE` are configured.
+- Dependabot checks npm, Maven, GitHub Actions, and Docker weekly against `develop`, grouped by ecosystem with major version updates ignored so dependency maintenance does not burn CI minutes unexpectedly.
 
 For private GHCR images, create a Koyeb private-registry secret and expose its name to GitHub Actions as `KOYEB_GHCR_SECRET`. Production database and OAuth values should be configured directly in Koyeb secrets/environment variables.
 

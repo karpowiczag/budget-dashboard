@@ -63,6 +63,14 @@ function percent(value) {
   return PCT.format(Number(value || 0));
 }
 
+function csrfHeaders() {
+  const token = document.cookie
+    .split("; ")
+    .find((entry) => entry.startsWith("XSRF-TOKEN="))
+    ?.split("=")[1];
+  return token ? { "X-XSRF-TOKEN": decodeURIComponent(token) } : {};
+}
+
 function sortByAmount(rows, key = "spend") {
   return [...rows].sort((a, b) => Math.abs(b[key] || 0) - Math.abs(a[key] || 0));
 }
@@ -169,7 +177,7 @@ function App() {
     try {
       const body = new FormData();
       body.append("file", file);
-      const response = await fetch("/api/uploads", { method: "POST", body });
+      const response = await fetch("/api/uploads", { method: "POST", body, headers: csrfHeaders() });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Import CSV nie powiódł się");
       const yearsResponse = await fetch("/api/years");

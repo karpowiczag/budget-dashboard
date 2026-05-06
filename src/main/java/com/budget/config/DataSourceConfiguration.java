@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
 
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class DataSourceConfiguration {
     @Bean
     DataSource dataSource(BudgetProperties properties) {
@@ -20,7 +20,9 @@ public class DataSourceConfiguration {
         config.setMinimumIdle(0);
         config.setPoolName("budget-db");
 
-        if (StringUtils.hasText(databaseUrl)) {
+        if (StringUtils.hasText(databaseUrl) && databaseUrl.startsWith("jdbc:")) {
+            configureJdbc(databaseUrl, config);
+        } else if (StringUtils.hasText(databaseUrl)) {
             configurePostgres(databaseUrl, config);
         } else {
             config.setJdbcUrl("jdbc:h2:file:./data/budget;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH");
@@ -29,6 +31,17 @@ public class DataSourceConfiguration {
             config.setDriverClassName("org.h2.Driver");
         }
         return new HikariDataSource(config);
+    }
+
+    private void configureJdbc(String jdbcUrl, HikariConfig config) {
+        config.setJdbcUrl(jdbcUrl);
+        if (jdbcUrl.startsWith("jdbc:h2:")) {
+            config.setUsername("sa");
+            config.setPassword("");
+            config.setDriverClassName("org.h2.Driver");
+        } else if (jdbcUrl.startsWith("jdbc:postgresql:")) {
+            config.setDriverClassName("org.postgresql.Driver");
+        }
     }
 
     private void configurePostgres(String databaseUrl, HikariConfig config) {

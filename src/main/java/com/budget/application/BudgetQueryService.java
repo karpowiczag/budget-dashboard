@@ -1,16 +1,15 @@
 package com.budget.application;
 
 import com.budget.domain.ImportRun;
-import com.budget.infrastructure.BudgetReportRepository;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 
 @Service
 public class BudgetQueryService {
-    private final BudgetReportRepository repository;
+    private final BudgetReportStore repository;
 
-    public BudgetQueryService(BudgetReportRepository repository) {
+    public BudgetQueryService(BudgetReportStore repository) {
         this.repository = repository;
     }
 

@@ -1,12 +1,20 @@
 package com.budget.config;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
+@Validated
 @ConfigurationProperties(prefix = "app")
 public record BudgetProperties(
+        @Valid
         Security security,
+        @Valid
         Database database,
+        @Valid
         Upload upload,
+        @Valid
         LocalImport localImport
 ) {
     public BudgetProperties {
@@ -16,15 +24,24 @@ public record BudgetProperties(
         if (localImport == null) localImport = new LocalImport(".");
     }
 
-    public record Security(boolean oauthEnabled, String allowedGithubLogin) {
+    public record Security(boolean oauthEnabled, String allowedGoogleEmail) {
+        public Security {
+            if (allowedGoogleEmail == null) allowedGoogleEmail = "";
+        }
     }
 
     public record Database(String url) {
+        public Database {
+            if (url == null) url = "";
+        }
     }
 
-    public record Upload(long maxBytes) {
+    public record Upload(@Positive long maxBytes) {
     }
 
     public record LocalImport(String root) {
+        public LocalImport {
+            if (root == null || root.isBlank()) root = ".";
+        }
     }
 }
