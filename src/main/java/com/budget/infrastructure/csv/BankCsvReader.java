@@ -7,6 +7,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -106,15 +108,11 @@ public class BankCsvReader implements BankTransactionReader {
         return text == null ? "" : text.replaceAll("\\s+", " ").trim();
     }
 
-    private double amount(String raw) {
+    private BigDecimal amount(String raw) {
         if (raw == null || raw.isBlank()) {
-            return 0;
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
         var normalized = raw.replace("PLN", "").replace(" ", "").replace(",", ".").trim();
-        return round2(Double.parseDouble(normalized));
-    }
-
-    private double round2(double value) {
-        return Math.round(value * 100.0) / 100.0;
+        return new BigDecimal(normalized).setScale(2, RoundingMode.HALF_UP);
     }
 }

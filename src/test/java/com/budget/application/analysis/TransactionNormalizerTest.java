@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.budget.application.categorization.CategoryClassifier;
 import com.budget.domain.transaction.BankTransaction;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -22,7 +23,7 @@ class TransactionNormalizerTest {
         assertThat(tx.correctedCategory()).isEqualTo("Marketplace i zakupy online");
         assertThat(tx.confidence()).isEqualTo("Niska");
         assertThat(tx.notes()).contains("Do ręcznego sprawdzenia");
-        assertThat(tx.analysisSpend()).isEqualTo(750);
+        assertThat(tx.analysisSpend()).isEqualByComparingTo(BigDecimal.valueOf(750));
     }
 
     @Test
@@ -34,6 +35,6 @@ class TransactionNormalizerTest {
         var tx = transactions.getFirst();
         assertThat(tx.correctedCategory()).isEqualTo("Przelewy własne");
         assertThat(tx.analysisSpend()).isZero();
-        assertThat(tx.excludedOutgoing()).isEqualTo(1000);
+        assertThat(tx.excludedOutgoing()).isEqualByComparingTo(BigDecimal.valueOf(1000));
     }
 }

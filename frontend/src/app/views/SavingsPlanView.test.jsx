@@ -61,6 +61,9 @@ describe("SavingsPlanView", () => {
     fireEvent.change(screen.getByLabelText("Limit Jedzenie poza domem"), { target: { value: "500" } });
     expect(onLimitChange).toHaveBeenLastCalledWith("Jedzenie poza domem", 500);
 
+    fireEvent.change(screen.getByLabelText("Komfortowy fundusz awaryjny w miesiącach"), { target: { value: "9" } });
+    expect(onSettingChange).toHaveBeenLastCalledWith("emergencyFundComfortMonths", 9);
+
     await userEvent.click(screen.getByRole("button", { name: "Zapisz ustawienia" }));
     expect(onSaveSettings).toHaveBeenCalledOnce();
     expect(screen.getByText("Ustawienia zapisane")).toBeInTheDocument();

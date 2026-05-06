@@ -16,6 +16,10 @@ export function SavingsPlanView({
   onSaveSettings,
   onSettingChange,
 }) {
+  const minMonths = Number(settings?.emergencyFundMinMonths || 3);
+  const comfortMonths = Number(settings?.emergencyFundComfortMonths || 6);
+  const coreMonthlyCost = Number(plan.coreMonthlyCost || 0);
+
   return (
     <Panel
       title={planTitle}
@@ -74,9 +78,34 @@ export function SavingsPlanView({
             <p>inwestycje: {money(plannedInvestmentAfterCuts)} / mies.</p>
           </div>
           <div>
-            <span>Fundusz awaryjny 3 mies.</span>
-            <strong>{money(plan.emergencyFundMin)}</strong>
-            <p>komfort 6 mies.: {money(plan.emergencyFundComfort)}</p>
+            <span>Fundusz awaryjny</span>
+            <div className="emergencyInputs">
+              <label>
+                min
+                <input
+                  className="monthInput"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={minMonths}
+                  onChange={(event) => onSettingChange("emergencyFundMinMonths", Number(event.target.value || 1))}
+                  aria-label="Minimalny fundusz awaryjny w miesiącach"
+                />
+              </label>
+              <label>
+                komfort
+                <input
+                  className="monthInput"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={comfortMonths}
+                  onChange={(event) => onSettingChange("emergencyFundComfortMonths", Number(event.target.value || 1))}
+                  aria-label="Komfortowy fundusz awaryjny w miesiącach"
+                />
+              </label>
+            </div>
+            <p>{minMonths} mies.: {money(coreMonthlyCost * minMonths)} · komfort: {money(coreMonthlyCost * comfortMonths)}</p>
           </div>
         </div>
         {settingsStatus && <div className={`inlineStatus ${settingsStatus.type}`}>{settingsStatus.message}</div>}

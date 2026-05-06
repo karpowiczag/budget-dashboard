@@ -3,6 +3,8 @@ package com.budget.application.analysis;
 import com.budget.application.categorization.CategoryClassifier;
 import com.budget.domain.transaction.BankTransaction;
 import com.budget.domain.transaction.NormalizedTransaction;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class TransactionNormalizer {
+    private static final BigDecimal LARGE_MARKETPLACE_AMOUNT = BigDecimal.valueOf(500);
     private static final Pattern MERCHANT_SPLIT = Pattern.compile(" ZAKUP| BLIK| PRZELEW| PŁATNOŚĆ| PLATNOSC| WPŁATA| WPLATA| DATA ", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private final CategoryClassifier classifier;
@@ -22,19 +25,19 @@ public class TransactionNormalizer {
         var normalized = new ArrayList<NormalizedTransaction>();
         int lp = 1;
         for (var row : bankTransactions) {
-            double value = row.amount();
+            var value = money(row.amount());
             var description = clean(row.description());
             var bankCategory = clean(row.bankCategory());
             var decision = classifier.classifyDecision(bankCategory, description, value);
             var correctedCategory = decision.category();
             var confidence = confidence(value, correctedCategory, decision.matchedByTitle());
             var notes = notes(bankCategory, correctedCategory, confidence);
-            boolean realIncome = value > 0 && classifier.isRealIncome(correctedCategory);
-            boolean spend = value < 0 && !classifier.isExcluded(correctedCategory);
-            boolean excludedFlow = classifier.isExcluded(correctedCategory) || (value > 0 && !realIncome);
-            double excluded = excludedFlow ? Math.abs(value) : 0;
-            double excludedOutgoing = excludedFlow && value < 0 ? -value : 0;
-            double excludedIncoming = excludedFlow && value > 0 ? value : 0;
+            var realIncome = value.signum() > 0 && classifier.isRealIncome(correctedCategory);
+            var spend = value.signum() < 0 && !classifier.isExcluded(correctedCategory);
+            var excludedFlow = classifier.isExcluded(correctedCategory) || (value.signum() > 0 && !realIncome);
+            var excluded = excludedFlow ? value.abs() : BigDecimal.ZERO;
+            var excludedOutgoing = excludedFlow && value.signum() < 0 ? value.negate() : BigDecimal.ZERO;
+            var excludedIncoming = excludedFlow && value.signum() > 0 ? value : BigDecimal.ZERO;
             var month = row.date().toString().substring(0, 7);
             normalized.add(new NormalizedTransaction(
                     lp++,
@@ -50,15 +53,15 @@ public class TransactionNormalizer {
                     classifier.subcategory(correctedCategory, description),
                     classifier.budgetBucket(correctedCategory),
                     classifier.fixedness(correctedCategory),
-                    value >= 0 ? "Wpływ" : "Wydatek",
+                    value.signum() >= 0 ? "Wpływ" : "Wydatek",
                     value,
-                    realIncome ? value : 0,
-                    spend ? -value : 0,
-                    spend && classifier.isDiscretionary(correctedCategory) ? -value : 0,
-                    round2(excluded),
-                    round2(excludedOutgoing),
-                    round2(excludedIncoming),
-                    round2(excludedIncoming - excludedOutgoing),
+                    realIncome ? value : BigDecimal.ZERO,
+                    spend ? value.negate() : BigDecimal.ZERO,
+                    spend && classifier.isDiscretionary(correctedCategory) ? value.negate() : BigDecimal.ZERO,
+                    money(excluded),
+                    money(excludedOutgoing),
+                    money(excludedIncoming),
+                    money(excludedIncoming.subtract(excludedOutgoing)),
                     confidence,
                     String.join("; ", notes),
                     decision.pattern()
@@ -67,8 +70,9 @@ public class TransactionNormalizer {
         return normalized;
     }
 
-    private String confidence(double value, String correctedCategory, boolean matchedByTitle) {
-        if ("Do sprawdzenia".equals(correctedCategory) || (Math.abs(value) >= 500 && "Marketplace i zakupy online".equals(correctedCategory))) {
+    private String confidence(BigDecimal value, String correctedCategory, boolean matchedByTitle) {
+        if ("Do sprawdzenia".equals(correctedCategory)
+                || (value.abs().compareTo(LARGE_MARKETPLACE_AMOUNT) >= 0 && "Marketplace i zakupy online".equals(correctedCategory))) {
             return "Niska";
         }
         if ("Marketplace i zakupy online".equals(correctedCategory) || !matchedByTitle) {
@@ -98,7 +102,7 @@ public class TransactionNormalizer {
         return value == null ? "" : value.replaceAll("\\s+", " ").trim();
     }
 
-    private double round2(double value) {
-        return Math.round(value * 100.0) / 100.0;
+    private BigDecimal money(BigDecimal value) {
+        return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP);
     }
 }

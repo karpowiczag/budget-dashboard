@@ -1,5 +1,6 @@
 package com.budget.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -26,6 +27,31 @@ class ProductionSettingsValidatorTest {
         assertThatThrownBy(() -> new DataSourceConfiguration().dataSource(properties, environment))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("DATABASE_URL");
+    }
+
+    @Test
+    void dataSourceRejectsH2DatabaseUrlInProduction() {
+        var environment = new MockEnvironment();
+        environment.setActiveProfiles("prod");
+        var properties = new BudgetProperties(
+                null,
+                new BudgetProperties.Database("jdbc:h2:mem:prod_is_not_allowed"),
+                null,
+                null,
+                null,
+                null
+        );
+
+        assertThatThrownBy(() -> new DataSourceConfiguration().dataSource(properties, environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("PostgreSQL");
+    }
+
+    @Test
+    void dataSourceAcceptsPostgresDatabaseUrlShapesInProduction() {
+        assertThat(DataSourceConfiguration.isProductionPostgresUrl("jdbc:postgresql://localhost:5432/budget")).isTrue();
+        assertThat(DataSourceConfiguration.isProductionPostgresUrl("postgres://user:pass@example.test:5432/budget")).isTrue();
+        assertThat(DataSourceConfiguration.isProductionPostgresUrl("postgresql://user:pass@example.test:5432/budget")).isTrue();
     }
 
     @Test

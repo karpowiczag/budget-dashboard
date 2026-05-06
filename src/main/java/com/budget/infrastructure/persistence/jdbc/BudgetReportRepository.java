@@ -678,14 +678,14 @@ public class BudgetReportRepository implements BudgetReportStore {
         entity.setBudgetBucket(tx.budgetBucket());
         entity.setFixedness(tx.fixedness());
         entity.setTransactionType(tx.type());
-        entity.setAmount(money(tx.amount()));
-        entity.setIncome(money(tx.income()));
-        entity.setAnalysisSpend(money(tx.analysisSpend()));
-        entity.setDiscretionary(money(tx.discretionary()));
-        entity.setExcluded(money(tx.excluded()));
-        entity.setExcludedOutgoing(money(tx.excludedOutgoing()));
-        entity.setExcludedIncoming(money(tx.excludedIncoming()));
-        entity.setExcludedNet(money(tx.excludedNet()));
+        entity.setAmount(tx.amount());
+        entity.setIncome(tx.income());
+        entity.setAnalysisSpend(tx.analysisSpend());
+        entity.setDiscretionary(tx.discretionary());
+        entity.setExcluded(tx.excluded());
+        entity.setExcludedOutgoing(tx.excludedOutgoing());
+        entity.setExcludedIncoming(tx.excludedIncoming());
+        entity.setExcludedNet(tx.excludedNet());
         entity.setConfidence(tx.confidence());
         entity.setNotes(tx.notes());
         entity.setMatchedRule(tx.matchedRule());
@@ -946,10 +946,6 @@ public class BudgetReportRepository implements BudgetReportStore {
 
     private MapSqlParameterSource params(int year) {
         return new MapSqlParameterSource("year", year);
-    }
-
-    private BigDecimal money(double value) {
-        return BigDecimal.valueOf(Math.round(value * 100.0) / 100.0);
     }
 
     private <T> List<T> aggregate(List<TransactionRecord> rows, Function<TransactionRecord, String> classifier, TriFactory<T> factory) {

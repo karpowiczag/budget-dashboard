@@ -50,6 +50,8 @@ dist/
 frontend/dist/
 coverage/
 frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
 src/main/resources/static/*
 !src/main/resources/static/.gitkeep
 

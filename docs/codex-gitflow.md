@@ -69,13 +69,15 @@ gh pr checks --watch
 
 7. Let GitHub branch protection enforce the merge gate.
 
-The native gate must pass before merge. It checks:
+The protected-branch gate must pass before merge. It checks:
 
 - The branch is up to date with the base branch.
 - The required `test` status check is passing.
 - All GitHub review conversations are resolved.
 - Stale reviews are dismissed after new pushes.
 - Admins are included in enforcement.
+
+The normal PR gate intentionally does not run GraalVM/native compilation because that burns CI minutes. Run the manual `UI Smoke` workflow when a frontend or import-flow change needs browser validation. Native compilation runs in the manual `Deploy` workflow after `develop` is promoted to `main`.
 
 8. Squash merge and delete the branch.
 

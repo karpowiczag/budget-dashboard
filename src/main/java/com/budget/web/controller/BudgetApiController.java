@@ -1,18 +1,12 @@
 package com.budget.web.controller;
 
 import com.budget.application.importing.BudgetImportService;
-import com.budget.application.importing.ImportSummary;
 import com.budget.application.importing.TransactionImportFile;
-import com.budget.application.reporting.AnalyticsReport;
 import com.budget.application.reporting.BudgetQueryService;
-import com.budget.application.reporting.CalendarReport;
-import com.budget.application.reporting.TransactionPage;
 import com.budget.application.reporting.TransactionQuery;
-import com.budget.application.reporting.YearSummary;
-import com.budget.application.settings.BudgetSettings;
 import com.budget.application.settings.BudgetSettingsService;
-import com.budget.domain.importjob.ImportRun;
-import com.budget.domain.report.BudgetSnapshot;
+import com.budget.web.dto.BudgetApiDtos;
+import com.budget.web.dto.BudgetApiMapper;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.security.Principal;
@@ -37,38 +31,45 @@ public class BudgetApiController {
     private final BudgetQueryService queryService;
     private final BudgetImportService importService;
     private final BudgetSettingsService settingsService;
+    private final BudgetApiMapper mapper;
 
-    public BudgetApiController(BudgetQueryService queryService, BudgetImportService importService, BudgetSettingsService settingsService) {
+    public BudgetApiController(
+            BudgetQueryService queryService,
+            BudgetImportService importService,
+            BudgetSettingsService settingsService,
+            BudgetApiMapper mapper
+    ) {
         this.queryService = queryService;
         this.importService = importService;
         this.settingsService = settingsService;
+        this.mapper = mapper;
     }
 
     @GetMapping("/session")
-    SessionResponse session(Principal principal) {
-        return new SessionResponse(principal != null, principal == null ? "" : principal.getName());
+    BudgetApiDtos.SessionResponse session(Principal principal) {
+        return new BudgetApiDtos.SessionResponse(principal != null, principal == null ? "" : principal.getName());
     }
 
     @GetMapping("/years")
-    List<YearSummary> years() {
-        return queryService.years();
+    List<BudgetApiDtos.YearSummaryResponse> years() {
+        return queryService.years().stream().map(mapper::toYearSummary).toList();
     }
 
     @GetMapping("/reports/{year}/dashboard")
-    BudgetSnapshot dashboard(@PathVariable @Min(2000) @Max(2100) int year) {
-        return queryService.dashboard(year);
+    BudgetApiDtos.DashboardResponse dashboard(@PathVariable @Min(2000) @Max(2100) int year) {
+        return mapper.toDashboard(queryService.dashboard(year));
     }
 
     @GetMapping("/reports/{year}/calendar")
-    CalendarReport calendar(
+    BudgetApiDtos.CalendarResponse calendar(
             @PathVariable @Min(2000) @Max(2100) int year,
             @RequestParam String month
     ) {
-        return queryService.calendar(year, month);
+        return mapper.toCalendar(queryService.calendar(year, month));
     }
 
     @GetMapping("/reports/{year}/analytics")
-    AnalyticsReport analytics(
+    BudgetApiDtos.AnalyticsResponse analytics(
             @PathVariable @Min(2000) @Max(2100) int year,
             @RequestParam(defaultValue = "year") String scope,
             @RequestParam(required = false) String month,
@@ -78,13 +79,13 @@ public class BudgetApiController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String subcategory
     ) {
-        return queryService.analytics(year, scope, month, date, area, group, category, subcategory);
+        return mapper.toAnalytics(queryService.analytics(year, scope, month, date, area, group, category, subcategory));
     }
 
     @GetMapping("/reports/{year}/transactions")
-    TransactionPage transactions(
+    BudgetApiDtos.TransactionPageResponse transactions(
             @PathVariable @Min(2000) @Max(2100) int year,
-            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "0") @Min(0) @Max(100000) int page,
             @RequestParam(defaultValue = "50") @Min(1) @Max(200) int size,
             @RequestParam(defaultValue = "postedDate,desc") String sort,
             @RequestParam(required = false) String month,
@@ -96,7 +97,7 @@ public class BudgetApiController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String subcategory
     ) {
-        return queryService.transactions(new TransactionQuery(
+        return mapper.toTransactionPage(queryService.transactions(new TransactionQuery(
                 year,
                 page,
                 size,
@@ -109,34 +110,31 @@ public class BudgetApiController {
                 group,
                 category,
                 subcategory
-        ));
+        )));
     }
 
     @PostMapping(path = "/imports/uploads", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    ImportSummary upload(@RequestParam("file") MultipartFile file) {
-        return importService.importUpload(new TransactionImportFile(file.getOriginalFilename(), file.getSize(), file.getContentType(), file::getInputStream));
+    BudgetApiDtos.ImportSummaryResponse upload(@RequestParam("file") MultipartFile file) {
+        return mapper.toImportSummary(importService.importUpload(new TransactionImportFile(file.getOriginalFilename(), file.getSize(), file.getContentType(), file::getInputStream)));
     }
 
     @PostMapping("/imports/rebuild")
-    ImportSummary rebuild(@RequestParam(value = "year", required = false) @Min(2000) @Max(2100) Integer year) {
-        return importService.rebuildLocal(year);
+    BudgetApiDtos.ImportSummaryResponse rebuild(@RequestParam(value = "year", required = false) @Min(2000) @Max(2100) Integer year) {
+        return mapper.toImportSummary(importService.rebuildLocal(year));
     }
 
     @GetMapping("/imports/runs")
-    List<ImportRun> importRuns() {
-        return queryService.importRuns();
+    List<BudgetApiDtos.ImportRunResponse> importRuns() {
+        return queryService.importRuns().stream().map(mapper::toImportRun).toList();
     }
 
     @GetMapping("/settings/budget")
-    BudgetSettings budgetSettings() {
-        return settingsService.current();
+    BudgetApiDtos.BudgetSettingsDto budgetSettings() {
+        return mapper.toBudgetSettings(settingsService.current());
     }
 
     @PutMapping("/settings/budget")
-    BudgetSettings saveBudgetSettings(@org.springframework.web.bind.annotation.RequestBody BudgetSettings settings) {
-        return settingsService.save(settings);
-    }
-
-    public record SessionResponse(boolean authenticated, String name) {
+    BudgetApiDtos.BudgetSettingsDto saveBudgetSettings(@org.springframework.web.bind.annotation.RequestBody BudgetApiDtos.BudgetSettingsDto settings) {
+        return mapper.toBudgetSettings(settingsService.save(mapper.toBudgetSettings(settings)));
     }
 }

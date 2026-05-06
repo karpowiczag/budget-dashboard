@@ -1,6 +1,7 @@
 # Budget Dashboard
 
 [![CI](https://github.com/karpowiczag/budget-dashboard/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/karpowiczag/budget-dashboard/actions/workflows/ci.yml)
+[![UI Smoke](https://github.com/karpowiczag/budget-dashboard/actions/workflows/ui-smoke.yml/badge.svg)](https://github.com/karpowiczag/budget-dashboard/actions/workflows/ui-smoke.yml)
 [![Deploy](https://github.com/karpowiczag/budget-dashboard/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/karpowiczag/budget-dashboard/actions/workflows/deploy.yml)
 
 Household budget dashboard for recurring bank CSV exports. Source code is public; bank exports, generated reports, local databases, and secrets stay private and must never be committed.
@@ -92,11 +93,12 @@ The raw CSV upload is processed in memory and not retained. The app persists nor
 GitHub Actions:
 
 - `ci.yml` tests and builds React from `frontend/`, syncs the frontend into Spring static resources, and runs Java tests for every PR into `develop`/`main` and every push to those branches. It cancels older in-progress runs on the same branch.
-- `deploy.yml` is manual-only and runs only from `main` because the GraalVM native build is expensive. It builds the native binary, packages a minimal Docker image, pushes it to GHCR, creates or updates Koyeb, and smokes `/actuator/health`. `KOYEB_TOKEN`, `KOYEB_APP`, `KOYEB_SERVICE`, and `KOYEB_PUBLIC_URL` are required for a release deployment.
+- `ui-smoke.yml` is manual-only. It starts Spring Boot with an isolated H2 database, imports committed fake CSV data through the browser, and checks the desktop dashboard workflow with Playwright.
+- `deploy.yml` is manual-only and runs only from `main` because the GraalVM native build is expensive. It builds the native binary, packages a minimal Docker image, pushes it to GHCR, creates or updates Koyeb, and smokes `/actuator/health`. `KOYEB_TOKEN`, `KOYEB_APP`, `KOYEB_SERVICE`, `KOYEB_PUBLIC_URL`, `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `APP_ALLOWED_GOOGLE_EMAIL` are required GitHub secrets for a release deployment. The deploy workflow owns these Koyeb runtime environment values so a newly created service cannot start without the production database and OAuth allowlist.
 - Dependabot checks npm, Maven, GitHub Actions, and Docker weekly against `develop`, grouped by ecosystem with major version updates ignored so dependency maintenance does not burn CI minutes unexpectedly.
 - GitHub branch protection is the merge gate for `develop` and `main`. It requires PRs, the `test` status check, up-to-date branches, resolved review conversations, dismisses stale reviews, includes admins, and blocks force pushes/deletions.
 
-For private GHCR images, create a Koyeb private-registry secret and expose its name to GitHub Actions as `KOYEB_GHCR_SECRET`. Production database and OAuth values should be configured directly in Koyeb secrets/environment variables.
+For private GHCR images, create a Koyeb private-registry secret and expose its name to GitHub Actions as `KOYEB_GHCR_SECRET`. Production database and OAuth values are stored as GitHub release secrets and passed into Koyeb by the manual deploy workflow.
 
 ## Solo GitFlow
 

@@ -1,6 +1,8 @@
 package com.budget.application.settings;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.LinkedHashMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,21 +43,33 @@ public class BudgetSettingsService {
         if (normalized.aggressiveMonthlySpend().compareTo(normalized.targetMonthlySpend()) > 0) {
             throw new IllegalArgumentException("aggressiveMonthlySpend cannot be greater than targetMonthlySpend");
         }
-        var limits = normalized.categoryLimits().stream()
-                .filter(row -> row.category() != null && !row.category().isBlank())
-                .map(row -> {
-                    if (row.limit().signum() < 0) {
-                        throw new IllegalArgumentException("Category limits cannot be negative");
-                    }
-                    return new BudgetSettings.CategoryLimitSetting(row.category().trim(), row.limit(), row.action());
-                })
-                .toList();
+        if (normalized.emergencyFundComfortMonths() < normalized.emergencyFundMinMonths()) {
+            throw new IllegalArgumentException("emergencyFundComfortMonths cannot be lower than emergencyFundMinMonths");
+        }
+        var limitsByCategory = new LinkedHashMap<String, BudgetSettings.CategoryLimitSetting>();
+        for (var row : normalized.categoryLimits()) {
+            if (row.category() == null || row.category().isBlank()) {
+                continue;
+            }
+            if (row.limit().signum() < 0) {
+                throw new IllegalArgumentException("Category limits cannot be negative");
+            }
+            var category = row.category().trim();
+            if (limitsByCategory.containsKey(category)) {
+                throw new IllegalArgumentException("Duplicate category limit: " + category);
+            }
+            limitsByCategory.put(category, new BudgetSettings.CategoryLimitSetting(
+                    category,
+                    money(row.limit()),
+                    row.action() == null ? "" : row.action().trim()
+            ));
+        }
         return new BudgetSettings(
-                normalized.targetMonthlySpend(),
-                normalized.aggressiveMonthlySpend(),
+                money(normalized.targetMonthlySpend()),
+                money(normalized.aggressiveMonthlySpend()),
                 normalized.emergencyFundMinMonths(),
                 normalized.emergencyFundComfortMonths(),
-                limits
+                java.util.List.copyOf(limitsByCategory.values())
         );
     }
 
@@ -65,5 +79,9 @@ public class BudgetSettingsService {
 
     private int positiveOrDefault(int value, int fallback) {
         return value > 0 ? value : fallback;
+    }
+
+    private BigDecimal money(BigDecimal value) {
+        return value.setScale(2, RoundingMode.HALF_UP);
     }
 }
