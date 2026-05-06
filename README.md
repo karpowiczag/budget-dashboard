@@ -75,15 +75,21 @@ app.categorization.personal-rules[0].category=Pensja
 
 ## Production Settings
 
-Required Koyeb environment variables:
+The no-card deployment target is a Render Free Web Service backed by Neon Free Postgres. Configure these environment variables on the Render service:
 
 ```text
 SPRING_PROFILES_ACTIVE=prod
-DATABASE_URL=postgres://...
+DATABASE_URL=postgresql://...
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 APP_ALLOWED_GOOGLE_EMAIL=you@example.com
-PORT=8080
+APP_LOCAL_REBUILD_ENABLED=false
+```
+
+Render provides `PORT` at runtime; the app falls back to `8080` for local containers. Use the Neon pooled PostgreSQL connection string when available. Configure this Google OAuth redirect URI for the deployed app:
+
+```text
+https://<render-app>.onrender.com/login/oauth2/code/google
 ```
 
 The raw CSV upload is processed in memory and not retained. The app persists normalized transactions, import audit records, budget settings, and structured analytics snapshots in PostgreSQL.
@@ -94,11 +100,11 @@ GitHub Actions:
 
 - `ci.yml` tests and builds React from `frontend/`, syncs the frontend into Spring static resources, and runs Java tests for every PR into `develop`/`main` and every push to those branches. It cancels older in-progress runs on the same branch.
 - `ui-smoke.yml` is manual-only. It starts Spring Boot with an isolated H2 database, imports committed fake CSV data through the browser, and checks the desktop dashboard workflow with Playwright.
-- `deploy.yml` is manual-only and runs only from `main` because the GraalVM native build is expensive. It builds the native binary, packages a minimal Docker image, pushes it to GHCR, creates or updates Koyeb, and smokes `/actuator/health`. `KOYEB_TOKEN`, `KOYEB_APP`, `KOYEB_SERVICE`, `KOYEB_PUBLIC_URL`, `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `APP_ALLOWED_GOOGLE_EMAIL` are required GitHub secrets for a release deployment. The deploy workflow owns these Koyeb runtime environment values so a newly created service cannot start without the production database and OAuth allowlist.
+- `deploy.yml` is manual-only and runs only from `main` because the GraalVM native build is expensive. It builds the native binary, packages a minimal Docker image, pushes it to GHCR, deploys the selected image tag with Render CLI `--wait`, and smokes `/actuator/health`. `RENDER_API_KEY`, `RENDER_SERVICE_ID`, and `RENDER_PUBLIC_URL` are required GitHub secrets for a release deployment. Production database and OAuth values are configured as Render service environment variables, not stored in the repository.
 - Dependabot checks npm, Maven, GitHub Actions, and Docker weekly against `develop`, grouped by ecosystem with major version updates ignored so dependency maintenance does not burn CI minutes unexpectedly.
 - GitHub branch protection is the merge gate for `develop` and `main`. It requires PRs, the `test` status check, up-to-date branches, resolved review conversations, dismisses stale reviews, includes admins, and blocks force pushes/deletions.
 
-For private GHCR images, create a Koyeb private-registry secret and expose its name to GitHub Actions as `KOYEB_GHCR_SECRET`. Production database and OAuth values are stored as GitHub release secrets and passed into Koyeb by the manual deploy workflow.
+Create the Render service as an image-backed Web Service using `ghcr.io/karpowiczag/budget-dashboard/budget:latest` as the default image URL, choose the Free instance type, and set `/actuator/health` as the health check path. Make the GHCR package public or configure Render registry credentials before the first deploy. Use Neon for PostgreSQL instead of Render Free Postgres because Render Free Postgres expires after 30 days.
 
 ## Solo GitFlow
 

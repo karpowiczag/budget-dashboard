@@ -49,18 +49,13 @@ jobs:
 
       - name: Validate deployment secrets
         env:
-          KOYEB_TOKEN: ${{ secrets.KOYEB_TOKEN }}
-          KOYEB_APP: ${{ secrets.KOYEB_APP }}
-          KOYEB_SERVICE: ${{ secrets.KOYEB_SERVICE }}
-          KOYEB_PUBLIC_URL: ${{ secrets.KOYEB_PUBLIC_URL }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          APP_ALLOWED_GOOGLE_EMAIL: ${{ secrets.APP_ALLOWED_GOOGLE_EMAIL }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          RENDER_PUBLIC_URL: ${{ secrets.RENDER_PUBLIC_URL }}
         run: |
           set -euo pipefail
           missing=0
-          for name in KOYEB_TOKEN KOYEB_APP KOYEB_SERVICE KOYEB_PUBLIC_URL DATABASE_URL GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET APP_ALLOWED_GOOGLE_EMAIL; do
+          for name in RENDER_API_KEY RENDER_SERVICE_ID RENDER_PUBLIC_URL; do
             if [ -z "${!name:-}" ]; then
               echo "::error::$name is required for a release deployment"
               missing=1
@@ -82,54 +77,32 @@ jobs:
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
 
-      - name: Install Koyeb CLI
-        run: |
-          set -euo pipefail
-          curl -fsSL https://raw.githubusercontent.com/koyeb/koyeb-cli/master/install.sh | sh
-          echo "$HOME/.koyeb/bin" >> "$GITHUB_PATH"
-
-      - name: Deploy image to Koyeb
+      - name: Install Render CLI
         env:
-          KOYEB_TOKEN: ${{ secrets.KOYEB_TOKEN }}
-          KOYEB_APP: ${{ secrets.KOYEB_APP }}
-          KOYEB_SERVICE: ${{ secrets.KOYEB_SERVICE }}
-          KOYEB_GHCR_SECRET: ${{ secrets.KOYEB_GHCR_SECRET }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          APP_ALLOWED_GOOGLE_EMAIL: ${{ secrets.APP_ALLOWED_GOOGLE_EMAIL }}
-          IMAGE: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          RENDER_CLI_VERSION: 2.16.0
+          RENDER_CLI_SHA256: 3ece121a73a1b222c7bcad3e75af1be2c0a8b285c5850bc635b44c2bdabea915
         run: |
           set -euo pipefail
+          curl -fsSL "https://github.com/render-oss/cli/releases/download/v${RENDER_CLI_VERSION}/cli_${RENDER_CLI_VERSION}_linux_amd64.zip" -o render.zip
+          echo "${RENDER_CLI_SHA256}  render.zip" | sha256sum -c -
+          unzip -q render.zip
+          sudo mv "cli_v${RENDER_CLI_VERSION}" /usr/local/bin/render
 
-          args=(
-            --docker "$IMAGE"
-            --ports "8080:http"
-            --routes "/:8080"
-            --checks "8080:http:/actuator/health"
-            --env "PORT=8080"
-            --env "SPRING_PROFILES_ACTIVE=prod"
-            --env "DATABASE_URL=$DATABASE_URL"
-            --env "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID"
-            --env "GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET"
-            --env "APP_ALLOWED_GOOGLE_EMAIL=$APP_ALLOWED_GOOGLE_EMAIL"
-            --env "APP_LOCAL_REBUILD_ENABLED=false"
-          )
-
-          if [ -n "$KOYEB_GHCR_SECRET" ]; then
-            args+=(--docker-private-registry-secret "$KOYEB_GHCR_SECRET")
-          fi
-
-          if koyeb services get "$KOYEB_APP/$KOYEB_SERVICE" >/dev/null 2>&1; then
-            koyeb services update "$KOYEB_APP/$KOYEB_SERVICE" "${args[@]}" --wait
-          else
-            koyeb services create "$KOYEB_SERVICE" --app "$KOYEB_APP" "${args[@]}" --wait
-          fi
+      - name: Deploy image to Render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          RENDER_OUTPUT: json
+          IMAGE: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          CI: true
+        run: |
+          set -euo pipefail
+          render deploys create "$RENDER_SERVICE_ID" --image "$IMAGE" --wait --output json --confirm
 
       - name: Smoke deployed health endpoint
         env:
-          KOYEB_PUBLIC_URL: ${{ secrets.KOYEB_PUBLIC_URL }}
+          RENDER_PUBLIC_URL: ${{ secrets.RENDER_PUBLIC_URL }}
         run: |
           set -euo pipefail
-          base="${KOYEB_PUBLIC_URL%/}"
-          curl --fail --silent --show-error --retry 10 --retry-delay 6 "$base/actuator/health"
+          base="${RENDER_PUBLIC_URL%/}"
+          curl --fail --silent --show-error --retry 30 --retry-delay 10 --retry-all-errors "$base/actuator/health"
