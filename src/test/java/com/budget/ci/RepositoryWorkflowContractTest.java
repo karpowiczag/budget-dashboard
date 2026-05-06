@@ -10,14 +10,9 @@ import org.junit.jupiter.api.Test;
 
 class RepositoryWorkflowContractTest {
     private static final List<String> REQUIRED_DEPLOY_SECRETS = List.of(
-            "KOYEB_TOKEN",
-            "KOYEB_APP",
-            "KOYEB_SERVICE",
-            "KOYEB_PUBLIC_URL",
-            "DATABASE_URL",
-            "GOOGLE_CLIENT_ID",
-            "GOOGLE_CLIENT_SECRET",
-            "APP_ALLOWED_GOOGLE_EMAIL"
+            "RENDER_API_KEY",
+            "RENDER_SERVICE_ID",
+            "RENDER_PUBLIC_URL"
     );
 
     @Test
@@ -35,7 +30,7 @@ class RepositoryWorkflowContractTest {
     }
 
     @Test
-    void deployWorkflowIsManualMainOnlyAndProvidesProductionRuntimeSecrets() throws IOException {
+    void deployWorkflowIsManualMainOnlyAndWaitsForRenderDeploy() throws IOException {
         var deploy = read(".github/workflows/deploy.yml");
 
         assertThat(deploy)
@@ -43,9 +38,10 @@ class RepositoryWorkflowContractTest {
                 .contains("if: github.ref == 'refs/heads/main'")
                 .contains("./mvnw -Pnative -DskipTests native:compile")
                 .contains("Validate deployment secrets")
-                .contains("--env \"SPRING_PROFILES_ACTIVE=prod\"")
-                .contains("--env \"APP_LOCAL_REBUILD_ENABLED=false\"")
-                .contains("curl --fail --silent --show-error --retry 10");
+                .contains("Install Render CLI")
+                .contains("Deploy image to Render")
+                .contains("render deploys create \"$RENDER_SERVICE_ID\" --image \"$IMAGE\" --wait")
+                .contains("curl --fail --silent --show-error --retry 30");
 
         for (var secret : REQUIRED_DEPLOY_SECRETS) {
             assertThat(deploy)
@@ -54,11 +50,7 @@ class RepositoryWorkflowContractTest {
                     .contains(secret);
         }
         assertThat(deploy).contains("::error::$name is required for a release deployment");
-        for (var runtimeEnv : List.of("DATABASE_URL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "APP_ALLOWED_GOOGLE_EMAIL")) {
-            assertThat(deploy)
-                    .as(runtimeEnv + " is passed to Koyeb")
-                    .contains("--env \"" + runtimeEnv + "=$" + runtimeEnv + "\"");
-        }
+        assertThat(deploy.toLowerCase()).doesNotContain("koy" + "eb");
     }
 
     @Test
