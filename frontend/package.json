@@ -1,0 +1,29 @@
+{
+  "name": "budget-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Household budget dashboard with Spring Boot and React.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "test": "vitest run",
+    "smoke:ui": "playwright test",
+    "build": "vite build",
+    "sync:backend": "node scripts/sync-backend-static.mjs"
+  },
+  "dependencies": {
+    "lucide-react": "^1.14.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "recharts": "^3.8.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "jsdom": "^29.1.1",
+    "vite": "^8.0.10",
+    "vitest": "^4.1.5"
+  }
+}

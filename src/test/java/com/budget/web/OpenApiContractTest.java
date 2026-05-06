@@ -1,0 +1,136 @@
+package com.budget.web;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.budget.web.controller.BudgetApiController;
+import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.parser.OpenAPIV3Parser;
+import java.nio.file.Path;
+import java.lang.reflect.ParameterizedType;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
+
+@SpringBootTest(properties = {
+        "app.database.url=jdbc:h2:mem:openapi_contract;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
+        "app.security.oauth-enabled=false"
+})
+class OpenApiContractTest {
+    private static final Map<String, String> OPERATION_IDS = Map.ofEntries(
+            Map.entry("session", "getSession"),
+            Map.entry("years", "listYears"),
+            Map.entry("dashboard", "getReportDashboard"),
+            Map.entry("calendar", "getReportCalendar"),
+            Map.entry("analytics", "getReportAnalytics"),
+            Map.entry("transactions", "listReportTransactions"),
+            Map.entry("upload", "uploadImportCsv"),
+            Map.entry("rebuild", "rebuildImports"),
+            Map.entry("importRuns", "listImportRuns"),
+            Map.entry("budgetSettings", "getBudgetSettings"),
+            Map.entry("saveBudgetSettings", "updateBudgetSettings")
+    );
+    private static final Map<String, String> SUCCESS_SCHEMAS = Map.ofEntries(
+            Map.entry("getSession", "SessionResponse"),
+            Map.entry("listYears", "[YearSummary]"),
+            Map.entry("getReportDashboard", "DashboardResponse"),
+            Map.entry("getReportCalendar", "CalendarResponse"),
+            Map.entry("getReportAnalytics", "AnalyticsResponse"),
+            Map.entry("listReportTransactions", "TransactionPage"),
+            Map.entry("uploadImportCsv", "ImportSummary"),
+            Map.entry("rebuildImports", "ImportSummary"),
+            Map.entry("listImportRuns", "[ImportRun]"),
+            Map.entry("getBudgetSettings", "BudgetSettings"),
+            Map.entry("updateBudgetSettings", "BudgetSettings")
+    );
+
+    @Autowired
+    @Qualifier("requestMappingHandlerMapping")
+    private RequestMappingHandlerMapping handlerMapping;
+
+    @Test
+    void openApiSpecParsesAndMatchesBudgetControllerMappings() {
+        var result = new OpenAPIV3Parser().readLocation(Path.of("docs/openapi/budget-api.yaml").toUri().toString(), null, null);
+
+        assertThat(result.getMessages()).isEmpty();
+        var openApi = result.getOpenAPI();
+        assertThat(openApi).isNotNull();
+
+        handlerMapping.getHandlerMethods().forEach((mapping, handler) -> {
+            if (!BudgetApiController.class.equals(handler.getBeanType())) {
+                return;
+            }
+            assertWebDtoReturnType(handler.getMethod().getGenericReturnType());
+            var expectedOperationId = OPERATION_IDS.get(handler.getMethod().getName());
+            assertThat(expectedOperationId).as("operation id for " + handler.getMethod()).isNotBlank();
+            mapping.getPatternValues().forEach(path -> {
+                assertThat(openApi.getPaths()).containsKey(path);
+                mapping.getMethodsCondition().getMethods().forEach(method -> {
+                    var operation = operation(openApi.getPaths().get(path), method);
+                    assertThat(operation).as(path + " " + method).isNotNull();
+                    assertThat(operation.getOperationId()).isEqualTo(expectedOperationId);
+                    assertSuccessSchema(operation, SUCCESS_SCHEMAS.get(expectedOperationId));
+                });
+            });
+        });
+
+        assertRef(openApi.getComponents().getSchemas().get("DashboardResponse"), "monthControl", "MonthControl");
+        assertArrayItemRef(openApi.getComponents().getSchemas().get("DashboardResponse"), "fixedness", "FixednessSummary");
+        assertArrayItemRef(openApi.getComponents().getSchemas().get("DashboardResponse"), "topMerchants", "MerchantSummary");
+        assertArrayItemRef(openApi.getComponents().getSchemas().get("DashboardResponse"), "recurring", "RecurringItem");
+        assertArrayItemRef(openApi.getComponents().getSchemas().get("DashboardResponse"), "largeOneoffs", "LargeOneOff");
+        assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "areaTop", "AreaSpend");
+        assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "hierarchyTop", "HierarchySpend");
+        assertThat(openApi.getComponents().getSchemas()).containsKeys("BudgetSettings", "CategoryLimitSetting");
+    }
+
+    private io.swagger.v3.oas.models.Operation operation(PathItem pathItem, RequestMethod method) {
+        return switch (method) {
+            case GET -> pathItem.getGet();
+            case POST -> pathItem.getPost();
+            case PUT -> pathItem.getPut();
+            case PATCH -> pathItem.getPatch();
+            case DELETE -> pathItem.getDelete();
+            default -> null;
+        };
+    }
+
+    private void assertWebDtoReturnType(java.lang.reflect.Type returnType) {
+        if (returnType instanceof ParameterizedType parameterizedType) {
+            assertThat(parameterizedType.getRawType()).isEqualTo(java.util.List.class);
+            assertWebDtoReturnType(parameterizedType.getActualTypeArguments()[0]);
+            return;
+        }
+        if (returnType instanceof Class<?> type) {
+            assertThat(type.getPackageName()).startsWith("com.budget.web.dto");
+        }
+    }
+
+    private void assertRef(Schema<?> schema, String property, String target) {
+        var propertySchema = (Schema<?>) schema.getProperties().get(property);
+        assertThat(propertySchema.get$ref()).isEqualTo("#/components/schemas/" + target);
+    }
+
+    private void assertArrayItemRef(Schema<?> schema, String property, String target) {
+        var propertySchema = (Schema<?>) schema.getProperties().get(property);
+        assertThat(propertySchema.getItems().get$ref()).isEqualTo("#/components/schemas/" + target);
+    }
+
+    private void assertSuccessSchema(io.swagger.v3.oas.models.Operation operation, String expectedSchema) {
+        assertThat(expectedSchema).as("success schema for " + operation.getOperationId()).isNotBlank();
+        var response = operation.getResponses().get("200");
+        assertThat(response).as("200 response for " + operation.getOperationId()).isNotNull();
+        var schema = response.getContent().get("application/json").getSchema();
+        if (expectedSchema.startsWith("[")) {
+            var itemSchema = expectedSchema.substring(1, expectedSchema.length() - 1);
+            assertThat(schema.getItems()).as("array items for " + operation.getOperationId()).isNotNull();
+            assertThat(schema.getItems().get$ref()).isEqualTo("#/components/schemas/" + itemSchema);
+            return;
+        }
+        assertThat(schema.get$ref()).isEqualTo("#/components/schemas/" + expectedSchema);
+    }
+}

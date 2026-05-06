@@ -7,6 +7,7 @@ outputs/
 imports/
 exports/
 *.csv
+!src/test/resources/fixtures/mbank/fake-*.csv
 *.xlsx
 *.xls
 *.xlsm
@@ -25,6 +26,8 @@ exports/
 !.env.example
 application-local.properties
 application-*.local.properties
+personal-categorization.*
+private-categorization.*
 secrets.*
 *.pem
 *.key
@@ -42,8 +45,13 @@ replay_pid*
 
 # Frontend
 node_modules/
+frontend/node_modules/
 dist/
+frontend/dist/
 coverage/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
 src/main/resources/static/*
 !src/main/resources/static/.gitkeep
 

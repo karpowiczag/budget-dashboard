@@ -1,0 +1,73 @@
+name: UI Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - run: npm ci
+        working-directory: frontend
+
+      - run: npm run build
+        working-directory: frontend
+
+      - run: npm run sync:backend
+        working-directory: frontend
+
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Start Spring Boot with isolated H2 database
+        env:
+          PORT: 8080
+          DATABASE_URL: jdbc:h2:mem:ui_smoke;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+          APP_OAUTH_ENABLED: false
+        run: |
+          set -euo pipefail
+          nohup ./mvnw spring-boot:run > app.log 2>&1 &
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8080/actuator/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat app.log
+          exit 1
+
+      - run: npm run smoke:ui
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:8080
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: ui-smoke-diagnostics
+          path: |
+            app.log
+            frontend/test-results
+            frontend/playwright-report
