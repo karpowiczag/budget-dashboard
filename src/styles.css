@@ -1017,6 +1017,32 @@ footer {
   gap: 6px;
 }
 
+.pager {
+  align-items: center;
+  color: #475569;
+  display: flex;
+  font-size: 13px;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.pager button {
+  background: #17324d;
+  border: 0;
+  border-radius: 7px;
+  color: #ffffff;
+  cursor: pointer;
+  min-width: 104px;
+  padding: 8px 12px;
+}
+
+.pager button:disabled {
+  background: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
 .tableWrap {
   max-width: 100%;
   overflow: auto;

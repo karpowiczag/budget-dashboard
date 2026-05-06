@@ -11,7 +11,7 @@ export function MonthlyStatsView({ activeTimeLabel, scopedStats, scopedTransacti
           <div>
             <span>Wydatki</span>
             <strong>{money(scopedStats.spend)}</strong>
-            <p>{scopedTransactions.length} transakcji w zakresie</p>
+            <p>{scopedStats.transactionCount || scopedTransactions.length} transakcji w zakresie</p>
           </div>
           <div>
             <span>Wpływy</span>
@@ -95,11 +95,11 @@ export function MonthlyStatsView({ activeTimeLabel, scopedStats, scopedTransacti
               </thead>
               <tbody>
                 {scopedStats.oneoffs.slice(0, 12).map((tx) => (
-                  <tr key={tx.Lp}>
-                    <td>{tx.Data}</td>
-                    <td>{tx.Sprzedawca}</td>
-                    <td>{tx["Kategoria skorygowana"]}</td>
-                    <td className="num">{money(tx["Wydatek analizy"])}</td>
+                  <tr key={tx.id || `${tx.postedDate}-${tx.merchant}-${tx.amount}`}>
+                    <td>{tx.postedDate || tx.date}</td>
+                    <td>{tx.merchant}</td>
+                    <td>{tx.correctedCategory || tx.category}</td>
+                    <td className="num">{money(tx.spend || tx.amount)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -5,6 +5,7 @@ import com.budget.application.reporting.BudgetReportStore;
 import com.budget.domain.report.BudgetAnalysisResult;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -59,9 +60,9 @@ public class BudgetImportService {
             throw new IllegalArgumentException("No local CSV files found for rebuild");
         }
         var years = new ArrayList<Integer>();
-        int transactions = 0;
-        double income = 0;
-        double spend = 0;
+        var transactions = 0;
+        var income = BigDecimal.ZERO;
+        var spend = BigDecimal.ZERO;
         for (var path : files) {
             try (var input = Files.newInputStream(path)) {
                 var year = requestedYear != null ? requestedYear : inferYearFromPath(path);
@@ -69,14 +70,14 @@ public class BudgetImportService {
                 repository.recordImportRun(result.year(), path.toString(), "ok", "local rebuild");
                 years.add(result.year());
                 transactions += result.transactionCount();
-                income += result.income();
-                spend += result.spend();
+                income = income.add(result.income());
+                spend = spend.add(result.spend());
             } catch (Exception e) {
                 repository.recordImportRun(requestedYear, path.toString(), "error", e.getMessage());
                 throw new IllegalArgumentException("Rebuild failed for " + path + ": " + e.getMessage(), e);
             }
         }
-        return new ImportSummary("ok", years, transactions, round2(income), round2(spend), "Local CSV rebuild completed");
+        return new ImportSummary("ok", years, transactions, income, spend, "Local CSV rebuild completed");
     }
 
     private BudgetAnalysisResult importStream(InputStream input, String fileName, Integer requestedYear) throws IOException {
@@ -140,7 +141,4 @@ public class BudgetImportService {
         return Path.of(value).getFileName().toString();
     }
 
-    private double round2(double value) {
-        return Math.round(value * 100.0) / 100.0;
-    }
 }

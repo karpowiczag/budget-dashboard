@@ -7,29 +7,52 @@ function csrfHeaders() {
 }
 
 async function readJson(response, fallbackMessage) {
-  const payload = await response.json();
+  const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload.error || fallbackMessage);
+    throw new Error(payload.detail || payload.error || fallbackMessage);
   }
   return payload;
 }
 
-export async function fetchYears() {
-  const response = await fetch("/api/years");
-  if (!response.ok) throw new Error("Nie mogę wczytać listy lat");
-  return response.json();
+function queryString(params) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "" || value === "Wszystkie") return;
+    query.set(key, value);
+  });
+  const value = query.toString();
+  return value ? `?${value}` : "";
 }
 
-export async function fetchBudget(year) {
-  const response = await fetch(`/api/budget/${year}`);
-  if (!response.ok) throw new Error(`Nie mogę wczytać danych ${year}`);
-  return response.json();
+export async function fetchYears() {
+  const response = await fetch("/api/v1/years");
+  return readJson(response, "Nie mogę wczytać listy lat");
+}
+
+export async function fetchDashboard(year) {
+  const response = await fetch(`/api/v1/reports/${year}/dashboard`);
+  return readJson(response, `Nie mogę wczytać danych ${year}`);
+}
+
+export async function fetchCalendar(year, month) {
+  const response = await fetch(`/api/v1/reports/${year}/calendar${queryString({ month })}`);
+  return readJson(response, "Nie mogę wczytać kalendarza");
+}
+
+export async function fetchAnalytics(year, params = {}) {
+  const response = await fetch(`/api/v1/reports/${year}/analytics${queryString(params)}`);
+  return readJson(response, "Nie mogę wczytać analityki");
+}
+
+export async function fetchTransactions(year, params = {}) {
+  const response = await fetch(`/api/v1/reports/${year}/transactions${queryString(params)}`);
+  return readJson(response, "Nie mogę wczytać transakcji");
 }
 
 export async function uploadTransactions(file) {
   const body = new FormData();
   body.append("file", file);
-  const response = await fetch("/api/uploads", {
+  const response = await fetch("/api/v1/imports/uploads", {
     method: "POST",
     body,
     headers: csrfHeaders(),

@@ -5,11 +5,12 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.budget.application.analysis.BudgetAnalysisService;
 import com.budget.application.reporting.BudgetReportStore;
+import com.budget.application.reporting.TransactionQuery;
 import com.budget.infrastructure.csv.BankCsvReader;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -50,7 +51,7 @@ class KnownCsvEndToEndIntegrationTest {
                 assertThat(result.transactionCount()).isEqualTo(budgetInput.transactions().size());
                 assertThat(result.transactionCount()).isGreaterThan(100);
                 assertThat(result.income()).isPositive();
-                assertThat(result.income()).isLessThan(500_000);
+                assertThat(result.income()).isLessThan(BigDecimal.valueOf(500_000));
                 assertThat(result.spend()).isPositive();
                 assertThat(result.transactions())
                         .filteredOn(tx -> "Spłata karty kredytowej".equals(tx.correctedCategory()))
@@ -62,15 +63,16 @@ class KnownCsvEndToEndIntegrationTest {
                         .filteredOn(tx -> "Zwroty i korekty".equals(tx.correctedCategory()))
                         .allSatisfy(tx -> assertThat(tx.income()).isZero());
 
-                var storedPayload = store.findPayload(expectedYear);
-                assertThat(storedPayload).containsKeys("kpis", "monthly", "categories", "transactions");
-                assertThat(storedPayload.get("year")).isEqualTo(expectedYear);
+                var dashboard = store.findDashboard(expectedYear);
+                assertThat(dashboard.kpis().transactions()).isEqualTo(result.transactionCount());
+                assertThat(dashboard.kpis().income()).isEqualByComparingTo(result.income());
+                assertThat(dashboard.kpis().spend()).isEqualByComparingTo(result.spend());
+                assertThat(dashboard.monthly()).hasSize(12);
+                assertThat(dashboard.categories()).isNotEmpty();
 
-                @SuppressWarnings("unchecked")
-                var kpis = (Map<String, Object>) storedPayload.get("kpis");
-                assertThat(((Number) kpis.get("transactions")).intValue()).isEqualTo(result.transactionCount());
-                assertThat(((Number) kpis.get("income")).doubleValue()).isEqualTo(result.income());
-                assertThat(((Number) kpis.get("spend")).doubleValue()).isEqualTo(result.spend());
+                var firstPage = store.findTransactions(new TransactionQuery(expectedYear, 0, 50, "postedDate,desc", null, null, null, null, null, null, null, null));
+                assertThat(firstPage.totalItems()).isEqualTo(result.transactionCount());
+                assertThat(firstPage.items()).hasSizeLessThanOrEqualTo(50);
             }
         }
     }
