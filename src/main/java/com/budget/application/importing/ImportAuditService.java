@@ -17,7 +17,12 @@ public class ImportAuditService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(Integer year, String inputCsv, String status, String message) {
-        repository.recordImportRun(year, inputCsv, status, sanitize(message));
+        record(year, inputCsv, status, message, 0);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void record(Integer year, String inputCsv, String status, String message, int duplicatesRemoved) {
+        repository.recordImportRun(year, inputCsv, status, sanitize(message), Math.max(0, duplicatesRemoved));
     }
 
     private String sanitize(String message) {

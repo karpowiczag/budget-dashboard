@@ -1,5 +1,6 @@
 package com.budget.application.importing;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -12,15 +13,22 @@ import static org.mockito.Mockito.when;
 
 import com.budget.application.analysis.BudgetAnalysisService;
 import com.budget.application.reporting.BudgetReportStore;
+import com.budget.application.reporting.TransactionPage;
+import com.budget.application.reporting.TransactionRecord;
+import com.budget.application.reporting.YearSummary;
 import com.budget.domain.report.BudgetAnalysisResult;
 import com.budget.domain.report.BudgetInput;
+import com.budget.domain.transaction.BankTransaction;
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
@@ -109,12 +117,142 @@ class BudgetImportServiceTest {
         );
 
         when(csvReader.read(any(), eq(csv.getFileName().toString()), eq(2026))).thenReturn(input);
-        when(analysis.analyze(input)).thenReturn(result);
+        when(analysis.analyze(any())).thenReturn(result);
 
         service.rebuildLocal(null);
 
-        verify(audit).record(2026, csv.getFileName().toString(), "ok", "local rebuild");
+        verify(audit).record(2026, csv.getFileName().toString(), "ok", "local rebuild", 0);
         verify(audit, never()).record(any(), eq(csv.toString()), any(), any());
+    }
+
+    @Test
+    void localRebuildMergesAllCsvFilesForYearWithoutDoubleCountingOverlap() throws Exception {
+        var folder = tempDir.resolve("2026");
+        Files.createDirectories(folder);
+        var firstCsv = folder.resolve("first.csv");
+        var secondCsv = folder.resolve("second.csv");
+        Files.writeString(firstCsv, "first");
+        Files.writeString(secondCsv, "second");
+        var january = bankTransaction("2026-01-10", "Market", -100);
+        var overlap = bankTransaction("2026-05-02", "Shared", -50);
+        var may = bankTransaction("2026-05-07", "New", -75);
+
+        var csvReader = mock(BankTransactionReader.class);
+        var analysis = mock(BudgetAnalysisService.class);
+        var repository = mock(BudgetReportStore.class);
+        var audit = mock(ImportAuditService.class);
+        var inputCaptor = ArgumentCaptor.forClass(BudgetInput.class);
+        var service = new BudgetImportService(
+                new ImportSettings(1024, tempDir, true),
+                csvReader,
+                analysis,
+                repository,
+                audit,
+                noOpTransactionManager()
+        );
+
+        when(csvReader.read(any(), eq("first.csv"), eq(2026))).thenReturn(new BudgetInput(2026, "first.csv", List.of(january, overlap)));
+        when(csvReader.read(any(), eq("second.csv"), eq(2026))).thenReturn(new BudgetInput(2026, "second.csv", List.of(overlap, may)));
+        when(analysis.analyze(inputCaptor.capture())).thenAnswer(invocation -> {
+            var input = invocation.getArgument(0, BudgetInput.class);
+            return new BudgetAnalysisResult(input.year(), input.fileName(), null, List.of(), input.transactions().size(), BigDecimal.TEN, BigDecimal.ONE);
+        });
+
+        var summary = service.rebuildLocal(2026);
+
+        assertThat(summary.transactions()).isEqualTo(3);
+        assertThat(summary.duplicatesRemoved()).isEqualTo(1);
+        assertThat(inputCaptor.getValue().transactions()).containsExactly(january, overlap, may);
+        verify(audit).record(2026, "2026 (2 CSV files)", "ok", "local rebuild; duplicates removed: 1", 1);
+    }
+
+    @Test
+    void localRebuildDeduplicatesSettledAndUnsettledCardTransactionCopies() throws Exception {
+        var folder = tempDir.resolve("2026");
+        Files.createDirectories(folder);
+        var firstCsv = folder.resolve("first.csv");
+        var secondCsv = folder.resolve("second.csv");
+        Files.writeString(firstCsv, "first");
+        Files.writeString(secondCsv, "second");
+        var unsettled = bankTransaction(
+                "2026-05-05",
+                "Merchant ZAKUP PRZY UŻYCIU KARTY - INTERNET transakcja nierozliczona",
+                -1809
+        );
+        var settled = bankTransaction(
+                "2026-05-05",
+                "Merchant ZAKUP PRZY UŻYCIU KARTY - INTERNET",
+                -1809
+        );
+        var separatePayment = bankTransaction(
+                "2026-05-05",
+                "Merchant ZAKUP PRZY UŻYCIU KARTY - INTERNET",
+                -8.75
+        );
+
+        var csvReader = mock(BankTransactionReader.class);
+        var analysis = mock(BudgetAnalysisService.class);
+        var repository = mock(BudgetReportStore.class);
+        var audit = mock(ImportAuditService.class);
+        var inputCaptor = ArgumentCaptor.forClass(BudgetInput.class);
+        var service = new BudgetImportService(
+                new ImportSettings(1024, tempDir, true),
+                csvReader,
+                analysis,
+                repository,
+                audit,
+                noOpTransactionManager()
+        );
+
+        when(csvReader.read(any(), eq("first.csv"), eq(2026))).thenReturn(new BudgetInput(2026, "first.csv", List.of(unsettled)));
+        when(csvReader.read(any(), eq("second.csv"), eq(2026))).thenReturn(new BudgetInput(2026, "second.csv", List.of(settled, separatePayment)));
+        when(analysis.analyze(inputCaptor.capture())).thenAnswer(invocation -> {
+            var input = invocation.getArgument(0, BudgetInput.class);
+            return new BudgetAnalysisResult(input.year(), input.fileName(), null, List.of(), input.transactions().size(), BigDecimal.TEN, BigDecimal.ONE);
+        });
+
+        var summary = service.rebuildLocal(2026);
+
+        assertThat(summary.transactions()).isEqualTo(2);
+        assertThat(summary.duplicatesRemoved()).isEqualTo(1);
+        assertThat(inputCaptor.getValue().transactions()).containsExactly(settled, separatePayment);
+    }
+
+    @Test
+    void uploadMergesWithExistingYearInsteadOfReplacingItWithPartialCsv() throws Exception {
+        var existing = bankTransaction("2026-01-10", "Existing", -100);
+        var newTransaction = bankTransaction("2026-05-07", "New", -75);
+        var csvReader = mock(BankTransactionReader.class);
+        var analysis = mock(BudgetAnalysisService.class);
+        var repository = mock(BudgetReportStore.class);
+        var audit = mock(ImportAuditService.class);
+        var inputCaptor = ArgumentCaptor.forClass(BudgetInput.class);
+        var service = new BudgetImportService(
+                new ImportSettings(2048, tempDir, true),
+                csvReader,
+                analysis,
+                repository,
+                audit,
+                noOpTransactionManager()
+        );
+
+        when(csvReader.read(any(), eq("partial.csv"), any())).thenReturn(new BudgetInput(2026, "partial.csv", List.of(newTransaction)));
+        when(repository.findYears()).thenReturn(List.of(new YearSummary(2026, OffsetDateTime.now(), 1, BigDecimal.ZERO, BigDecimal.ZERO, "old.csv")));
+        when(repository.findTransactions(any())).thenReturn(new TransactionPage(List.of(transactionRecord(existing)), 0, 200, 1, 1, "postedDate,asc"));
+        when(analysis.analyze(inputCaptor.capture())).thenAnswer(invocation -> {
+            var input = invocation.getArgument(0, BudgetInput.class);
+            return new BudgetAnalysisResult(input.year(), input.fileName(), null, List.of(), input.transactions().size(), BigDecimal.TEN, BigDecimal.ONE);
+        });
+
+        var summary = service.importUpload(new TransactionImportFile(
+                "partial.csv",
+                12,
+                "text/csv",
+                () -> new ByteArrayInputStream("csv".getBytes(java.nio.charset.StandardCharsets.UTF_8))
+        ));
+
+        assertThat(summary.transactions()).isEqualTo(2);
+        assertThat(inputCaptor.getValue().transactions()).containsExactly(existing, newTransaction);
     }
 
     @Test
@@ -163,5 +301,40 @@ class BudgetImportServiceTest {
             public void rollback(TransactionStatus status) {
             }
         };
+    }
+
+    private BankTransaction bankTransaction(String date, String description, double amount) {
+        return new BankTransaction(LocalDate.parse(date), "account", description, "bank", BigDecimal.valueOf(amount).setScale(2));
+    }
+
+    private TransactionRecord transactionRecord(BankTransaction transaction) {
+        return new TransactionRecord(
+                1,
+                1,
+                transaction.date(),
+                transaction.date().toString().substring(0, 7),
+                transaction.description(),
+                transaction.description(),
+                transaction.account(),
+                transaction.bankCategory(),
+                "Kategoria",
+                "Obszar",
+                "Grupa",
+                "Podkategoria",
+                "Koszyk",
+                "Stałe",
+                "Wydatek",
+                transaction.amount(),
+                BigDecimal.ZERO,
+                transaction.amount().abs(),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                "Wysoka",
+                "",
+                ""
+        );
     }
 }

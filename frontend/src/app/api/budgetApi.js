@@ -49,6 +49,11 @@ export async function fetchTransactions(year, params = {}) {
   return readJson(response, "Nie mogę wczytać transakcji");
 }
 
+export async function fetchImportRuns() {
+  const response = await fetch("/api/v1/imports/runs");
+  return readJson(response, "Nie mogę wczytać historii importów");
+}
+
 export async function fetchBudgetSettings() {
   const response = await fetch("/api/v1/settings/budget");
   return readJson(response, "Nie mogę wczytać ustawień budżetu");
@@ -75,4 +80,12 @@ export async function uploadTransactions(file) {
     headers: csrfHeaders(),
   });
   return readJson(response, "Import CSV nie powiódł się");
+}
+
+export async function rebuildTransactions(year) {
+  const response = await fetch(`/api/v1/imports/rebuild${queryString({ year })}`, {
+    method: "POST",
+    headers: csrfHeaders(),
+  });
+  return readJson(response, "Przebudowa danych nie powiodła się");
 }

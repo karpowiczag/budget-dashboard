@@ -18,7 +18,7 @@ public interface BudgetReportStore {
 
     TransactionPage findTransactions(TransactionQuery query);
 
-    void recordImportRun(Integer year, String inputCsv, String status, String message);
+    void recordImportRun(Integer year, String inputCsv, String status, String message, int duplicatesRemoved);
 
     List<ImportRun> findImportRuns();
 }

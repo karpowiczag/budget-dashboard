@@ -75,8 +75,15 @@ public class BudgetApiMapper {
                 map(report.categoryTop(), row -> new BudgetApiDtos.CategorySpendResponse(row.category(), row.spend(), row.count())),
                 map(report.subcategoryTop(), row -> new BudgetApiDtos.SubcategorySpendResponse(row.subcategory(), row.category(), row.spend(), row.count())),
                 map(report.hierarchyTop(), row -> new BudgetApiDtos.HierarchySpendResponse(row.area(), row.group(), row.category(), row.subcategory(), row.spend(), row.count())),
+                map(report.financialFlows(), row -> new BudgetApiDtos.FinancialFlowResponse(row.category(), row.outgoing(), row.count())),
                 map(report.merchants(), row -> new BudgetApiDtos.AnalyticsMerchantSpendResponse(row.merchant(), row.sum(), row.count())),
-                map(report.oneoffs(), this::toTransaction)
+                map(report.oneoffs(), this::toTransaction),
+                map(report.monthlyCategoryTrends(), row -> new BudgetApiDtos.MonthlyCategoryTrendResponse(row.month(), row.monthKey(), row.category(), row.spend(), row.count())),
+                map(report.monthlyBucketTrends(), row -> new BudgetApiDtos.MonthlyBucketTrendResponse(row.month(), row.monthKey(), row.bucket(), row.spend(), row.count())),
+                map(report.monthlyMerchantTrends(), row -> new BudgetApiDtos.MonthlyMerchantTrendResponse(row.month(), row.monthKey(), row.merchant(), row.spend(), row.count())),
+                map(report.fixednessBreakdown(), row -> new BudgetApiDtos.FixednessBreakdownResponse(row.fixedness(), row.spend(), row.count())),
+                map(report.confidenceBreakdown(), row -> new BudgetApiDtos.ConfidenceBreakdownResponse(row.confidence(), row.count(), row.spend(), row.income(), row.excluded())),
+                map(report.amountBands(), row -> new BudgetApiDtos.AmountBandResponse(row.label(), row.minAmount(), row.maxAmount(), row.count(), row.spend()))
         );
     }
 
@@ -127,6 +134,7 @@ public class BudgetApiMapper {
                 summary.status(),
                 summary.years(),
                 summary.transactions(),
+                summary.duplicatesRemoved(),
                 summary.income(),
                 summary.spend(),
                 summary.message()
@@ -140,6 +148,7 @@ public class BudgetApiMapper {
                 run.inputCsv(),
                 run.status(),
                 run.message(),
+                run.duplicatesRemoved(),
                 run.createdAt()
         );
     }
@@ -150,7 +159,7 @@ public class BudgetApiMapper {
                 settings.aggressiveMonthlySpend(),
                 settings.emergencyFundMinMonths(),
                 settings.emergencyFundComfortMonths(),
-                map(settings.categoryLimits(), row -> new BudgetApiDtos.CategoryLimitSettingDto(row.category(), row.limit(), row.action()))
+                map(settings.categoryLimits(), row -> new BudgetApiDtos.CategoryLimitSettingDto(row.scope(), row.name(), row.category(), row.limit(), row.action(), row.bucketOverride()))
         );
     }
 
@@ -163,7 +172,7 @@ public class BudgetApiMapper {
                 dto.aggressiveMonthlySpend(),
                 dto.emergencyFundMinMonths(),
                 dto.emergencyFundComfortMonths(),
-                map(dto.categoryLimits(), row -> new BudgetSettings.CategoryLimitSetting(row.category(), row.limit(), row.action()))
+                map(dto.categoryLimits(), row -> new BudgetSettings.CategoryLimitSetting(row.scope(), row.name(), row.category(), row.limit(), row.action(), row.bucketOverride()))
         );
     }
 
@@ -184,7 +193,11 @@ public class BudgetApiMapper {
                 row.corrections(),
                 row.lowConfidence(),
                 row.toCheck(),
-                row.toCheckAmount()
+                row.toCheckAmount(),
+                row.savingsAccountNetChange(),
+                row.savingsAccountGrossDeposits(),
+                row.savingsAccountInflows(),
+                row.savingsAccountOutflows()
         );
     }
 
@@ -215,7 +228,8 @@ public class BudgetApiMapper {
                 row.maxMonth(),
                 row.maxAmount(),
                 row.discretionary(),
-                row.count()
+                row.count(),
+                row.merchantExamples()
         );
     }
 
@@ -250,12 +264,16 @@ public class BudgetApiMapper {
                 row.monthlyCutNeeded(),
                 row.emergencyFundMin(),
                 row.emergencyFundComfort(),
+                map(row.parentLimits(), this::toCategoryLimit),
                 map(row.categoryLimits(), this::toCategoryLimit)
         );
     }
 
     private BudgetApiDtos.CategoryLimitResponse toCategoryLimit(BudgetSnapshot.CategoryLimit row) {
         return new BudgetApiDtos.CategoryLimitResponse(
+                row.scope(),
+                row.name(),
+                row.parent(),
                 row.category(),
                 row.bucket(),
                 row.currentMonthly(),

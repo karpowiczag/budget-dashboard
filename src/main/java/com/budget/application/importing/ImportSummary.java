@@ -7,6 +7,7 @@ public record ImportSummary(
         String status,
         List<Integer> years,
         int transactions,
+        int duplicatesRemoved,
         BigDecimal income,
         BigDecimal spend,
         String message

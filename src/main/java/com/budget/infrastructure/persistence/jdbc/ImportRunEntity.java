@@ -18,18 +18,21 @@ public class ImportRunEntity {
     private String status;
     @Column("message")
     private String message;
+    @Column("duplicates_removed")
+    private Integer duplicatesRemoved;
     @Column("created_at")
     private OffsetDateTime createdAt;
 
     public ImportRunEntity() {
     }
 
-    public ImportRunEntity(Long id, Integer reportYear, String inputCsv, String status, String message, OffsetDateTime createdAt) {
+    public ImportRunEntity(Long id, Integer reportYear, String inputCsv, String status, String message, Integer duplicatesRemoved, OffsetDateTime createdAt) {
         this.id = id;
         this.reportYear = reportYear;
         this.inputCsv = inputCsv;
         this.status = status;
         this.message = message;
+        this.duplicatesRemoved = duplicatesRemoved;
         this.createdAt = createdAt;
     }
 
@@ -71,6 +74,14 @@ public class ImportRunEntity {
 
     public void setMessage(String message) {
         this.message = message;
+    }
+
+    public Integer getDuplicatesRemoved() {
+        return duplicatesRemoved;
+    }
+
+    public void setDuplicatesRemoved(Integer duplicatesRemoved) {
+        this.duplicatesRemoved = duplicatesRemoved;
     }
 
     public OffsetDateTime getCreatedAt() {

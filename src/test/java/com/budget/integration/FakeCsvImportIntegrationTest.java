@@ -80,7 +80,7 @@ class FakeCsvImportIntegrationTest {
 
         assertTransaction("RĘCZNA SPŁATA KARTY KREDYT", "Spłata karty kredytowej", 0, 65_000, 0, "Transfer techniczny");
         assertTransaction("ZWROT ZAKUPU SKLEP TESTOWY", "Zwroty i korekty", 0, 0, 120, "Transfer techniczny");
-        assertTransaction("PRZELEW DO BM MBANKU IKZE", "Oszczędności i inwestycje", 0, 3_000, 0, "Oszczędzanie/inwestycje");
+        assertTransaction("PRZELEW DO BM MBANKU IKZE", "Oszczędności i inwestycje", 0, 3_000, 0, "Inwestycje");
         assertTransaction("SKLEP TAJEMNICZY", "Do sprawdzenia", 750, 0, 0, "Do sprawdzenia");
         assertThat(findTransaction("BIEDRONKA ZAKUP; KASA 1").subcategory()).isEqualTo("Market spożywczy");
 
@@ -128,6 +128,25 @@ class FakeCsvImportIntegrationTest {
         var filteredPage = getMap("/api/v1/reports/2026/transactions", Map.of("month", "2026-01", "category", "Żywność i chemia"));
         assertThat(filteredPage).containsEntry("totalItems", 2);
         assertThat(items(filteredPage)).extracting(row -> row.get("merchant")).contains("BIEDRONKA", "LIDL");
+
+        var subcategoryPage = getMap("/api/v1/reports/2026/transactions", Map.of("subcategory", "Market spożywczy"));
+        assertThat(subcategoryPage).containsEntry("totalItems", 3);
+
+        var classifiedPage = getMap("/api/v1/reports/2026/transactions", Map.of(
+                "query", "kasa 1",
+                "fixedness", "Zmienne konieczne",
+                "confidence", "Wysoka",
+                "sort", "fixedness,asc"
+        ));
+        assertThat(classifiedPage).containsEntry("totalItems", 1).containsEntry("sort", "fixedness,asc");
+        assertThat(items(classifiedPage)).singleElement().satisfies(row -> {
+            assertThat(row.get("merchant")).isEqualTo("BIEDRONKA");
+            assertThat(row.get("fixedness")).isEqualTo("Zmienne konieczne");
+            assertThat(row.get("confidence")).isEqualTo("Wysoka");
+        });
+
+        var unmatchedFixednessPage = getMap("/api/v1/reports/2026/transactions", Map.of("fixedness", "Nie istnieje"));
+        assertThat(unmatchedFixednessPage).containsEntry("totalItems", 0);
 
         var analytics = getMap("/api/v1/reports/2026/analytics", Map.of("scope", "month", "month", "2026-01"));
         assertThat(analytics).containsEntry("scope", "month").containsEntry("transactionCount", 10);
@@ -237,7 +256,7 @@ class FakeCsvImportIntegrationTest {
     }
 
     private TransactionRecord findTransaction(String description) {
-        var page = store.findTransactions(new TransactionQuery(2026, 0, 50, "postedDate,desc", null, null, description, null, null, null, null, null));
+        var page = store.findTransactions(new TransactionQuery(2026, 0, 50, "postedDate,desc", null, null, description, null, null, null, null, null, null));
         return page.items().stream()
                 .filter(row -> description.equals(row.description()))
                 .findFirst()

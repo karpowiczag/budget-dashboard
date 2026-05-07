@@ -29,11 +29,23 @@ class TransactionNormalizerTest {
     @Test
     void excludesOwnTransfersFromSpend() {
         var transactions = normalizer.normalize(List.of(
-                new BankTransaction(LocalDate.of(2026, 2, 1), "konto", "PRZELEW WŁASNY NA OSZCZĘDNOŚCI", "", -1000)
+                new BankTransaction(LocalDate.of(2026, 2, 1), "konto", "PRZELEW WŁASNY NA DRUGIE KONTO", "", -1000)
         ));
 
         var tx = transactions.getFirst();
         assertThat(tx.correctedCategory()).isEqualTo("Przelewy własne");
+        assertThat(tx.analysisSpend()).isZero();
+        assertThat(tx.excludedOutgoing()).isEqualByComparingTo(BigDecimal.valueOf(1000));
+    }
+
+    @Test
+    void excludesSavingsAccountTransfersAsSeparateFinancialFlow() {
+        var transactions = normalizer.normalize(List.of(
+                new BankTransaction(LocalDate.of(2026, 2, 1), "konto", "PRZELEW WŁASNY NA OSZCZĘDNOŚCI", "", -1000)
+        ));
+
+        var tx = transactions.getFirst();
+        assertThat(tx.correctedCategory()).isEqualTo("Konto oszczędnościowe");
         assertThat(tx.analysisSpend()).isZero();
         assertThat(tx.excludedOutgoing()).isEqualByComparingTo(BigDecimal.valueOf(1000));
     }

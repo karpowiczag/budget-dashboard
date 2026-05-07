@@ -59,6 +59,10 @@ final class SubcategoryClassifier {
                     sub("ORLEN|BP |SHELL|CIRCLE K|MOL |STACJA", "Paliwo"),
                     sub("SERWIS|CZĘŚCI|CZESCI|MOTORPOL|MYJNIA", "Serwis/myjnia/części")
             );
+            case "TV, internet, telefon" -> List.of(
+                    sub("PLUS\\s+(TATIANA|ALEKSANDER),?\\s*E-FAKTURA|ORANGE|T-MOBILE|\\bPLAY\\b", "Telefon"),
+                    sub("KORBANK|UPC|VECTRA|NETIA", "Internet/TV")
+            );
             case "Odzież i obuwie" -> List.of(
                     sub("VINTED", "Second hand/Vinted"),
                     sub("CCC|OBUWIE|DEICHMANN|BALAGANSTUDIO", "Buty"),
@@ -80,6 +84,10 @@ final class SubcategoryClassifier {
                     sub("IKZE", "IKZE"),
                     sub("FUNDUSZ|SUBFUNDUSZ|SFI", "Fundusze"),
                     sub("MAKLERSK|BROKERAGE|BM MBANKU", "Rachunek maklerski")
+            );
+            case "Konto oszczędnościowe" -> List.of(
+                    sub("KONTO OSZCZĘDNOŚCIOWE|KONTO OSZCZEDNOSCIOWE|RACHUNEK OSZCZĘDNOŚCIOWY|RACHUNEK OSZCZEDNOSCIOWY", "Konto oszczędnościowe"),
+                    sub("OSZCZĘDNOŚCI|OSZCZEDNOSCI", "Przelew oszczędnościowy")
             );
             case "Spłata karty kredytowej" -> List.of(
                     sub("RĘCZNA SPŁATA|RECZNA SPLATA", "Wychodząca spłata karty"),

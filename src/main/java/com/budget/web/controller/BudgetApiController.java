@@ -91,11 +91,14 @@ public class BudgetApiController {
             @RequestParam(required = false) String month,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) String query,
+            @RequestParam(required = false) String flow,
             @RequestParam(required = false) String bucket,
             @RequestParam(required = false) String area,
             @RequestParam(required = false) String group,
             @RequestParam(required = false) String category,
-            @RequestParam(required = false) String subcategory
+            @RequestParam(required = false) String subcategory,
+            @RequestParam(required = false) String fixedness,
+            @RequestParam(required = false) String confidence
     ) {
         return mapper.toTransactionPage(queryService.transactions(new TransactionQuery(
                 year,
@@ -105,11 +108,14 @@ public class BudgetApiController {
                 month,
                 date,
                 query,
+                flow,
                 bucket,
                 area,
                 group,
                 category,
-                subcategory
+                subcategory,
+                fixedness,
+                confidence
         )));
     }
 

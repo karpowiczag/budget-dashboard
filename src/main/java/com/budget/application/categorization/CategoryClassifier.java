@@ -23,6 +23,8 @@ public class CategoryClassifier {
         this.regexMatcher = regexMatcher;
         this.subcategoryClassifier = subcategoryClassifier;
         this.matchers = List.of(
+                new PositiveEmployerIncomeMatcher(),
+                new BankCategoryRuleMatcher(),
                 regexMatcher,
                 new PositiveFlowCategoryMatcher(),
                 new FallbackCategoryMatcher()

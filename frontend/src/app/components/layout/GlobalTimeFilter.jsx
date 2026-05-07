@@ -4,21 +4,25 @@ import { money } from "../../domain/formatters.js";
 export function GlobalTimeFilter({
   activeTimeLabel,
   calendarStats,
+  description,
   drillFilter,
   monthly,
   selectedMonth,
+  title = "Zakres czasu",
   timeScope,
+  variant = "full",
   onClearDrill,
   onMonthChange,
   onSelectDay,
   onTimeScopeChange,
 }) {
   return (
-    <section className="globalTime">
+    <section className={`globalTime ${variant === "compact" ? "compactTime" : ""}`}>
       <div className="timeHead">
         <div>
-          <strong>Globalny filtr czasu</strong>
+          <strong>{title}</strong>
           <span>{activeTimeLabel}</span>
+          {description && <em>{description}</em>}
         </div>
         <div className="timeControls">
           <div className="segmented compact" aria-label="Zakres czasu">
@@ -37,7 +41,7 @@ export function GlobalTimeFilter({
         </div>
       </div>
 
-      {calendarStats && timeScope !== "all" && (
+      {variant === "full" && calendarStats && timeScope !== "all" && (
         <div className="globalCalendar">
           <div className="calendarWeekdays">
             {["Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Nd"].map((day) => (

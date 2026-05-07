@@ -1,7 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ImportView } from "./ImportView.jsx";
+
+afterEach(() => cleanup());
 
 describe("ImportView", () => {
   it("passes selected csv file to upload handler", async () => {
@@ -27,5 +29,47 @@ describe("ImportView", () => {
     expect(screen.getByText("Importuję...")).toBeInTheDocument();
     expect(screen.getByText("Importuję i kategoryzuję transakcje...")).toBeInTheDocument();
     expect(screen.getByLabelText(/importuję/i)).toBeDisabled();
+  });
+
+  it("shows data health and duplicate audit history", () => {
+    render(
+      <ImportView
+        onUpload={vi.fn()}
+        uploading={false}
+        importStatus={null}
+        importHealth={{
+          cards: [
+            { label: "Lata w bazie", value: 2, detail: "2025, 2026" },
+            { label: "Usunięte duplikaty", value: 4, detail: "ostatnie 50 importów" },
+          ],
+        }}
+        importRuns={[
+          { id: 1, year: 2026, inputCsv: "2026 (3 CSV files)", status: "ok", message: "local rebuild", duplicatesRemoved: 4, createdAt: "2026-05-07T10:00:00Z" },
+        ]}
+      />
+    );
+
+    expect(screen.getByRole("heading", { name: "Stan danych" })).toBeInTheDocument();
+    expect(screen.getByText("Usunięte duplikaty")).toBeInTheDocument();
+    expect(screen.getByText(/duplikaty 4/)).toBeInTheDocument();
+  });
+
+  it("can rebuild active local year to apply new categorization rules", async () => {
+    const onRebuild = vi.fn();
+
+    render(
+      <ImportView
+        activeYear="2026"
+        onRebuild={onRebuild}
+        onUpload={vi.fn()}
+        rebuilding={false}
+        uploading={false}
+        importStatus={null}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /przebuduj rok/i }));
+
+    expect(onRebuild).toHaveBeenCalledWith("2026");
   });
 });
