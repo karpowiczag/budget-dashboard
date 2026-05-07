@@ -66,6 +66,25 @@ By default local auth is disabled and the app uses `data/budget.mv.db`. Upload a
 Invoke-RestMethod -Method Post http://127.0.0.1:8080/api/v1/imports/rebuild
 ```
 
+### Docker Compose
+
+Use Compose when you want local PostgreSQL without installing it on the host:
+
+```powershell
+docker compose up -d postgres
+$env:DATABASE_URL="postgresql://budget:budget@localhost:15432/budget?sslmode=disable"
+$env:APP_OAUTH_ENABLED="false"
+.\mvnw.cmd spring-boot:run
+```
+
+To run the full app in containers, including the React production build served by Spring Boot:
+
+```powershell
+docker compose --profile app up --build
+```
+
+The full app is served on `http://127.0.0.1:8080`. PostgreSQL is published to host port `15432` by default to avoid colliding with local database installs; override it with `POSTGRES_HOST_PORT` when needed. The Compose app profile disables OAuth and local folder rebuilds; import CSV files through the UI so private yearly folders are not mounted into containers.
+
 Household-specific categorization rules should stay out of public source. Put private salary/counterparty rules in ignored local Spring config such as `application-local.properties`:
 
 ```properties
