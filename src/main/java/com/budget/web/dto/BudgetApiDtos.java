@@ -398,4 +398,105 @@ public final class BudgetApiDtos {
 
     public record CategoryLimitSettingDto(String scope, String name, String category, BigDecimal limit, String action, String bucketOverride) {
     }
+
+    public record FireSummaryResponse(
+            LocalDate asOf,
+            boolean reportsLoaded,
+            String reportsPath,
+            int sourceCount,
+            int positionCount,
+            int currentAge,
+            int targetAge,
+            int yearsToFire,
+            BigDecimal currentPortfolioValue,
+            BigDecimal costBasis,
+            BigDecimal unrealizedGain,
+            BigDecimal emergencyFundValue,
+            BigDecimal retirementLockedValue,
+            BigDecimal liquidFireCapital,
+            BigDecimal annualSpendTarget,
+            BigDecimal monthlySpendTarget,
+            BigDecimal safeWithdrawalRate,
+            BigDecimal fireNumber,
+            BigDecimal gapToFireNumber,
+            BigDecimal bridgeCapitalToAge60,
+            BigDecimal bridgeCapitalToAge65,
+            BigDecimal currentMonthlyWealthContribution,
+            List<FireScenarioResponse> scenarios,
+            List<FireAllocationResponse> allocation,
+            List<FireWrapperResponse> wrappers,
+            List<FireRebalanceActionResponse> rebalancing,
+            List<FireMilestoneResponse> milestones,
+            List<FireLegalRuleResponse> legalRules,
+            List<FireSourceResponse> sources
+    ) {
+    }
+
+    public record FireScenarioResponse(
+            String id,
+            String label,
+            BigDecimal realReturn,
+            BigDecimal projectedAtFire,
+            BigDecimal gapAtFire,
+            BigDecimal requiredMonthlyContribution,
+            BigDecimal currentPlanMonthlyContribution,
+            boolean onTrack
+    ) {
+    }
+
+    public record FireAllocationResponse(
+            String assetClass,
+            BigDecimal value,
+            BigDecimal share,
+            BigDecimal targetShare,
+            BigDecimal drift,
+            String status
+    ) {
+    }
+
+    public record FireWrapperResponse(
+            String wrapper,
+            BigDecimal value,
+            BigDecimal share,
+            int positions,
+            String liquidity
+    ) {
+    }
+
+    public record FireRebalanceActionResponse(
+            String assetClass,
+            BigDecimal currentShare,
+            BigDecimal targetShare,
+            BigDecimal drift,
+            BigDecimal amountToTarget,
+            String action,
+            String priority
+    ) {
+    }
+
+    public record FireMilestoneResponse(
+            int age,
+            String label,
+            String description,
+            BigDecimal requiredCapital
+    ) {
+    }
+
+    public record FireLegalRuleResponse(
+            String id,
+            String label,
+            String value,
+            String note,
+            String sourceUrl
+    ) {
+    }
+
+    public record FireSourceResponse(
+            String fileName,
+            String portfolio,
+            LocalDate asOf,
+            int positions,
+            BigDecimal value
+    ) {
+    }
 }

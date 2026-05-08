@@ -22,7 +22,7 @@ class ProductionSettingsValidatorTest {
     void dataSourceRejectsBlankDatabaseUrlInProduction() {
         var environment = new MockEnvironment();
         environment.setActiveProfiles("prod");
-        var properties = new BudgetProperties(null, new BudgetProperties.Database(""), null, null, null, null);
+        var properties = new BudgetProperties(null, new BudgetProperties.Database(""), null, null, null, null, null);
 
         assertThatThrownBy(() -> new DataSourceConfiguration().dataSource(properties, environment))
                 .isInstanceOf(IllegalStateException.class)
@@ -36,6 +36,7 @@ class ProductionSettingsValidatorTest {
         var properties = new BudgetProperties(
                 null,
                 new BudgetProperties.Database("jdbc:h2:mem:prod_is_not_allowed"),
+                null,
                 null,
                 null,
                 null,

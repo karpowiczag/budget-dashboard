@@ -45,6 +45,7 @@ describe("buildDashboardViews", () => {
       "plan",
       "reports",
       "wealth",
+      "fire",
       "obligations",
       "transactions",
       "import",
@@ -54,6 +55,7 @@ describe("buildDashboardViews", () => {
       "Plan",
       "Raporty",
       "Majątek",
+      "FIRE",
       "Zobowiązania",
       "Transakcje",
       "Import",
@@ -168,6 +170,19 @@ describe("module view-model selectors", () => {
     })).toMatchObject({
       eyebrow: "Majątek",
       cards: [{ label: "Inwestycje", value: 500 }],
+    });
+
+    expect(selectModuleHeader({
+      view: "fire",
+      fireSummary: { currentPortfolioValue: 100000, fireNumber: 2000000, gapToFireNumber: 1900000, bridgeCapitalToAge60: 1200000, safeWithdrawalRate: 0.035, targetAge: 50, positionCount: 12 },
+    })).toMatchObject({
+      eyebrow: "FIRE tracking",
+      cards: [
+        { label: "Kapitał teraz", value: 100000 },
+        { label: "Cel FIRE", value: 2000000 },
+        { label: "Brakuje", value: 1900000 },
+        { label: "Pomost 50-60", value: 1200000 },
+      ],
     });
   });
 });

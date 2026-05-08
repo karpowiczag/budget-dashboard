@@ -59,6 +59,11 @@ export async function fetchBudgetSettings() {
   return readJson(response, "Nie mogę wczytać ustawień budżetu");
 }
 
+export async function fetchFireSummary() {
+  const response = await fetch("/api/v1/fire/summary");
+  return readJson(response, "Nie mogę wczytać modułu FIRE");
+}
+
 export async function updateBudgetSettings(settings) {
   const response = await fetch("/api/v1/settings/budget", {
     method: "PUT",

@@ -3,6 +3,7 @@ package com.budget.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.budget.web.controller.BudgetApiController;
+import com.budget.web.controller.FireApiController;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.parser.OpenAPIV3Parser;
@@ -32,7 +33,8 @@ class OpenApiContractTest {
             Map.entry("rebuild", "rebuildImports"),
             Map.entry("importRuns", "listImportRuns"),
             Map.entry("budgetSettings", "getBudgetSettings"),
-            Map.entry("saveBudgetSettings", "updateBudgetSettings")
+            Map.entry("saveBudgetSettings", "updateBudgetSettings"),
+            Map.entry("summary", "getFireSummary")
     );
     private static final Map<String, String> SUCCESS_SCHEMAS = Map.ofEntries(
             Map.entry("getSession", "SessionResponse"),
@@ -45,7 +47,8 @@ class OpenApiContractTest {
             Map.entry("rebuildImports", "ImportSummary"),
             Map.entry("listImportRuns", "[ImportRun]"),
             Map.entry("getBudgetSettings", "BudgetSettings"),
-            Map.entry("updateBudgetSettings", "BudgetSettings")
+            Map.entry("updateBudgetSettings", "BudgetSettings"),
+            Map.entry("getFireSummary", "FireSummary")
     );
 
     @Autowired
@@ -61,7 +64,7 @@ class OpenApiContractTest {
         assertThat(openApi).isNotNull();
 
         handlerMapping.getHandlerMethods().forEach((mapping, handler) -> {
-            if (!BudgetApiController.class.equals(handler.getBeanType())) {
+            if (!BudgetApiController.class.equals(handler.getBeanType()) && !FireApiController.class.equals(handler.getBeanType())) {
                 return;
             }
             assertWebDtoReturnType(handler.getMethod().getGenericReturnType());

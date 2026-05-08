@@ -4,10 +4,12 @@
 20[0-9][0-9]/
 data/
 outputs/
+/fire/
 imports/
 exports/
 *.csv
 !src/test/resources/fixtures/mbank/fake-*.csv
+!src/test/resources/fixtures/myfund/fake-*.csv
 *.xlsx
 *.xls
 *.xlsm

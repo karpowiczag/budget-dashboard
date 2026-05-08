@@ -21,6 +21,8 @@ public record BudgetProperties(
         @Valid
         BudgetSettings budgetSettings,
         @Valid
+        Fire fire,
+        @Valid
         Categorization categorization
 ) {
     public BudgetProperties {
@@ -29,6 +31,20 @@ public record BudgetProperties(
         if (upload == null) upload = new Upload(12_582_912L);
         if (localImport == null) localImport = new LocalImport(".", true);
         if (budgetSettings == null) budgetSettings = new BudgetSettings(BigDecimal.valueOf(14_000), BigDecimal.valueOf(13_000), 3, 6);
+        if (fire == null) fire = new Fire(
+                "fire/investments_reports",
+                36,
+                50,
+                BigDecimal.valueOf(0.035),
+                BigDecimal.valueOf(0.02),
+                BigDecimal.valueOf(0.04),
+                BigDecimal.valueOf(0.055),
+                BigDecimal.valueOf(0.80),
+                BigDecimal.valueOf(0.10),
+                BigDecimal.valueOf(0.05),
+                BigDecimal.valueOf(0.05),
+                BigDecimal.valueOf(0.05)
+        );
         if (categorization == null) categorization = new Categorization(List.of());
     }
 
@@ -62,6 +78,35 @@ public record BudgetProperties(
         public BudgetSettings {
             if (targetMonthlySpend == null) targetMonthlySpend = BigDecimal.valueOf(14_000);
             if (aggressiveMonthlySpend == null) aggressiveMonthlySpend = BigDecimal.valueOf(13_000);
+        }
+    }
+
+    public record Fire(
+            String reportsPath,
+            @Positive int currentAge,
+            @Positive int targetAge,
+            @Positive BigDecimal safeWithdrawalRate,
+            @Positive BigDecimal pessimisticRealReturn,
+            @Positive BigDecimal expectedRealReturn,
+            @Positive BigDecimal optimisticRealReturn,
+            BigDecimal targetEquityShare,
+            BigDecimal targetBondShare,
+            BigDecimal targetCashShare,
+            BigDecimal targetAlternativeShare,
+            @Positive BigDecimal rebalanceBand
+    ) {
+        public Fire {
+            if (reportsPath == null || reportsPath.isBlank()) reportsPath = "fire/investments_reports";
+            if (targetAge <= currentAge) targetAge = currentAge + 1;
+            if (safeWithdrawalRate == null) safeWithdrawalRate = BigDecimal.valueOf(0.035);
+            if (pessimisticRealReturn == null) pessimisticRealReturn = BigDecimal.valueOf(0.02);
+            if (expectedRealReturn == null) expectedRealReturn = BigDecimal.valueOf(0.04);
+            if (optimisticRealReturn == null) optimisticRealReturn = BigDecimal.valueOf(0.055);
+            if (targetEquityShare == null) targetEquityShare = BigDecimal.valueOf(0.80);
+            if (targetBondShare == null) targetBondShare = BigDecimal.valueOf(0.10);
+            if (targetCashShare == null) targetCashShare = BigDecimal.valueOf(0.05);
+            if (targetAlternativeShare == null) targetAlternativeShare = BigDecimal.valueOf(0.05);
+            if (rebalanceBand == null) rebalanceBand = BigDecimal.valueOf(0.05);
         }
     }
 

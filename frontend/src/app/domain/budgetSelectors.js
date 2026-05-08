@@ -70,6 +70,7 @@ export function buildSidebarNavigation(isHistorical) {
     { id: "plan", label: isHistorical ? "Symulacja" : "Plan" },
     { id: "reports", label: "Raporty" },
     { id: "wealth", label: "Majątek" },
+    { id: "fire", label: "FIRE" },
     { id: "obligations", label: "Zobowiązania" },
     { id: "transactions", label: "Transakcje" },
     { id: "import", label: "Import" },
@@ -696,6 +697,7 @@ export function selectModuleHeader({
   data,
   financialFlows,
   importHealth,
+  fireSummary,
   monthDashboard,
   plan,
   planSummary,
@@ -746,6 +748,17 @@ export function selectModuleHeader({
       title: "Ile przesuwamy w oszczędności, inwestycje i dług?",
       subtitle: "To przepływy z importowanych transakcji, nie live saldo kont.",
       cards: wealthDashboard?.cards || [],
+    },
+    fire: {
+      eyebrow: "FIRE tracking",
+      title: "Czy możemy odejść z pracy w wieku 50 lat?",
+      subtitle: "Prognoza oparta o lokalne raporty MyFund, budżet życia i polskie reguły podatkowo-emerytalne.",
+      cards: [
+        { label: "Kapitał teraz", value: Number(fireSummary?.currentPortfolioValue || 0), detail: `${Number(fireSummary?.positionCount || 0)} pozycji` },
+        { label: "Cel FIRE", value: Number(fireSummary?.fireNumber || 0), detail: `${Number(fireSummary?.safeWithdrawalRate || 0) * 100}% SWR` },
+        { label: "Brakuje", value: Number(fireSummary?.gapToFireNumber || 0), detail: `do wieku ${fireSummary?.targetAge || 50}`, tone: Number(fireSummary?.gapToFireNumber || 0) > 0 ? "warn" : "good" },
+        { label: "Pomost 50-60", value: Number(fireSummary?.bridgeCapitalToAge60 || 0), detail: "kapitał płynny przed IKE/ZUS" },
+      ],
     },
     obligations: {
       eyebrow: "Zobowiązania",

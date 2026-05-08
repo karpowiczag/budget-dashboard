@@ -274,6 +274,18 @@ paths:
                 $ref: "#/components/schemas/BudgetSettings"
         "400":
           $ref: "#/components/responses/Problem"
+  /api/v1/fire/summary:
+    get:
+      operationId: getFireSummary
+      responses:
+        "200":
+          description: FIRE tracking summary based on local MyFund portfolio reports and budget snapshots.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FireSummary"
+        "400":
+          $ref: "#/components/responses/Problem"
 components:
   parameters:
     Year:
@@ -1196,6 +1208,193 @@ components:
           type: string
           enum: ["", "Obowiązkowe stałe", "Obowiązkowe zmienne", "Do rozbicia", "Nieobowiązkowe", "Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu"]
           description: Optional manual high-level budget bucket override for category-scope settings.
+    FireSummary:
+      type: object
+      required: [reportsLoaded, reportsPath, sourceCount, positionCount, currentAge, targetAge, yearsToFire, currentPortfolioValue, costBasis, unrealizedGain, emergencyFundValue, retirementLockedValue, liquidFireCapital, annualSpendTarget, monthlySpendTarget, safeWithdrawalRate, fireNumber, gapToFireNumber, bridgeCapitalToAge60, bridgeCapitalToAge65, currentMonthlyWealthContribution, scenarios, allocation, wrappers, rebalancing, milestones, legalRules, sources]
+      properties:
+        asOf:
+          type: string
+          format: date
+        reportsLoaded:
+          type: boolean
+        reportsPath:
+          type: string
+        sourceCount:
+          type: integer
+        positionCount:
+          type: integer
+        currentAge:
+          type: integer
+        targetAge:
+          type: integer
+        yearsToFire:
+          type: integer
+        currentPortfolioValue:
+          $ref: "#/components/schemas/Money"
+        costBasis:
+          $ref: "#/components/schemas/Money"
+        unrealizedGain:
+          $ref: "#/components/schemas/Money"
+        emergencyFundValue:
+          $ref: "#/components/schemas/Money"
+        retirementLockedValue:
+          $ref: "#/components/schemas/Money"
+        liquidFireCapital:
+          $ref: "#/components/schemas/Money"
+        annualSpendTarget:
+          $ref: "#/components/schemas/Money"
+        monthlySpendTarget:
+          $ref: "#/components/schemas/Money"
+        safeWithdrawalRate:
+          $ref: "#/components/schemas/Ratio"
+        fireNumber:
+          $ref: "#/components/schemas/Money"
+        gapToFireNumber:
+          $ref: "#/components/schemas/Money"
+        bridgeCapitalToAge60:
+          $ref: "#/components/schemas/Money"
+        bridgeCapitalToAge65:
+          $ref: "#/components/schemas/Money"
+        currentMonthlyWealthContribution:
+          $ref: "#/components/schemas/Money"
+        scenarios:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireScenario"
+        allocation:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireAllocation"
+        wrappers:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireWrapper"
+        rebalancing:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireRebalanceAction"
+        milestones:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireMilestone"
+        legalRules:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireLegalRule"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireSource"
+    FireScenario:
+      type: object
+      required: [id, label, realReturn, projectedAtFire, gapAtFire, requiredMonthlyContribution, currentPlanMonthlyContribution, onTrack]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        realReturn:
+          $ref: "#/components/schemas/Ratio"
+        projectedAtFire:
+          $ref: "#/components/schemas/Money"
+        gapAtFire:
+          $ref: "#/components/schemas/Money"
+        requiredMonthlyContribution:
+          $ref: "#/components/schemas/Money"
+        currentPlanMonthlyContribution:
+          $ref: "#/components/schemas/Money"
+        onTrack:
+          type: boolean
+    FireAllocation:
+      type: object
+      required: [assetClass, value, share, targetShare, drift, status]
+      properties:
+        assetClass:
+          type: string
+        value:
+          $ref: "#/components/schemas/Money"
+        share:
+          $ref: "#/components/schemas/Ratio"
+        targetShare:
+          $ref: "#/components/schemas/Ratio"
+        drift:
+          $ref: "#/components/schemas/Ratio"
+        status:
+          type: string
+    FireWrapper:
+      type: object
+      required: [wrapper, value, share, positions, liquidity]
+      properties:
+        wrapper:
+          type: string
+        value:
+          $ref: "#/components/schemas/Money"
+        share:
+          $ref: "#/components/schemas/Ratio"
+        positions:
+          type: integer
+        liquidity:
+          type: string
+    FireRebalanceAction:
+      type: object
+      required: [assetClass, currentShare, targetShare, drift, amountToTarget, action, priority]
+      properties:
+        assetClass:
+          type: string
+        currentShare:
+          $ref: "#/components/schemas/Ratio"
+        targetShare:
+          $ref: "#/components/schemas/Ratio"
+        drift:
+          $ref: "#/components/schemas/Ratio"
+        amountToTarget:
+          $ref: "#/components/schemas/Money"
+        action:
+          type: string
+        priority:
+          type: string
+    FireMilestone:
+      type: object
+      required: [age, label, description, requiredCapital]
+      properties:
+        age:
+          type: integer
+        label:
+          type: string
+        description:
+          type: string
+        requiredCapital:
+          $ref: "#/components/schemas/Money"
+    FireLegalRule:
+      type: object
+      required: [id, label, value, note, sourceUrl]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        value:
+          type: string
+        note:
+          type: string
+        sourceUrl:
+          type: string
+          format: uri
+    FireSource:
+      type: object
+      required: [fileName, portfolio, positions, value]
+      properties:
+        fileName:
+          type: string
+        portfolio:
+          type: string
+        asOf:
+          type: string
+          format: date
+        positions:
+          type: integer
+        value:
+          $ref: "#/components/schemas/Money"
     ProblemDetail:
       type: object
       properties:

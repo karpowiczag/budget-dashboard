@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchAnalytics, fetchCalendar, fetchTransactions } from "./api/budgetApi.js";
+import { fetchAnalytics, fetchCalendar, fetchFireSummary, fetchTransactions } from "./api/budgetApi.js";
 import { budgetQueryKeys } from "./api/queryKeys.js";
 import { AppShell } from "./components/layout/AppShell.jsx";
 import { DashboardFooter } from "./components/layout/DashboardFooter.jsx";
@@ -13,6 +13,7 @@ import { useBudgetData } from "./hooks/useBudgetData.js";
 import { useDashboardModel } from "./hooks/useDashboardModel.js";
 import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel } from "./domain/budgetSelectors.js";
 import { ImportView } from "./views/ImportView.jsx";
+import { FireView } from "./views/FireView.jsx";
 import { MonthControlView } from "./views/MonthControlView.jsx";
 import { RecurringView } from "./views/RecurringView.jsx";
 import { ReportsView } from "./views/ReportsView.jsx";
@@ -150,6 +151,11 @@ export default function App() {
     queryFn: () => fetchTransactions(year, transactionQueryFilters),
     enabled: !!data && !!year,
   });
+  const fireQuery = useQuery({
+    queryKey: budgetQueryKeys.fire,
+    queryFn: fetchFireSummary,
+    enabled: !!data && view === "fire",
+  });
   const inspectorQuery = useQuery({
     queryKey: budgetQueryKeys.transactions(year, inspectorFilters),
     queryFn: () => fetchTransactions(year, inspectorFilters),
@@ -171,6 +177,7 @@ export default function App() {
     customLimits,
     bucketOverrides: categoryBucketOverrides,
     importRuns,
+    fireSummary: fireQuery.data || null,
   });
 
   if (status === "loading") {
@@ -402,6 +409,10 @@ export default function App() {
           wealthDashboard={model.wealthDashboard}
           onInspect={openTransactionInspector}
         />
+      )}
+
+      {view === "fire" && (
+        <FireView fireSummary={fireQuery.data || model.fireSummary} />
       )}
 
       {view === "obligations" && (

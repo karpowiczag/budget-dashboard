@@ -917,6 +917,16 @@ button.kpi {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.metricGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.metricGrid.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .monthCards div,
 .metricCard,
 .fundItem {
@@ -972,6 +982,13 @@ button.kpi {
   color: #64748b;
   line-height: 1.35;
   margin: 8px 0 0;
+}
+
+.metricCard small {
+  color: #64748b;
+  display: block;
+  line-height: 1.35;
+  margin-top: 8px;
 }
 
 .monthDecisionGrid {

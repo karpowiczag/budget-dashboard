@@ -13,6 +13,7 @@ class GoogleAccountAllowlistTest {
                 null,
                 null,
                 null,
+                null,
                 null
         );
         var allowlist = new GoogleAccountAllowlist(properties);

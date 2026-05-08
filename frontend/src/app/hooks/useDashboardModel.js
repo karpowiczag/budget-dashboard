@@ -47,6 +47,7 @@ export function useDashboardModel({
   customLimits,
   bucketOverrides,
   importRuns,
+  fireSummary,
 }) {
   const buckets = useMemo(() => selectBuckets(data), [data]);
   const planRows = useMemo(() => selectPlanRows(data, customLimits, bucketOverrides), [data, customLimits, bucketOverrides]);
@@ -90,6 +91,7 @@ export function useDashboardModel({
       transactionPage,
       financialFlows,
       importHealth,
+      fireSummary,
       views: buildSidebarNavigation(false),
     };
   }
@@ -166,6 +168,7 @@ export function useDashboardModel({
     data,
     financialFlows,
     importHealth,
+    fireSummary,
     monthDashboard,
     plan,
     planSummary,
@@ -201,6 +204,7 @@ export function useDashboardModel({
     transactionPage,
     financialFlows,
     importHealth,
+    fireSummary,
     monthControlFinancialFlow,
     monthDashboard,
     spendingPlanSections,

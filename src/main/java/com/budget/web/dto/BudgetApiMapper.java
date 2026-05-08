@@ -1,5 +1,6 @@
 package com.budget.web.dto;
 
+import com.budget.application.fire.FireSummary;
 import com.budget.application.importing.ImportSummary;
 import com.budget.application.reporting.AnalyticsReport;
 import com.budget.application.reporting.CalendarReport;
@@ -180,6 +181,87 @@ public class BudgetApiMapper {
                 dto.emergencyFundMinMonths(),
                 dto.emergencyFundComfortMonths(),
                 map(dto.categoryLimits(), row -> new BudgetSettings.CategoryLimitSetting(row.scope(), row.name(), row.category(), row.limit(), row.action(), row.bucketOverride()))
+        );
+    }
+
+    public BudgetApiDtos.FireSummaryResponse toFireSummary(FireSummary summary) {
+        return new BudgetApiDtos.FireSummaryResponse(
+                summary.asOf(),
+                summary.reportsLoaded(),
+                summary.reportsPath(),
+                summary.sourceCount(),
+                summary.positionCount(),
+                summary.currentAge(),
+                summary.targetAge(),
+                summary.yearsToFire(),
+                summary.currentPortfolioValue(),
+                summary.costBasis(),
+                summary.unrealizedGain(),
+                summary.emergencyFundValue(),
+                summary.retirementLockedValue(),
+                summary.liquidFireCapital(),
+                summary.annualSpendTarget(),
+                summary.monthlySpendTarget(),
+                summary.safeWithdrawalRate(),
+                summary.fireNumber(),
+                summary.gapToFireNumber(),
+                summary.bridgeCapitalToAge60(),
+                summary.bridgeCapitalToAge65(),
+                summary.currentMonthlyWealthContribution(),
+                map(summary.scenarios(), row -> new BudgetApiDtos.FireScenarioResponse(
+                        row.id(),
+                        row.label(),
+                        row.realReturn(),
+                        row.projectedAtFire(),
+                        row.gapAtFire(),
+                        row.requiredMonthlyContribution(),
+                        row.currentPlanMonthlyContribution(),
+                        row.onTrack()
+                )),
+                map(summary.allocation(), row -> new BudgetApiDtos.FireAllocationResponse(
+                        row.assetClass(),
+                        row.value(),
+                        row.share(),
+                        row.targetShare(),
+                        row.drift(),
+                        row.status()
+                )),
+                map(summary.wrappers(), row -> new BudgetApiDtos.FireWrapperResponse(
+                        row.wrapper(),
+                        row.value(),
+                        row.share(),
+                        row.positions(),
+                        row.liquidity()
+                )),
+                map(summary.rebalancing(), row -> new BudgetApiDtos.FireRebalanceActionResponse(
+                        row.assetClass(),
+                        row.currentShare(),
+                        row.targetShare(),
+                        row.drift(),
+                        row.amountToTarget(),
+                        row.action(),
+                        row.priority()
+                )),
+                map(summary.milestones(), row -> new BudgetApiDtos.FireMilestoneResponse(
+                        row.age(),
+                        row.label(),
+                        row.description(),
+                        row.requiredCapital()
+                )),
+                map(summary.legalRules(), row -> new BudgetApiDtos.FireLegalRuleResponse(
+                        row.id(),
+                        row.label(),
+                        row.value(),
+                        row.note(),
+                        row.sourceUrl()
+                )),
+                map(summary.sources(), row -> new BudgetApiDtos.FireSourceResponse(
+                        row.fileName(),
+                        row.portfolio(),
+                        row.asOf(),
+                        row.positions(),
+                        row.value()
+                ))
         );
     }
 
