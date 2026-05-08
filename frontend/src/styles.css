@@ -962,6 +962,51 @@ button.kpi {
   border-color: #fed7aa;
 }
 
+.metricCard.editableMetric {
+  min-height: 172px;
+}
+
+.editableMetric .inlineEdit {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 12px;
+}
+
+.editableMetric label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.editableMetric label span {
+  margin: 0;
+}
+
+.editableMetric input {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  color: #172033;
+  font: inherit;
+  font-weight: 800;
+  height: 36px;
+  min-width: 0;
+  padding: 0 10px;
+  width: 100%;
+}
+
+.editableMetric .secondaryButton.compact {
+  height: 36px;
+  white-space: nowrap;
+}
+
+.editableMetric .secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .monthCards span,
 .metricCard span,
 .fundItem span {

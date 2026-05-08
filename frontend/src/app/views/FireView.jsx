@@ -30,12 +30,15 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
   const budget = summary.budgetLink || {};
   const hasSpendTarget = summary.spendTargetConfigured === true;
   const setupTarget = "Ustaw cel";
+  const saveDraft = () => {
+    if (draft) onSaveSettings?.(draft);
+  };
   return (
     <section className="viewStack">
       <Panel
         title="Plan FIRE"
         action={
-          <button className="primaryButton" disabled={!draft || saving} onClick={() => onSaveSettings?.(draft)} type="button">
+          <button className="primaryButton" disabled={!draft || saving} onClick={saveDraft} type="button">
             {saving ? "Zapisuję..." : "Zapisz FIRE"}
           </button>
         }
@@ -46,7 +49,14 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
         </div>
         <div className="metricGrid four">
           <Metric label="Kapitał dziś" value={money(summary.currentPortfolioValue)} detail={`${summary.positionCount} pozycji`} />
-          <Metric label="Cel FIRE" value={hasSpendTarget ? money(summary.fireNumber) : setupTarget} detail={hasSpendTarget ? `${percent(summary.safeWithdrawalRate)} SWR` : "wpisz wydatki FIRE"} />
+          <SpendTargetCard
+            draft={draft}
+            hasSpendTarget={hasSpendTarget}
+            saving={saving}
+            value={hasSpendTarget ? money(summary.fireNumber) : setupTarget}
+            onChange={(value) => update(draft, setDraft, "monthlySpendOverride", value)}
+            onSave={saveDraft}
+          />
           <Metric label="Brakuje" value={hasSpendTarget ? money(summary.gapToFireNumber) : setupTarget} detail={hasSpendTarget ? `do wieku ${summary.targetAge}` : "nie liczę bez celu"} warn={hasSpendTarget && Number(summary.gapToFireNumber) > 0} />
           <Metric label="Wymagane / mies." value={hasSpendTarget ? money(baseScenario?.requiredMonthlyContribution) : setupTarget} detail={hasSpendTarget ? "scenariusz bazowy" : "najpierw cel wydatków"} />
         </div>
@@ -203,6 +213,37 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
         </Panel>
       </section>
     </section>
+  );
+}
+
+function SpendTargetCard({ draft, hasSpendTarget, onChange, onSave, saving, value }) {
+  const rawValue = draft?.monthlySpendOverride ?? "";
+  const numericValue = Number(rawValue || 0);
+  const canSave = !!draft && numericValue > 0 && !saving;
+  return (
+    <div className={`metricCard editableMetric ${!hasSpendTarget ? "warn" : ""}`}>
+      <span>Cel FIRE</span>
+      <strong>{value}</strong>
+      <small>{hasSpendTarget ? "na podstawie docelowych wydatków" : "wpisz miesięczne wydatki FIRE"}</small>
+      <div className="inlineEdit">
+        <label>
+          <span>Cel wydatków FIRE miesięcznie</span>
+          <input
+            aria-label="Cel wydatków FIRE miesięcznie"
+            disabled={!draft || saving}
+            min="0"
+            onChange={(event) => onChange(event.target.value === "" ? null : Number(event.target.value))}
+            placeholder="np. 10000"
+            step="100"
+            type="number"
+            value={rawValue}
+          />
+        </label>
+        <button className="secondaryButton compact" disabled={!canSave} onClick={onSave} type="button">
+          {saving ? "Zapisuję..." : "Zapisz cel"}
+        </button>
+      </div>
+    </div>
   );
 }
 

@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FireView } from "./FireView.jsx";
 
@@ -77,9 +78,49 @@ describe("FireView", () => {
 
     expect(screen.getAllByText("Ustaw cel").length).toBeGreaterThan(0);
     expect(screen.getByText("nie zgaduję tej liczby")).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "Cel wydatków FIRE miesięcznie" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Zapisz cel" })).toBeDisabled();
     expect(screen.queryByText("Target budżetu")).not.toBeInTheDocument();
     expect(screen.queryByText(/14\s*000/)).not.toBeInTheDocument();
     expect(screen.queryByText("domyślny cel FIRE")).not.toBeInTheDocument();
+  });
+
+  it("saves the FIRE spending target from the main card", async () => {
+    const user = userEvent.setup();
+    const onSaveSettings = vi.fn();
+
+    render(
+      <FireView
+        fireSettings={{ monthlySpendOverride: null }}
+        fireSummary={{
+          reportsLoaded: true,
+          currentAge: 36,
+          targetAge: 50,
+          positionCount: 4,
+          currentPortfolioValue: 200000,
+          monthlySpendTarget: 0,
+          spendTargetConfigured: false,
+          fireNumber: 0,
+          gapToFireNumber: 0,
+          safeWithdrawalRate: 0.035,
+          scenarios: [],
+          allocation: [],
+          wrappers: [],
+          rebalancing: [],
+          actionItems: [],
+          milestones: [],
+          legalRules: [],
+          sources: [],
+          budgetLink: { firePortfolioMonthlyContribution: 9000 },
+        }}
+        onSaveSettings={onSaveSettings}
+      />
+    );
+
+    await user.type(screen.getByRole("spinbutton", { name: "Cel wydatków FIRE miesięcznie" }), "10000");
+    await user.click(screen.getByRole("button", { name: "Zapisz cel" }));
+
+    expect(onSaveSettings).toHaveBeenCalledWith(expect.objectContaining({ monthlySpendOverride: 10000 }));
   });
 
   it("explains where local MyFund reports are expected when data is missing", () => {
