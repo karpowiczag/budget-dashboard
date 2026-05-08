@@ -588,6 +588,7 @@ components:
         coreMonthlyCost:
           $ref: "#/components/schemas/Money"
         targetMonthlySpend:
+          description: Current household budget spending target, exposed only as budget context. It does not drive the FIRE spending target.
           $ref: "#/components/schemas/Money"
         aggressiveMonthlySpend:
           $ref: "#/components/schemas/Money"
@@ -1580,8 +1581,10 @@ components:
           minimum: 18
           maximum: 90
         monthlySpendOverride:
+          description: Monthly FIRE spending target. When omitted, the model uses the app-level FIRE default, not the household budget target.
           $ref: "#/components/schemas/Money"
         monthlyContributionOverride:
+          description: Optional manual FIRE contribution override. When omitted, current contribution comes from household budget investments plus net savings-account movement.
           $ref: "#/components/schemas/Money"
         safeWithdrawalRate:
           $ref: "#/components/schemas/Ratio"

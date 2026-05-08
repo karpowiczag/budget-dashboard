@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 public class FireQueryService {
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
     private static final BigDecimal TWELVE = BigDecimal.valueOf(12);
+    private static final BigDecimal DEFAULT_FIRE_MONTHLY_SPEND_TARGET = BigDecimal.valueOf(14_000);
     private static final String WRAPPER_EMERGENCY = "Poduszka bezpieczeństwa";
     private static final String WRAPPER_RETIREMENT = "Emerytalne długoterminowe";
     private static final String WRAPPER_TAXABLE = "Rachunek opodatkowany";
@@ -53,16 +54,14 @@ public class FireQueryService {
                 .toList(), FirePortfolioPosition::valuePln);
         var liquidFireCapital = currentValue.subtract(retirementLocked).max(BigDecimal.ZERO);
         var budgetLink = budgetLink(settings);
-        var monthlySpendTarget = settings.monthlySpendOverride() == null
-                ? budgetSpendTarget(budgetLink)
-                : money(settings.monthlySpendOverride());
+        var monthlySpendTarget = fireSpendTarget(settings);
         var annualSpendTarget = monthlySpendTarget.multiply(TWELVE);
         var fireNumber = divide(annualSpendTarget, settings.safeWithdrawalRate(), 2);
         var yearsToFire = settings.targetAge() - settings.currentAge();
         var monthlyContribution = settings.monthlyContributionOverride() == null
                 ? budgetLink.firePortfolioMonthlyContribution()
                 : money(settings.monthlyContributionOverride());
-        budgetLink = applyOverridesToBudgetLink(budgetLink, monthlySpendTarget, monthlyContribution, settings);
+        budgetLink = applyOverridesToBudgetLink(budgetLink, monthlyContribution, settings);
         var scenarios = scenarios(settings, currentValue, fireNumber, monthlyContribution, yearsToFire);
         var investmentPositions = positions.stream()
                 .filter(position -> !position.wrapper().equals(WRAPPER_EMERGENCY))
@@ -177,17 +176,17 @@ public class FireQueryService {
                     money(dashboard.savingsPlan().emergencyFundComfort()),
                     settings.monthlySpendOverride() != null,
                     settings.monthlyContributionOverride() != null,
-                    "Prognoza FIRE używa inwestycji + netto konta oszczędnościowego. Nadpłaty kredytu są pokazane osobno jako redukcja długu, a nie wpłata do portfela MyFund."
+                    "Budżet domowy zasila FIRE tylko tempem wpłat: inwestycje + netto konto oszczędnościowe. Cel wydatków FIRE jest osobnym ustawieniem, a nadpłaty kredytu są osobnym strumieniem redukcji długu."
             );
         } catch (ReportNotFoundException | IllegalStateException e) {
             return FireSummary.FireBudgetLink.empty();
         }
     }
 
-    private BigDecimal budgetSpendTarget(FireSummary.FireBudgetLink budgetLink) {
-        return budgetLink.linked() && budgetLink.targetMonthlySpend().signum() > 0
-                ? money(budgetLink.targetMonthlySpend())
-                : BigDecimal.valueOf(14_000);
+    private BigDecimal fireSpendTarget(FireSettings settings) {
+        return settings.monthlySpendOverride() == null
+                ? DEFAULT_FIRE_MONTHLY_SPEND_TARGET
+                : money(settings.monthlySpendOverride());
     }
 
     private BigDecimal monthlyAverage(BudgetSnapshot dashboard, String bucket) {
@@ -201,7 +200,6 @@ public class FireQueryService {
 
     private FireSummary.FireBudgetLink applyOverridesToBudgetLink(
             FireSummary.FireBudgetLink budgetLink,
-            BigDecimal monthlySpendTarget,
             BigDecimal monthlyContribution,
             FireSettings settings
     ) {
@@ -211,7 +209,7 @@ public class FireQueryService {
                 budgetLink.activeMonths(),
                 budgetLink.monthlyIncome(),
                 budgetLink.currentMonthlyLivingSpend(),
-                money(monthlySpendTarget),
+                budgetLink.targetMonthlySpend(),
                 budgetLink.actualMonthlyInvestments(),
                 budgetLink.savingsAccountMonthlyNet(),
                 budgetLink.savingsAccountMonthlyGrossDeposits(),

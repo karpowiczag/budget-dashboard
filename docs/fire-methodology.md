@@ -4,7 +4,8 @@ This module is a planning model for a Polish household targeting work-optional s
 
 ## Inputs
 
-- Budget spending target comes from the latest imported budget snapshot.
+- The FIRE spending target is a separate FIRE setting, because future work-optional spending can differ from the current household budget limit.
+- The household budget contributes only the current investment pace: investments plus net savings-account movement. Loan overpayments are shown separately as debt reduction.
 - Investment portfolio values come from local MyFund `portfelSklad` CSV exports in `fire/investments_reports`.
 - Private MyFund files stay local and ignored by Git.
 - All model returns are real returns, so projected values are interpreted in today's PLN purchasing power.
@@ -25,7 +26,7 @@ The default FIRE number is:
 annual spending target / safe withdrawal rate
 ```
 
-The default safe withdrawal rate is 3.5%, intentionally below the classic 4% heuristic because this household targets a long horizon starting at age 50 and has PLN/tax/regulatory constraints. The value is configurable through `APP_FIRE_SAFE_WITHDRAWAL_RATE`.
+The annual spending target comes from the FIRE monthly spending setting, not from the current budget target. The default safe withdrawal rate is 3.5%, intentionally below the classic 4% heuristic because this household targets a long horizon starting at age 50 and has PLN/tax/regulatory constraints. The value is configurable through `APP_FIRE_SAFE_WITHDRAWAL_RATE`.
 
 ## Bridge Capital
 

@@ -155,7 +155,7 @@ public record FireSummary(
                     BigDecimal.ZERO,
                     false,
                     false,
-                    "Brak odbudowanego budżetu domowego; FIRE używa tylko override/default."
+                    "Brak odbudowanego budżetu domowego; FIRE używa tylko ustawień FIRE/defaultu."
             );
         }
     }

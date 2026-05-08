@@ -754,7 +754,7 @@ export function selectModuleHeader({
     fire: {
       eyebrow: "FIRE tracking",
       title: "Czy możemy odejść z pracy w wieku 50 lat?",
-      subtitle: "Prognoza oparta o lokalne raporty MyFund, budżet życia i polskie reguły podatkowo-emerytalne.",
+      subtitle: "Prognoza oparta o cel FIRE, lokalne raporty MyFund, tempo inwestowania z budżetu i polskie reguły podatkowo-emerytalne.",
       cards: [
         { label: "Kapitał teraz", value: Number(fireSummary?.currentPortfolioValue || 0), detail: `${Number(fireSummary?.positionCount || 0)} pozycji` },
         { label: "Cel FIRE", value: Number(fireSummary?.fireNumber || 0), detail: `${percent(fireSummary?.safeWithdrawalRate)} SWR` },
