@@ -174,7 +174,7 @@ describe("module view-model selectors", () => {
 
     expect(selectModuleHeader({
       view: "fire",
-      fireSummary: { currentPortfolioValue: 100000, fireNumber: 2000000, gapToFireNumber: 1900000, liquidBridgeGapToAge60: 1200000, safeWithdrawalRate: 0.035, targetAge: 50, positionCount: 12, budgetLink: { firePortfolioMonthlyContribution: 3000 } },
+      fireSummary: { spendTargetConfigured: true, currentPortfolioValue: 100000, fireNumber: 2000000, gapToFireNumber: 1900000, liquidBridgeGapToAge60: 1200000, safeWithdrawalRate: 0.035, targetAge: 50, positionCount: 12, budgetLink: { firePortfolioMonthlyContribution: 3000 } },
     })).toMatchObject({
       eyebrow: "FIRE tracking",
       cards: [
@@ -183,6 +183,19 @@ describe("module view-model selectors", () => {
         { label: "Brakuje", value: 1900000 },
         { label: "Wpłata z budżetu", value: 3000 },
         { label: "Luka 50-60", value: 1200000 },
+      ],
+    });
+
+    expect(selectModuleHeader({
+      view: "fire",
+      fireSummary: { spendTargetConfigured: false, currentPortfolioValue: 100000, safeWithdrawalRate: 0.035, targetAge: 50, positionCount: 12, budgetLink: { firePortfolioMonthlyContribution: 3000 } },
+    })).toMatchObject({
+      cards: [
+        { label: "Kapitał teraz", value: 100000 },
+        { label: "Cel FIRE", value: "Ustaw cel", textValue: true },
+        { label: "Brakuje", value: "Ustaw cel", textValue: true },
+        { label: "Wpłata z budżetu", value: 3000 },
+        { label: "Luka 50-60", value: "Ustaw cel", textValue: true },
       ],
     });
   });

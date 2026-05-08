@@ -757,10 +757,16 @@ export function selectModuleHeader({
       subtitle: "Prognoza oparta o cel FIRE, lokalne raporty MyFund, tempo inwestowania z budżetu i polskie reguły podatkowo-emerytalne.",
       cards: [
         { label: "Kapitał teraz", value: Number(fireSummary?.currentPortfolioValue || 0), detail: `${Number(fireSummary?.positionCount || 0)} pozycji` },
-        { label: "Cel FIRE", value: Number(fireSummary?.fireNumber || 0), detail: `${percent(fireSummary?.safeWithdrawalRate)} SWR` },
-        { label: "Brakuje", value: Number(fireSummary?.gapToFireNumber || 0), detail: `do wieku ${fireSummary?.targetAge || 50}`, tone: Number(fireSummary?.gapToFireNumber || 0) > 0 ? "warn" : "good" },
+        fireSummary?.spendTargetConfigured
+          ? { label: "Cel FIRE", value: Number(fireSummary?.fireNumber || 0), detail: `${percent(fireSummary?.safeWithdrawalRate)} SWR` }
+          : { label: "Cel FIRE", value: "Ustaw cel", detail: "docelowe wydatki / mies.", textValue: true, tone: "warn" },
+        fireSummary?.spendTargetConfigured
+          ? { label: "Brakuje", value: Number(fireSummary?.gapToFireNumber || 0), detail: `do wieku ${fireSummary?.targetAge || 50}`, tone: Number(fireSummary?.gapToFireNumber || 0) > 0 ? "warn" : "good" }
+          : { label: "Brakuje", value: "Ustaw cel", detail: "nie liczę bez celu", textValue: true },
         { label: "Wpłata z budżetu", value: Number(fireSummary?.budgetLink?.firePortfolioMonthlyContribution || fireSummary?.currentMonthlyWealthContribution || 0), detail: "inwestycje + konto oszcz. netto" },
-        { label: "Luka 50-60", value: Number(fireSummary?.liquidBridgeGapToAge60 || 0), detail: "po zostawieniu poduszki", tone: Number(fireSummary?.liquidBridgeGapToAge60 || 0) > 0 ? "warn" : "good" },
+        fireSummary?.spendTargetConfigured
+          ? { label: "Luka 50-60", value: Number(fireSummary?.liquidBridgeGapToAge60 || 0), detail: "po zostawieniu poduszki", tone: Number(fireSummary?.liquidBridgeGapToAge60 || 0) > 0 ? "warn" : "good" }
+          : { label: "Luka 50-60", value: "Ustaw cel", detail: "pomost zależy od celu", textValue: true },
       ],
     },
     obligations: {

@@ -206,6 +206,7 @@ public class BudgetApiMapper {
                 summary.emergencyReserveTarget(),
                 summary.annualSpendTarget(),
                 summary.monthlySpendTarget(),
+                summary.spendTargetConfigured(),
                 summary.safeWithdrawalRate(),
                 summary.fireNumber(),
                 summary.gapToFireNumber(),

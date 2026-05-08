@@ -26,7 +26,7 @@ The default FIRE number is:
 annual spending target / safe withdrawal rate
 ```
 
-The annual spending target comes from the FIRE monthly spending setting, not from the current budget target. The default safe withdrawal rate is 3.5%, intentionally below the classic 4% heuristic because this household targets a long horizon starting at age 50 and has PLN/tax/regulatory constraints. The value is configurable through `APP_FIRE_SAFE_WITHDRAWAL_RATE`.
+The annual spending target comes from the explicit FIRE monthly spending setting, not from the current budget target. If that setting is empty, the app does not guess a FIRE number. The default safe withdrawal rate is 3.5%, intentionally below the classic 4% heuristic because this household targets a long horizon starting at age 50 and has PLN/tax/regulatory constraints. The value is configurable through `APP_FIRE_SAFE_WITHDRAWAL_RATE`.
 
 ## Bridge Capital
 

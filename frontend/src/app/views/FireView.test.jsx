@@ -22,6 +22,8 @@ describe("FireView", () => {
           targetAge: 50,
           positionCount: 4,
           currentPortfolioValue: 200000,
+          monthlySpendTarget: 14000,
+          spendTargetConfigured: true,
           fireNumber: 4800000,
           gapToFireNumber: 4600000,
           safeWithdrawalRate: 0.035,
@@ -43,6 +45,41 @@ describe("FireView", () => {
     expect(screen.getByText("Polskie reguły w modelu")).toBeInTheDocument();
     expect(screen.getByTestId("fire-projection-chart")).toBeInTheDocument();
     expect(screen.getByTestId("fire-allocation-chart")).toBeInTheDocument();
+  });
+
+  it("does not show a guessed 14k FIRE spending target when target is not configured", () => {
+    render(
+      <FireView
+        fireSettings={{ monthlySpendOverride: null }}
+        fireSummary={{
+          reportsLoaded: true,
+          currentAge: 36,
+          targetAge: 50,
+          positionCount: 4,
+          currentPortfolioValue: 200000,
+          monthlySpendTarget: 0,
+          spendTargetConfigured: false,
+          fireNumber: 0,
+          gapToFireNumber: 0,
+          safeWithdrawalRate: 0.035,
+          scenarios: [],
+          allocation: [],
+          wrappers: [],
+          rebalancing: [],
+          actionItems: [{ priority: "P1", title: "Ustaw miesięczny cel wydatków FIRE", detail: "Bez celu nie liczę.", amount: 0 }],
+          milestones: [],
+          legalRules: [],
+          sources: [],
+          budgetLink: { firePortfolioMonthlyContribution: 9000, targetMonthlySpend: 14000 },
+        }}
+      />
+    );
+
+    expect(screen.getAllByText("Ustaw cel").length).toBeGreaterThan(0);
+    expect(screen.getByText("nie zgaduję tej liczby")).toBeInTheDocument();
+    expect(screen.queryByText("Target budżetu")).not.toBeInTheDocument();
+    expect(screen.queryByText(/14\s*000/)).not.toBeInTheDocument();
+    expect(screen.queryByText("domyślny cel FIRE")).not.toBeInTheDocument();
   });
 
   it("explains where local MyFund reports are expected when data is missing", () => {

@@ -23,6 +23,7 @@ public record FireSummary(
         BigDecimal emergencyReserveTarget,
         BigDecimal annualSpendTarget,
         BigDecimal monthlySpendTarget,
+        boolean spendTargetConfigured,
         BigDecimal safeWithdrawalRate,
         BigDecimal fireNumber,
         BigDecimal gapToFireNumber,
@@ -155,7 +156,7 @@ public record FireSummary(
                     BigDecimal.ZERO,
                     false,
                     false,
-                    "Brak odbudowanego budżetu domowego; FIRE używa tylko ustawień FIRE/defaultu."
+                    "Brak odbudowanego budżetu domowego; FIRE używa tylko jawnych ustawień FIRE i realnych przepływów po imporcie."
             );
         }
     }

@@ -28,6 +28,8 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
 
   const baseScenario = summary.scenarios?.find((scenario) => scenario.id === "base") || summary.scenarios?.[0];
   const budget = summary.budgetLink || {};
+  const hasSpendTarget = summary.spendTargetConfigured === true;
+  const setupTarget = "Ustaw cel";
   return (
     <section className="viewStack">
       <Panel
@@ -44,9 +46,9 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
         </div>
         <div className="metricGrid four">
           <Metric label="Kapitał dziś" value={money(summary.currentPortfolioValue)} detail={`${summary.positionCount} pozycji`} />
-          <Metric label="Cel FIRE" value={money(summary.fireNumber)} detail={`${percent(summary.safeWithdrawalRate)} SWR`} />
-          <Metric label="Brakuje" value={money(summary.gapToFireNumber)} detail={`do wieku ${summary.targetAge}`} warn={Number(summary.gapToFireNumber) > 0} />
-          <Metric label="Wymagane / mies." value={money(baseScenario?.requiredMonthlyContribution)} detail="scenariusz bazowy" />
+          <Metric label="Cel FIRE" value={hasSpendTarget ? money(summary.fireNumber) : setupTarget} detail={hasSpendTarget ? `${percent(summary.safeWithdrawalRate)} SWR` : "wpisz wydatki FIRE"} />
+          <Metric label="Brakuje" value={hasSpendTarget ? money(summary.gapToFireNumber) : setupTarget} detail={hasSpendTarget ? `do wieku ${summary.targetAge}` : "nie liczę bez celu"} warn={hasSpendTarget && Number(summary.gapToFireNumber) > 0} />
+          <Metric label="Wymagane / mies." value={hasSpendTarget ? money(baseScenario?.requiredMonthlyContribution) : setupTarget} detail={hasSpendTarget ? "scenariusz bazowy" : "najpierw cel wydatków"} />
         </div>
         {settingsStatus && <div className={`inlineStatus ${settingsStatus.type}`}>{settingsStatus.message}</div>}
       </Panel>
@@ -57,14 +59,14 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
           <span>{budget.note || "Odbuduj budżet domowy, żeby FIRE używał realnych przepływów."}</span>
         </div>
         <div className="metricGrid four">
-          <Metric label="Cel wydatków FIRE" value={money(summary.monthlySpendTarget)} detail={budget.spendOverrideUsed ? "z ustawień FIRE" : "domyślny cel FIRE"} />
+          <Metric label="Cel wydatków FIRE" value={hasSpendTarget ? money(summary.monthlySpendTarget) : setupTarget} detail={hasSpendTarget ? "z ustawień FIRE" : "nie zgaduję tej liczby"} />
           <Metric label="Wpłata FIRE" value={money(budget.firePortfolioMonthlyContribution || summary.currentMonthlyWealthContribution)} detail={budget.contributionOverrideUsed ? "override" : "z budżetu: inwestycje + oszcz. netto"} />
           <Metric label="Nadpłata kredytu" value={money(budget.loanOverpaymentMonthly)} detail="osobno od portfela FIRE" />
           <Metric label="Poduszka zostaje" value={money(summary.emergencyReserveTarget || budget.emergencyReserveTarget)} detail="nie liczę jej do pomostu" />
         </div>
         <div className="metricGrid four">
           <Metric label="Wydatki teraz" value={money(budget.currentMonthlyLivingSpend)} detail={`${budget.activeMonths || 0} mies. danych`} />
-          <Metric label="Target budżetu" value={money(budget.targetMonthlySpend)} detail="tylko kontekst, nie cel FIRE" />
+          <Metric label="Okres budżetu" value={`${budget.activeMonths || 0} mies.`} detail={budget.budgetYear ? `rok ${budget.budgetYear}` : "brak danych"} />
           <Metric label="Inwestycje" value={money(budget.actualMonthlyInvestments)} detail="średnio / mies." />
           <Metric label="Konto oszcz. netto" value={money(budget.savingsAccountMonthlyNet)} detail={`brutto ${money(budget.savingsAccountMonthlyGrossDeposits)}`} />
         </div>
@@ -224,7 +226,7 @@ function FireSettingsForm({ draft, onChange }) {
     <div className="fireSettingsGrid">
       <NumberField label="Wiek teraz" value={draft.currentAge} min={18} max={90} step={1} onChange={(value) => update(draft, onChange, "currentAge", value)} />
       <NumberField label="Wiek FIRE" value={draft.targetAge} min={19} max={90} step={1} onChange={(value) => update(draft, onChange, "targetAge", value)} />
-      <MoneyField label="Docelowe wydatki FIRE / mies." value={draft.monthlySpendOverride} placeholder="domyślny cel FIRE" onChange={(value) => update(draft, onChange, "monthlySpendOverride", value)} />
+      <MoneyField label="Docelowe wydatki FIRE / mies." value={draft.monthlySpendOverride} placeholder="np. 10000" onChange={(value) => update(draft, onChange, "monthlySpendOverride", value)} />
       <MoneyField label="Wpłata FIRE override / mies." value={draft.monthlyContributionOverride} placeholder="z budżetu" onChange={(value) => update(draft, onChange, "monthlyContributionOverride", value)} />
       <PercentField label="SWR" value={draft.safeWithdrawalRate} onChange={(value) => update(draft, onChange, "safeWithdrawalRate", value)} />
       <PercentField label="Zwrot ostrożny" value={draft.pessimisticRealReturn} onChange={(value) => update(draft, onChange, "pessimisticRealReturn", value)} />

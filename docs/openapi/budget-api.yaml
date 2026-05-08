@@ -1238,7 +1238,7 @@ components:
           description: Optional manual high-level budget bucket override for category-scope settings.
     FireSummary:
       type: object
-      required: [reportsLoaded, reportsPath, sourceCount, positionCount, currentAge, targetAge, yearsToFire, currentPortfolioValue, costBasis, unrealizedGain, emergencyFundValue, retirementLockedValue, liquidFireCapital, bridgeableLiquidCapital, emergencyReserveTarget, annualSpendTarget, monthlySpendTarget, safeWithdrawalRate, fireNumber, gapToFireNumber, bridgeCapitalToAge60, bridgeCapitalToAge65, liquidBridgeGapToAge60, liquidBridgeGapToAge65, taxableCapitalValue, taxableUnrealizedGain, estimatedCapitalGainsTax, currentMonthlyWealthContribution, budgetLink, contributionPlan, withdrawalPlan, dataQuality, scenarios, allocation, wrappers, rebalancing, actionItems, milestones, legalRules, sources]
+      required: [reportsLoaded, reportsPath, sourceCount, positionCount, currentAge, targetAge, yearsToFire, currentPortfolioValue, costBasis, unrealizedGain, emergencyFundValue, retirementLockedValue, liquidFireCapital, bridgeableLiquidCapital, emergencyReserveTarget, annualSpendTarget, monthlySpendTarget, spendTargetConfigured, safeWithdrawalRate, fireNumber, gapToFireNumber, bridgeCapitalToAge60, bridgeCapitalToAge65, liquidBridgeGapToAge60, liquidBridgeGapToAge65, taxableCapitalValue, taxableUnrealizedGain, estimatedCapitalGainsTax, currentMonthlyWealthContribution, budgetLink, contributionPlan, withdrawalPlan, dataQuality, scenarios, allocation, wrappers, rebalancing, actionItems, milestones, legalRules, sources]
       properties:
         asOf:
           type: string
@@ -1278,6 +1278,9 @@ components:
           $ref: "#/components/schemas/Money"
         monthlySpendTarget:
           $ref: "#/components/schemas/Money"
+        spendTargetConfigured:
+          type: boolean
+          description: True only when the user explicitly configured monthly FIRE spending. When false, the app must not present a guessed FIRE number.
         safeWithdrawalRate:
           $ref: "#/components/schemas/Ratio"
         fireNumber:
@@ -1581,7 +1584,7 @@ components:
           minimum: 18
           maximum: 90
         monthlySpendOverride:
-          description: Monthly FIRE spending target. When omitted, the model uses the app-level FIRE default, not the household budget target.
+          description: Explicit monthly FIRE spending target. When omitted, the model does not guess a FIRE number from the household budget.
           $ref: "#/components/schemas/Money"
         monthlyContributionOverride:
           description: Optional manual FIRE contribution override. When omitted, current contribution comes from household budget investments plus net savings-account movement.

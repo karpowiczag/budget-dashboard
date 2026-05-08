@@ -29,22 +29,7 @@ class FireQueryServiceTest {
 
     @Test
     void buildsFireSummaryFromPortfolioSnapshotWithoutBudgetData() throws Exception {
-        var settings = new FireSettings(
-                Path.of("fire/investments_reports"),
-                36,
-                50,
-                null,
-                null,
-                BigDecimal.valueOf(0.035),
-                BigDecimal.valueOf(0.02),
-                BigDecimal.valueOf(0.04),
-                BigDecimal.valueOf(0.055),
-                BigDecimal.valueOf(0.80),
-                BigDecimal.valueOf(0.10),
-                BigDecimal.valueOf(0.05),
-                BigDecimal.valueOf(0.05),
-                BigDecimal.valueOf(0.05)
-        );
+        var settings = settingsWithSpend("14000.00");
         when(portfolioReader.read(settings.reportsPath())).thenReturn(new FirePortfolioSnapshot(
                 LocalDate.parse("2026-05-08"),
                 List.of(
@@ -75,7 +60,7 @@ class FireQueryServiceTest {
 
     @Test
     void linksHouseholdBudgetAndExcludesLoanOverpaymentsFromFireContribution() throws Exception {
-        var settings = defaultSettings();
+        var settings = settingsWithSpend("14000.00");
         when(portfolioReader.read(settings.reportsPath())).thenReturn(new FirePortfolioSnapshot(
                 LocalDate.parse("2026-05-08"),
                 List.of(position("Akcje", "Rachunek opodatkowany", "200000")),
@@ -95,6 +80,28 @@ class FireQueryServiceTest {
         assertThat(summary.budgetLink().savingsAccountMonthlyNet()).isEqualByComparingTo("1000.00");
         assertThat(summary.budgetLink().loanOverpaymentMonthly()).isEqualByComparingTo("4000.00");
         assertThat(summary.contributionPlan().recommendation()).contains("Nadpłaty kredytu");
+    }
+
+    @Test
+    void requiresExplicitFireSpendTargetInsteadOfGuessingFromBudget() throws Exception {
+        var settings = defaultSettings();
+        when(portfolioReader.read(settings.reportsPath())).thenReturn(new FirePortfolioSnapshot(
+                LocalDate.parse("2026-05-08"),
+                List.of(position("Akcje", "Rachunek opodatkowany", "200000")),
+                List.of("fake.csv")
+        ));
+        when(budgetStore.findYears()).thenReturn(List.of(new YearSummary(2026, OffsetDateTime.parse("2026-05-08T10:00:00Z"), 100, new BigDecimal("100000"), new BigDecimal("50000"), "local.csv")));
+        when(budgetStore.findDashboard(2026)).thenReturn(budgetSnapshot());
+
+        var summary = new FireQueryService(portfolioReader, budgetStore, new FireSettingsService(settings, new MemoryStore())).summary();
+
+        assertThat(summary.spendTargetConfigured()).isFalse();
+        assertThat(summary.monthlySpendTarget()).isEqualByComparingTo("0.00");
+        assertThat(summary.fireNumber()).isEqualByComparingTo("0.00");
+        assertThat(summary.scenarios()).isEmpty();
+        assertThat(summary.budgetLink().targetMonthlySpend()).isEqualByComparingTo("12000.00");
+        assertThat(summary.budgetLink().firePortfolioMonthlyContribution()).isEqualByComparingTo("9000.00");
+        assertThat(summary.actionItems()).extracting(FireSummary.FireActionItem::title).contains("Ustaw miesięczny cel wydatków FIRE");
     }
 
     @Test
@@ -151,11 +158,15 @@ class FireQueryServiceTest {
     }
 
     private FireSettings defaultSettings() {
+        return settingsWithSpend(null);
+    }
+
+    private FireSettings settingsWithSpend(String monthlySpend) {
         return new FireSettings(
                 Path.of("fire/investments_reports"),
                 36,
                 50,
-                null,
+                monthlySpend == null ? null : new BigDecimal(monthlySpend),
                 null,
                 BigDecimal.valueOf(0.035),
                 BigDecimal.valueOf(0.02),

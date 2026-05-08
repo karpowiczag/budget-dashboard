@@ -22,7 +22,6 @@ import org.springframework.stereotype.Service;
 public class FireQueryService {
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
     private static final BigDecimal TWELVE = BigDecimal.valueOf(12);
-    private static final BigDecimal DEFAULT_FIRE_MONTHLY_SPEND_TARGET = BigDecimal.valueOf(14_000);
     private static final String WRAPPER_EMERGENCY = "Poduszka bezpieczeństwa";
     private static final String WRAPPER_RETIREMENT = "Emerytalne długoterminowe";
     private static final String WRAPPER_TAXABLE = "Rachunek opodatkowany";
@@ -54,6 +53,7 @@ public class FireQueryService {
                 .toList(), FirePortfolioPosition::valuePln);
         var liquidFireCapital = currentValue.subtract(retirementLocked).max(BigDecimal.ZERO);
         var budgetLink = budgetLink(settings);
+        var spendTargetConfigured = settings.monthlySpendOverride() != null;
         var monthlySpendTarget = fireSpendTarget(settings);
         var annualSpendTarget = monthlySpendTarget.multiply(TWELVE);
         var fireNumber = divide(annualSpendTarget, settings.safeWithdrawalRate(), 2);
@@ -62,7 +62,9 @@ public class FireQueryService {
                 ? budgetLink.firePortfolioMonthlyContribution()
                 : money(settings.monthlyContributionOverride());
         budgetLink = applyOverridesToBudgetLink(budgetLink, monthlyContribution, settings);
-        var scenarios = scenarios(settings, currentValue, fireNumber, monthlyContribution, yearsToFire);
+        var scenarios = spendTargetConfigured
+                ? scenarios(settings, currentValue, fireNumber, monthlyContribution, yearsToFire)
+                : List.<FireSummary.FireScenario>of();
         var investmentPositions = positions.stream()
                 .filter(position -> !position.wrapper().equals(WRAPPER_EMERGENCY))
                 .toList();
@@ -85,11 +87,11 @@ public class FireQueryService {
         var baseScenario = scenarios.stream()
                 .filter(scenario -> scenario.id().equals("base"))
                 .findFirst()
-                .orElseGet(scenarios::getFirst);
-        var contributionPlan = contributionPlan(monthlyContribution, baseScenario, budgetLink);
+                .orElse(null);
+        var contributionPlan = contributionPlan(monthlyContribution, baseScenario, budgetLink, spendTargetConfigured);
         var withdrawalPlan = withdrawalPlan(monthlySpendTarget, annualSpendTarget, liquidFireCapital, bridgeTo60, bridgeTo65, estimatedTax);
         var dataQuality = dataQuality(snapshot, positions);
-        var actionItems = actionItems(baseScenario, contributionPlan, liquidBridgeGapTo60, dataQuality, rebalancing, budgetLink);
+        var actionItems = actionItems(baseScenario, contributionPlan, liquidBridgeGapTo60, dataQuality, rebalancing, budgetLink, spendTargetConfigured);
 
         return new FireSummary(
                 snapshot.asOf(),
@@ -110,6 +112,7 @@ public class FireQueryService {
                 money(budgetLink.emergencyReserveTarget()),
                 money(annualSpendTarget),
                 money(monthlySpendTarget),
+                spendTargetConfigured,
                 settings.safeWithdrawalRate(),
                 money(fireNumber),
                 money(fireNumber.subtract(currentValue).max(BigDecimal.ZERO)),
@@ -130,7 +133,7 @@ public class FireQueryService {
                 wrappers,
                 rebalancing,
                 actionItems,
-                milestones(settings, annualSpendTarget, fireNumber, bridgeTo60, bridgeTo65),
+                spendTargetConfigured ? milestones(settings, annualSpendTarget, fireNumber, bridgeTo60, bridgeTo65) : List.of(),
                 legalRules(),
                 sources(positions)
         );
@@ -185,7 +188,7 @@ public class FireQueryService {
 
     private BigDecimal fireSpendTarget(FireSettings settings) {
         return settings.monthlySpendOverride() == null
-                ? DEFAULT_FIRE_MONTHLY_SPEND_TARGET
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
                 : money(settings.monthlySpendOverride());
     }
 
@@ -368,8 +371,20 @@ public class FireQueryService {
     private FireSummary.FireContributionPlan contributionPlan(
             BigDecimal currentMonthly,
             FireSummary.FireScenario baseScenario,
-            FireSummary.FireBudgetLink budgetLink
+            FireSummary.FireBudgetLink budgetLink,
+            boolean spendTargetConfigured
     ) {
+        if (!spendTargetConfigured || baseScenario == null) {
+            return new FireSummary.FireContributionPlan(
+                    money(currentMonthly),
+                    BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                    BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                    BigDecimal.valueOf(28_260L * 2),
+                    BigDecimal.valueOf(11_304L * 2),
+                    money(BigDecimal.valueOf(28_260L * 2 + 11_304L * 2).divide(TWELVE, 2, RoundingMode.HALF_UP)),
+                    "Ustaw docelowe miesięczne wydatki FIRE. Budżet będzie dalej dostarczał tylko obecne tempo wpłat inwestycyjnych."
+            );
+        }
         var required = money(baseScenario.requiredMonthlyContribution());
         var additional = money(required.subtract(currentMonthly).max(BigDecimal.ZERO));
         var ikeCapacity = BigDecimal.valueOf(28_260L * 2);
@@ -465,9 +480,19 @@ public class FireQueryService {
             BigDecimal liquidBridgeGapTo60,
             FireSummary.FireDataQuality dataQuality,
             List<FireSummary.FireRebalanceAction> rebalancing,
-            FireSummary.FireBudgetLink budgetLink
+            FireSummary.FireBudgetLink budgetLink,
+            boolean spendTargetConfigured
     ) {
         var items = new ArrayList<FireSummary.FireActionItem>();
+        if (!spendTargetConfigured) {
+            items.add(new FireSummary.FireActionItem(
+                    "P1",
+                    "planning",
+                    "Ustaw miesięczny cel wydatków FIRE",
+                    "Bez tej liczby model nie liczy FIRE number, luki ani wymaganej wpłaty. Budżet domowy nie zgaduje przyszłych kosztów życia.",
+                    BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+            ));
+        }
         if (!dataQuality.status().equals("ok")) {
             items.add(new FireSummary.FireActionItem(
                     "P1",
@@ -477,7 +502,7 @@ public class FireQueryService {
                     BigDecimal.ZERO
             ));
         }
-        if (contributionPlan.additionalMonthlyNeeded().signum() > 0) {
+        if (spendTargetConfigured && contributionPlan.additionalMonthlyNeeded().signum() > 0) {
             items.add(new FireSummary.FireActionItem(
                     "P1",
                     "contribution",
@@ -486,7 +511,7 @@ public class FireQueryService {
                     contributionPlan.additionalMonthlyNeeded()
             ));
         }
-        if (budgetLink.loanOverpaymentMonthly().compareTo(BigDecimal.ZERO) > 0 && contributionPlan.additionalMonthlyNeeded().signum() > 0) {
+        if (spendTargetConfigured && budgetLink.loanOverpaymentMonthly().compareTo(BigDecimal.ZERO) > 0 && contributionPlan.additionalMonthlyNeeded().signum() > 0) {
             items.add(new FireSummary.FireActionItem(
                     "P2",
                     "debt",
@@ -495,7 +520,7 @@ public class FireQueryService {
                     budgetLink.loanOverpaymentMonthly()
             ));
         }
-        if (liquidBridgeGapTo60.signum() > 0) {
+        if (spendTargetConfigured && liquidBridgeGapTo60.signum() > 0) {
             items.add(new FireSummary.FireActionItem(
                     "P1",
                     "bridge",

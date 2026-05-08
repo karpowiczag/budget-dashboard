@@ -418,6 +418,7 @@ public final class BudgetApiDtos {
             BigDecimal emergencyReserveTarget,
             BigDecimal annualSpendTarget,
             BigDecimal monthlySpendTarget,
+            boolean spendTargetConfigured,
             BigDecimal safeWithdrawalRate,
             BigDecimal fireNumber,
             BigDecimal gapToFireNumber,
