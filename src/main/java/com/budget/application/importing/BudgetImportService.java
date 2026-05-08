@@ -207,15 +207,20 @@ public class BudgetImportService {
     }
 
     private MergedTransactions mergeTransactionSources(List<List<BankTransaction>> sources) {
-        var deduplicated = new LinkedHashMap<TransactionFingerprint, BankTransaction>();
+        var grouped = new LinkedHashMap<TransactionFingerprint, List<List<BankTransaction>>>();
         var sourceCount = 0;
         for (var source : sources) {
+            var sourceGroups = new LinkedHashMap<TransactionFingerprint, List<BankTransaction>>();
             for (var transaction : source) {
                 sourceCount++;
-                deduplicated.merge(fingerprint(transaction), transaction, this::preferSettledTransaction);
+                sourceGroups.computeIfAbsent(fingerprint(transaction), ignored -> new ArrayList<>()).add(transaction);
             }
+            sourceGroups.forEach((fingerprint, transactions) ->
+                    grouped.computeIfAbsent(fingerprint, ignored -> new ArrayList<>()).add(transactions)
+            );
         }
-        var merged = new ArrayList<>(deduplicated.values());
+        var merged = new ArrayList<BankTransaction>();
+        grouped.values().forEach(sourceGroups -> merged.addAll(bestTransactions(sourceGroups)));
         merged.sort(Comparator.comparing(BankTransaction::date)
                 .thenComparing(BankTransaction::account)
                 .thenComparing(BankTransaction::description)
@@ -223,19 +228,28 @@ public class BudgetImportService {
         return new MergedTransactions(merged, sourceCount - merged.size());
     }
 
-    private BankTransaction preferSettledTransaction(BankTransaction existing, BankTransaction candidate) {
-        var existingUnsettled = isUnsettled(existing);
-        var candidateUnsettled = isUnsettled(candidate);
-        if (existingUnsettled && !candidateUnsettled) {
-            return candidate;
+    private List<BankTransaction> bestTransactions(List<List<BankTransaction>> sourceGroups) {
+        var keepCount = sourceGroups.stream().mapToInt(List::size).max().orElse(0);
+        var candidates = sourceGroups.stream()
+                .flatMap(List::stream)
+                .sorted(this::compareTransactionQuality)
+                .toList();
+        return candidates.stream().limit(keepCount).toList();
+    }
+
+    private int compareTransactionQuality(BankTransaction left, BankTransaction right) {
+        return Integer.compare(transactionQuality(right), transactionQuality(left));
+    }
+
+    private int transactionQuality(BankTransaction transaction) {
+        var score = 0;
+        if (!isUnsettled(transaction)) {
+            score += 2;
         }
-        if (!existingUnsettled && candidateUnsettled) {
-            return existing;
+        if (!blank(transaction.bankCategory())) {
+            score += 1;
         }
-        if (blank(existing.bankCategory()) && !blank(candidate.bankCategory())) {
-            return candidate;
-        }
-        return existing;
+        return score;
     }
 
     private TransactionFingerprint fingerprint(BankTransaction transaction) {

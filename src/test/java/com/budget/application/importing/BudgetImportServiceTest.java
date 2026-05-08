@@ -256,6 +256,42 @@ class BudgetImportServiceTest {
     }
 
     @Test
+    void uploadPreservesRepeatedSameFingerprintTransactionsFromOneCsv() throws Exception {
+        var firstCharge = bankTransaction("2026-05-07", "RESTAURACJA CGP W VOLV", -23.60);
+        var secondCharge = bankTransaction("2026-05-07", "RESTAURACJA CGP W VOLV", -23.60);
+        var csvReader = mock(BankTransactionReader.class);
+        var analysis = mock(BudgetAnalysisService.class);
+        var repository = mock(BudgetReportStore.class);
+        var audit = mock(ImportAuditService.class);
+        var inputCaptor = ArgumentCaptor.forClass(BudgetInput.class);
+        var service = new BudgetImportService(
+                new ImportSettings(2048, tempDir, true),
+                csvReader,
+                analysis,
+                repository,
+                audit,
+                noOpTransactionManager()
+        );
+
+        when(csvReader.read(any(), eq("partial.csv"), any())).thenReturn(new BudgetInput(2026, "partial.csv", List.of(firstCharge, secondCharge)));
+        when(analysis.analyze(inputCaptor.capture())).thenAnswer(invocation -> {
+            var input = invocation.getArgument(0, BudgetInput.class);
+            return new BudgetAnalysisResult(input.year(), input.fileName(), null, List.of(), input.transactions().size(), BigDecimal.TEN, BigDecimal.ONE);
+        });
+
+        var summary = service.importUpload(new TransactionImportFile(
+                "partial.csv",
+                12,
+                "text/csv",
+                () -> new ByteArrayInputStream("csv".getBytes(java.nio.charset.StandardCharsets.UTF_8))
+        ));
+
+        assertThat(summary.transactions()).isEqualTo(2);
+        assertThat(summary.duplicatesRemoved()).isZero();
+        assertThat(inputCaptor.getValue().transactions()).containsExactly(firstCharge, secondCharge);
+    }
+
+    @Test
     void failedLocalRebuildErrorUsesFileNameWithoutLocalPath() throws Exception {
         var folder = tempDir.resolve("2026");
         Files.createDirectories(folder);
