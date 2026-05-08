@@ -49,8 +49,53 @@ public record BudgetSnapshot(
             int corrections,
             int lowConfidence,
             int toCheck,
-            BigDecimal toCheckAmount
+            BigDecimal toCheckAmount,
+            BigDecimal savingsAccountNetChange,
+            BigDecimal savingsAccountGrossDeposits,
+            BigDecimal savingsAccountInflows,
+            BigDecimal savingsAccountOutflows
     ) {
+        public Kpis(
+                BigDecimal income,
+                BigDecimal spend,
+                BigDecimal discretionary,
+                BigDecimal operatingSurplus,
+                BigDecimal savingsRate,
+                BigDecimal excludedGross,
+                BigDecimal excludedOutgoing,
+                BigDecimal excludedIncoming,
+                BigDecimal excludedNet,
+                BigDecimal realSavingsOutgoing,
+                BigDecimal unassignedSurplus,
+                int transactions,
+                int corrections,
+                int lowConfidence,
+                int toCheck,
+                BigDecimal toCheckAmount
+        ) {
+            this(
+                    income,
+                    spend,
+                    discretionary,
+                    operatingSurplus,
+                    savingsRate,
+                    excludedGross,
+                    excludedOutgoing,
+                    excludedIncoming,
+                    excludedNet,
+                    realSavingsOutgoing,
+                    unassignedSurplus,
+                    transactions,
+                    corrections,
+                    lowConfidence,
+                    toCheck,
+                    toCheckAmount,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO
+            );
+        }
     }
 
     public record MonthlySummary(
@@ -78,8 +123,27 @@ public record BudgetSnapshot(
             String maxMonth,
             BigDecimal maxAmount,
             boolean discretionary,
-            int count
+            int count,
+            List<String> merchantExamples
     ) {
+        public CategorySummary(
+                String category,
+                String group,
+                BigDecimal spend,
+                BigDecimal income,
+                BigDecimal excluded,
+                BigDecimal monthlyAverage,
+                String maxMonth,
+                BigDecimal maxAmount,
+                boolean discretionary,
+                int count
+        ) {
+            this(category, group, spend, income, excluded, monthlyAverage, maxMonth, maxAmount, discretionary, count, List.of());
+        }
+
+        public CategorySummary {
+            merchantExamples = BudgetSnapshot.copy(merchantExamples);
+        }
     }
 
     public record HierarchySummary(
@@ -116,14 +180,48 @@ public record BudgetSnapshot(
             BigDecimal monthlyCutNeeded,
             BigDecimal emergencyFundMin,
             BigDecimal emergencyFundComfort,
+            List<CategoryLimit> parentLimits,
             List<CategoryLimit> categoryLimits
     ) {
+        public SavingsPlan(
+                BigDecimal currentMonthlySpend,
+                BigDecimal currentMonthlyIncome,
+                BigDecimal coreMonthlyCost,
+                BigDecimal targetMonthlySpend,
+                BigDecimal aggressiveMonthlySpend,
+                BigDecimal targetInvestmentTransfer,
+                BigDecimal aggressiveInvestmentTransfer,
+                BigDecimal monthlyCutNeeded,
+                BigDecimal emergencyFundMin,
+                BigDecimal emergencyFundComfort,
+                List<CategoryLimit> categoryLimits
+        ) {
+            this(
+                    currentMonthlySpend,
+                    currentMonthlyIncome,
+                    coreMonthlyCost,
+                    targetMonthlySpend,
+                    aggressiveMonthlySpend,
+                    targetInvestmentTransfer,
+                    aggressiveInvestmentTransfer,
+                    monthlyCutNeeded,
+                    emergencyFundMin,
+                    emergencyFundComfort,
+                    List.of(),
+                    categoryLimits
+            );
+        }
+
         public SavingsPlan {
+            parentLimits = BudgetSnapshot.copy(parentLimits);
             categoryLimits = BudgetSnapshot.copy(categoryLimits);
         }
     }
 
     public record CategoryLimit(
+            String scope,
+            String name,
+            boolean parent,
             String category,
             String bucket,
             BigDecimal currentMonthly,
@@ -133,6 +231,18 @@ public record BudgetSnapshot(
             String priority,
             String action
     ) {
+        public CategoryLimit(
+                String category,
+                String bucket,
+                BigDecimal currentMonthly,
+                BigDecimal limit,
+                BigDecimal potentialMonthly,
+                BigDecimal potentialYearly,
+                String priority,
+                String action
+        ) {
+            this("category", category, false, category, bucket, currentMonthly, limit, potentialMonthly, potentialYearly, priority, action);
+        }
     }
 
     public record MonthControl(

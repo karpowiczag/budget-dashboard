@@ -33,7 +33,7 @@ public class JdbcBudgetSettingsRepository implements BudgetSettingsStore {
         var limits = jdbc.query("""
                 SELECT * FROM budget_category_limit_settings
                 WHERE settings_key = :settingsKey
-                ORDER BY category
+                ORDER BY limit_scope, limit_name, category
                 """, params(), this::mapLimit);
         var profile = profiles.getFirst();
         return Optional.of(new BudgetSettings(
@@ -67,14 +67,17 @@ public class JdbcBudgetSettingsRepository implements BudgetSettingsStore {
         for (var limit : settings.categoryLimits()) {
             jdbc.update("""
                     INSERT INTO budget_category_limit_settings (
-                        settings_key, category, limit_amount, action
+                        settings_key, category, limit_scope, limit_name, limit_amount, action, budget_bucket_override
                     ) VALUES (
-                        :settingsKey, :category, :limitAmount, :action
+                        :settingsKey, :category, :scope, :name, :limitAmount, :action, :bucketOverride
                     )
                     """, params()
-                    .addValue("category", limit.category())
+                    .addValue("category", persistenceCategory(limit))
+                    .addValue("scope", limit.scope())
+                    .addValue("name", limit.displayName())
                     .addValue("limitAmount", limit.limit())
-                    .addValue("action", limit.action()));
+                    .addValue("action", limit.action())
+                    .addValue("bucketOverride", limit.bucketOverride()));
         }
         return findDefaultSettings().orElseThrow();
     }
@@ -90,10 +93,17 @@ public class JdbcBudgetSettingsRepository implements BudgetSettingsStore {
 
     private BudgetSettings.CategoryLimitSetting mapLimit(ResultSet rs, int rowNum) throws SQLException {
         return new BudgetSettings.CategoryLimitSetting(
+                rs.getString("limit_scope"),
+                rs.getString("limit_name"),
                 rs.getString("category"),
                 rs.getBigDecimal("limit_amount"),
-                rs.getString("action")
+                rs.getString("action"),
+                rs.getString("budget_bucket_override")
         );
+    }
+
+    private String persistenceCategory(BudgetSettings.CategoryLimitSetting limit) {
+        return "category".equals(limit.scope()) ? limit.displayName() : limit.scope() + ":" + limit.displayName();
     }
 
     private MapSqlParameterSource params() {

@@ -30,8 +30,8 @@ public class TransactionNormalizer {
             var bankCategory = clean(row.bankCategory());
             var decision = classifier.classifyDecision(bankCategory, description, value);
             var correctedCategory = decision.category();
-            var confidence = confidence(value, correctedCategory, decision.matchedByTitle());
-            var notes = notes(bankCategory, correctedCategory, confidence);
+            var confidence = confidence(value, decision);
+            var notes = notes(bankCategory, correctedCategory, confidence, decision.reviewReason());
             var realIncome = value.signum() > 0 && classifier.isRealIncome(correctedCategory);
             var spend = value.signum() < 0 && !classifier.isExcluded(correctedCategory);
             var excludedFlow = classifier.isExcluded(correctedCategory) || (value.signum() > 0 && !realIncome);
@@ -47,10 +47,17 @@ public class TransactionNormalizer {
                     description,
                     row.account(),
                     bankCategory,
+                    decision.categoryId(),
                     correctedCategory,
+                    decision.subcategoryId(),
                     classifier.budgetArea(correctedCategory),
                     classifier.group(correctedCategory),
-                    classifier.subcategory(correctedCategory, description),
+                    decision.subcategory(),
+                    decision.flowType(),
+                    decision.budgetGroupId(),
+                    decision.budgetGroup(),
+                    decision.reviewStatus(),
+                    decision.reviewReason(),
                     classifier.budgetBucket(correctedCategory),
                     classifier.fixedness(correctedCategory),
                     value.signum() >= 0 ? "Wpływ" : "Wydatek",
@@ -70,21 +77,25 @@ public class TransactionNormalizer {
         return normalized;
     }
 
-    private String confidence(BigDecimal value, String correctedCategory, boolean matchedByTitle) {
-        if ("Do sprawdzenia".equals(correctedCategory)
-                || (value.abs().compareTo(LARGE_MARKETPLACE_AMOUNT) >= 0 && "Marketplace i zakupy online".equals(correctedCategory))) {
+    private String confidence(BigDecimal value, com.budget.application.categorization.CategoryDecision decision) {
+        if ("needsReview".equals(decision.reviewStatus())
+                || "needsSplit".equals(decision.reviewStatus())
+                || (value.abs().compareTo(LARGE_MARKETPLACE_AMOUNT) >= 0 && "marketplaceOnline".equals(decision.categoryId()))) {
             return "Niska";
         }
-        if ("Marketplace i zakupy online".equals(correctedCategory) || !matchedByTitle) {
+        if (!decision.matchedByTitle()) {
             return "Średnia";
         }
         return "Wysoka";
     }
 
-    private List<String> notes(String bankCategory, String correctedCategory, String confidence) {
+    private List<String> notes(String bankCategory, String correctedCategory, String confidence, String reviewReason) {
         var notes = new ArrayList<String>();
         if (!bankCategory.equals(correctedCategory)) {
             notes.add("Własna kategoria z tytułu/opisu");
+        }
+        if (reviewReason != null && !reviewReason.isBlank()) {
+            notes.add(reviewReason);
         }
         if ("Niska".equals(confidence)) {
             notes.add("Do ręcznego sprawdzenia");

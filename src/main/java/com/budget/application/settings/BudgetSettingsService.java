@@ -3,11 +3,24 @@ package com.budget.application.settings;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.LinkedHashMap;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class BudgetSettingsService {
+    private static final Set<String> LIMIT_SCOPES = Set.of("bucket", "area", "group", "category");
+    private static final Set<String> BUCKET_OVERRIDES = Set.of(
+            "Obowiązkowe stałe",
+            "Obowiązkowe zmienne",
+            "Do rozbicia",
+            "Nieobowiązkowe",
+            "Nieregularne",
+            "Inwestycje",
+            "Konto oszczędnościowe",
+            "Nadpłata kredytu"
+    );
+
     private final BudgetSettingsDefaults defaults;
     private final BudgetSettingsStore store;
 
@@ -46,22 +59,28 @@ public class BudgetSettingsService {
         if (normalized.emergencyFundComfortMonths() < normalized.emergencyFundMinMonths()) {
             throw new IllegalArgumentException("emergencyFundComfortMonths cannot be lower than emergencyFundMinMonths");
         }
-        var limitsByCategory = new LinkedHashMap<String, BudgetSettings.CategoryLimitSetting>();
+        var limitsByKey = new LinkedHashMap<String, BudgetSettings.CategoryLimitSetting>();
         for (var row : normalized.categoryLimits()) {
-            if (row.category() == null || row.category().isBlank()) {
+            var scope = normalizeScope(row.scope());
+            var name = normalizeName(row);
+            var bucketOverride = normalizeBucketOverride(row.bucketOverride());
+            if (name.isBlank()) {
                 continue;
             }
             if (row.limit().signum() < 0) {
                 throw new IllegalArgumentException("Category limits cannot be negative");
             }
-            var category = row.category().trim();
-            if (limitsByCategory.containsKey(category)) {
-                throw new IllegalArgumentException("Duplicate category limit: " + category);
+            var key = scope + "\u001F" + name;
+            if (limitsByKey.containsKey(key)) {
+                throw new IllegalArgumentException("Duplicate budget limit: " + scope + "/" + name);
             }
-            limitsByCategory.put(category, new BudgetSettings.CategoryLimitSetting(
-                    category,
+            limitsByKey.put(key, new BudgetSettings.CategoryLimitSetting(
+                    scope,
+                    name,
+                    "category".equals(scope) ? name : "",
                     money(row.limit()),
-                    row.action() == null ? "" : row.action().trim()
+                    row.action() == null ? "" : row.action().trim(),
+                    "category".equals(scope) ? bucketOverride : ""
             ));
         }
         return new BudgetSettings(
@@ -69,8 +88,35 @@ public class BudgetSettingsService {
                 money(normalized.aggressiveMonthlySpend()),
                 normalized.emergencyFundMinMonths(),
                 normalized.emergencyFundComfortMonths(),
-                java.util.List.copyOf(limitsByCategory.values())
+                java.util.List.copyOf(limitsByKey.values())
         );
+    }
+
+    private String normalizeScope(String scope) {
+        var normalized = scope == null || scope.isBlank() ? "category" : scope.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!LIMIT_SCOPES.contains(normalized)) {
+            throw new IllegalArgumentException("Unsupported budget limit scope: " + scope);
+        }
+        return normalized;
+    }
+
+    private String normalizeName(BudgetSettings.CategoryLimitSetting row) {
+        var name = row.name();
+        if (name == null || name.isBlank()) {
+            name = row.category();
+        }
+        return name == null ? "" : name.trim();
+    }
+
+    private String normalizeBucketOverride(String bucketOverride) {
+        var normalized = bucketOverride == null ? "" : bucketOverride.trim();
+        if (normalized.isBlank()) {
+            return "";
+        }
+        if (!BUCKET_OVERRIDES.contains(normalized)) {
+            throw new IllegalArgumentException("Unsupported budget bucket override: " + bucketOverride);
+        }
+        return normalized;
     }
 
     private BigDecimal positiveOrDefault(BigDecimal value, BigDecimal fallback) {

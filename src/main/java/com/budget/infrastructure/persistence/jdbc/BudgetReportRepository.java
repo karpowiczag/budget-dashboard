@@ -34,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class BudgetReportRepository implements BudgetReportStore {
+    private static final java.util.Set<String> FINANCIAL_FLOW_CATEGORIES = java.util.Set.of("Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu");
+
     private final ReportDataJdbcRepository reports;
     private final BudgetTransactionDataJdbcRepository transactions;
     private final ImportRunDataJdbcRepository importRuns;
@@ -106,13 +108,17 @@ public class BudgetReportRepository implements BudgetReportStore {
     @Override
     public BudgetSnapshot findDashboard(int year) {
         var report = reports.findById(year).orElseThrow(() -> new ReportNotFoundException(year));
+        var kpis = enrichSavingsAccountKpis(
+                queryOne("SELECT * FROM report_kpis WHERE report_year = :year", params(year), this::mapKpis),
+                year
+        );
         return new BudgetSnapshot(
                 year,
                 report.getPeriodLabel(),
                 report.getPeriodStart(),
                 report.getPeriodEnd(),
                 activeMonths(year),
-                queryOne("SELECT * FROM report_kpis WHERE report_year = :year", params(year), this::mapKpis),
+                kpis,
                 query("SELECT * FROM report_monthly_summaries WHERE report_year = :year ORDER BY month_key", params(year), this::mapMonthly),
                 query("SELECT * FROM report_category_summaries WHERE report_year = :year ORDER BY spend DESC, category", params(year), this::mapCategory),
                 query("SELECT * FROM report_hierarchy_summaries WHERE report_year = :year ORDER BY budget_area, spend DESC, budget_group, category, subcategory", params(year), this::mapHierarchy),
@@ -126,12 +132,86 @@ public class BudgetReportRepository implements BudgetReportStore {
         );
     }
 
+    private BudgetSnapshot.Kpis enrichSavingsAccountKpis(BudgetSnapshot.Kpis row, int year) {
+        var turnover = savingsAccountTurnover(year);
+        var grossDeposits = decimal("""
+                SELECT COALESCE(SUM(excluded_outgoing), 0)
+                FROM budget_transactions
+                WHERE report_year = :year
+                  AND corrected_category = 'Konto oszczędnościowe'
+                """, params(year));
+        return new BudgetSnapshot.Kpis(
+                row.income(),
+                row.spend(),
+                row.discretionary(),
+                row.operatingSurplus(),
+                row.savingsRate(),
+                row.excludedGross(),
+                row.excludedOutgoing(),
+                row.excludedIncoming(),
+                row.excludedNet(),
+                row.realSavingsOutgoing(),
+                row.unassignedSurplus(),
+                row.transactions(),
+                row.corrections(),
+                row.lowConfidence(),
+                row.toCheck(),
+                row.toCheckAmount(),
+                turnover.netChange(),
+                grossDeposits,
+                turnover.inflows(),
+                turnover.outflows()
+        );
+    }
+
+    private SavingsAccountTurnover savingsAccountTurnover(int year) {
+        var latestSavingsAccountDate = jdbc.queryForObject("""
+                SELECT MAX(posted_date)
+                FROM budget_transactions
+                WHERE report_year = :year
+                  AND (LOWER(account) LIKE '%oszcz%' OR LOWER(account) LIKE '%lokat%' OR LOWER(account) LIKE '%saving%')
+                """, params(year), LocalDate.class);
+        var accountInflows = decimal("""
+                SELECT COALESCE(SUM(amount), 0)
+                FROM budget_transactions
+                WHERE report_year = :year
+                  AND amount > 0
+                  AND (LOWER(account) LIKE '%oszcz%' OR LOWER(account) LIKE '%lokat%' OR LOWER(account) LIKE '%saving%')
+                """, params(year));
+        var accountOutflows = decimal("""
+                SELECT COALESCE(SUM(-amount), 0)
+                FROM budget_transactions
+                WHERE report_year = :year
+                  AND amount < 0
+                  AND (LOWER(account) LIKE '%oszcz%' OR LOWER(account) LIKE '%lokat%' OR LOWER(account) LIKE '%saving%')
+                """, params(year));
+        var pendingDeposits = latestSavingsAccountDate == null
+                ? decimal("""
+                        SELECT COALESCE(SUM(excluded_outgoing), 0)
+                        FROM budget_transactions
+                        WHERE report_year = :year
+                          AND corrected_category = 'Konto oszczędnościowe'
+                        """, params(year))
+                : decimal("""
+                        SELECT COALESCE(SUM(excluded_outgoing), 0)
+                        FROM budget_transactions
+                        WHERE report_year = :year
+                          AND corrected_category = 'Konto oszczędnościowe'
+                          AND posted_date > :latestSavingsAccountDate
+                        """, params(year).addValue("latestSavingsAccountDate", latestSavingsAccountDate));
+        var inflows = accountInflows.add(pendingDeposits);
+        return new SavingsAccountTurnover(inflows.subtract(accountOutflows), inflows, accountOutflows);
+    }
+
+    private record SavingsAccountTurnover(BigDecimal netChange, BigDecimal inflows, BigDecimal outflows) {
+    }
+
     @Override
     public CalendarReport findCalendar(int year, String month) {
         ensureReport(year);
         var monthKey = month == null || month.isBlank() ? latestMonth(year) : month;
         var ym = YearMonth.parse(monthKey);
-        var query = new TransactionQuery(year, 0, 5_000, "spend,desc", monthKey, null, null, null, null, null, null, null);
+        var query = new TransactionQuery(year, 0, 5_000, "spend,desc", monthKey, null, null, null, null, null, null, null, null);
         var rows = findTransactionRows(query, false);
         var byDate = new LinkedHashMap<LocalDate, List<TransactionRecord>>();
         for (var row : rows) {
@@ -174,8 +254,15 @@ public class BudgetReportRepository implements BudgetReportStore {
                 aggregate(rows, TransactionRecord::correctedCategory, AnalyticsReport.CategorySpend::new),
                 aggregateSubcategories(rows),
                 aggregateHierarchy(rows),
+                financialFlows(rows),
                 aggregate(rows, TransactionRecord::merchant, AnalyticsReport.MerchantSpend::new),
-                oneoffs
+                oneoffs,
+                monthlyCategoryTrends(rows),
+                monthlyBucketTrends(rows),
+                monthlyMerchantTrends(rows),
+                fixednessBreakdown(rows),
+                confidenceBreakdown(rows),
+                amountBands(rows)
         );
     }
 
@@ -188,8 +275,8 @@ public class BudgetReportRepository implements BudgetReportStore {
     }
 
     @Override
-    public void recordImportRun(Integer year, String inputCsv, String status, String message) {
-        importRuns.save(new ImportRunEntity(null, year, inputCsv, status, message, OffsetDateTime.now()));
+    public void recordImportRun(Integer year, String inputCsv, String status, String message, int duplicatesRemoved) {
+        importRuns.save(new ImportRunEntity(null, year, inputCsv, status, message, Math.max(0, duplicatesRemoved), OffsetDateTime.now()));
     }
 
     @Override
@@ -201,6 +288,7 @@ public class BudgetReportRepository implements BudgetReportStore {
                         row.getInputCsv(),
                         row.getStatus(),
                         row.getMessage(),
+                        row.getDuplicatesRemoved() == null ? 0 : row.getDuplicatesRemoved(),
                         row.getCreatedAt()
                 ))
                 .toList();
@@ -268,10 +356,10 @@ public class BudgetReportRepository implements BudgetReportStore {
             update("""
                     INSERT INTO report_category_summaries (
                         report_year, category, budget_group, spend, income, excluded,
-                        monthly_average, max_month, max_amount, discretionary, transaction_count
+                        monthly_average, max_month, max_amount, discretionary, transaction_count, merchant_examples
                     ) VALUES (
                         :year, :category, :group, :spend, :income, :excluded,
-                        :monthlyAverage, :maxMonth, :maxAmount, :discretionary, :count
+                        :monthlyAverage, :maxMonth, :maxAmount, :discretionary, :count, :merchantExamples
                     )
                     """, params(year)
                     .addValue("category", row.category())
@@ -283,7 +371,8 @@ public class BudgetReportRepository implements BudgetReportStore {
                     .addValue("maxMonth", row.maxMonth())
                     .addValue("maxAmount", row.maxAmount())
                     .addValue("discretionary", row.discretionary())
-                    .addValue("count", row.count()));
+                    .addValue("count", row.count())
+                    .addValue("merchantExamples", encodeExamples(row.merchantExamples())));
         }
     }
 
@@ -351,16 +440,22 @@ public class BudgetReportRepository implements BudgetReportStore {
                 .addValue("emergencyFundMin", plan.emergencyFundMin())
                 .addValue("emergencyFundComfort", plan.emergencyFundComfort()));
 
-        for (var row : plan.categoryLimits()) {
+        var limitRows = new ArrayList<BudgetSnapshot.CategoryLimit>();
+        limitRows.addAll(plan.parentLimits());
+        limitRows.addAll(plan.categoryLimits());
+        for (var row : limitRows) {
             update("""
                     INSERT INTO report_category_limits (
-                        report_year, category, bucket, current_monthly, limit_amount,
-                        potential_monthly, potential_yearly, priority, action
+                        report_year, limit_scope, limit_name, is_parent, category, bucket,
+                        current_monthly, limit_amount, potential_monthly, potential_yearly, priority, action
                     ) VALUES (
-                        :year, :category, :bucket, :currentMonthly, :limit,
-                        :potentialMonthly, :potentialYearly, :priority, :action
+                        :year, :scope, :name, :parent, :category, :bucket,
+                        :currentMonthly, :limit, :potentialMonthly, :potentialYearly, :priority, :action
                     )
                     """, params(year)
+                    .addValue("scope", row.scope())
+                    .addValue("name", row.name())
+                    .addValue("parent", row.parent())
                     .addValue("category", row.category())
                     .addValue("bucket", row.bucket())
                     .addValue("currentMonthly", row.currentMonthly())
@@ -532,6 +627,8 @@ public class BudgetReportRepository implements BudgetReportStore {
     private BudgetSnapshot.SavingsPlan savingsPlan(int year) {
         var plan = queryOne("SELECT * FROM report_savings_plan WHERE report_year = :year", params(year), this::mapSavingsPlanWithoutLimits);
         var limits = query("SELECT * FROM report_category_limits WHERE report_year = :year ORDER BY potential_monthly DESC, category", params(year), this::mapCategoryLimit);
+        var parentLimits = limits.stream().filter(BudgetSnapshot.CategoryLimit::parent).toList();
+        var categoryLimits = limits.stream().filter(row -> !row.parent()).toList();
         return new BudgetSnapshot.SavingsPlan(
                 plan.currentMonthlySpend(),
                 plan.currentMonthlyIncome(),
@@ -543,7 +640,8 @@ public class BudgetReportRepository implements BudgetReportStore {
                 plan.monthlyCutNeeded(),
                 plan.emergencyFundMin(),
                 plan.emergencyFundComfort(),
-                limits
+                parentLimits,
+                categoryLimits
         );
     }
 
@@ -623,6 +721,20 @@ public class BudgetReportRepository implements BudgetReportStore {
             clauses.add("posted_date = :date");
             params.addValue("date", query.date());
         }
+        if (query.flow() != null) {
+            switch (query.flow()) {
+                case "income" -> clauses.add("income > 0");
+                case "livingExpense" -> clauses.add("analysis_spend > 0 AND flow_type = 'livingExpense'");
+                case "excluded" -> clauses.add("excluded > 0");
+                case "technicalTransfer" -> clauses.add("excluded > 0 AND flow_type = 'technicalTransfer'");
+                case "wealthTransfer" -> {
+                    clauses.add("excluded_outgoing > 0 AND flow_type = 'wealthTransfer'");
+                }
+                case "refundCorrection" -> clauses.add("flow_type = 'refundCorrection'");
+                case "review" -> clauses.add("review_status <> 'ok'");
+                default -> throw new IllegalArgumentException("Unsupported transaction flow: " + query.flow());
+            }
+        }
         if (query.bucket() != null) {
             clauses.add("budget_bucket = :bucket");
             params.addValue("bucket", query.bucket());
@@ -643,13 +755,26 @@ public class BudgetReportRepository implements BudgetReportStore {
             clauses.add("(subcategory = :subcategory OR corrected_category || ' · ' || subcategory = :subcategory)");
             params.addValue("subcategory", query.subcategory());
         }
+        if (query.fixedness() != null) {
+            clauses.add("fixedness = :fixedness");
+            params.addValue("fixedness", query.fixedness());
+        }
+        if (query.confidence() != null) {
+            clauses.add("confidence = :confidence");
+            params.addValue("confidence", query.confidence());
+        }
+        if (query.reviewStatus() != null) {
+            clauses.add("review_status = :reviewStatus");
+            params.addValue("reviewStatus", query.reviewStatus());
+        }
         if (query.query() != null) {
             clauses.add("""
                     LOWER(
                         COALESCE(merchant, '') || ' ' ||
                         COALESCE(description, '') || ' ' ||
                         COALESCE(corrected_category, '') || ' ' ||
-                        COALESCE(subcategory, '')
+                        COALESCE(subcategory, '') || ' ' ||
+                        COALESCE(review_reason, '')
                     ) LIKE :needle
                     """);
             params.addValue("needle", "%" + query.query().toLowerCase() + "%");
@@ -673,10 +798,17 @@ public class BudgetReportRepository implements BudgetReportStore {
         entity.setDescription(tx.description());
         entity.setAccount(tx.account());
         entity.setBankCategory(tx.bankCategory());
+        entity.setCategoryId(tx.categoryId());
         entity.setCorrectedCategory(tx.correctedCategory());
+        entity.setSubcategoryId(tx.subcategoryId());
         entity.setBudgetArea(tx.budgetArea());
         entity.setBudgetGroup(tx.group());
         entity.setSubcategory(tx.subcategory());
+        entity.setFlowType(tx.flowType());
+        entity.setBudgetGroupId(tx.budgetGroupId());
+        entity.setBudgetGroupLabel(tx.budgetGroup());
+        entity.setReviewStatus(tx.reviewStatus());
+        entity.setReviewReason(tx.reviewReason());
         entity.setBudgetBucket(tx.budgetBucket());
         entity.setFixedness(tx.fixedness());
         entity.setTransactionType(tx.type());
@@ -742,7 +874,8 @@ public class BudgetReportRepository implements BudgetReportStore {
                 rs.getString("max_month"),
                 rs.getBigDecimal("max_amount"),
                 rs.getBoolean("discretionary"),
-                rs.getInt("transaction_count")
+                rs.getInt("transaction_count"),
+                decodeExamples(rs.getString("merchant_examples"))
         );
     }
 
@@ -783,12 +916,16 @@ public class BudgetReportRepository implements BudgetReportStore {
                 rs.getBigDecimal("monthly_cut_needed"),
                 rs.getBigDecimal("emergency_fund_min"),
                 rs.getBigDecimal("emergency_fund_comfort"),
+                List.of(),
                 List.of()
         );
     }
 
     private BudgetSnapshot.CategoryLimit mapCategoryLimit(ResultSet rs, int rowNum) throws SQLException {
         return new BudgetSnapshot.CategoryLimit(
+                rs.getString("limit_scope"),
+                rs.getString("limit_name"),
+                rs.getBoolean("is_parent"),
                 rs.getString("category"),
                 rs.getString("bucket"),
                 rs.getBigDecimal("current_monthly"),
@@ -909,10 +1046,17 @@ public class BudgetReportRepository implements BudgetReportStore {
                 rs.getString("description"),
                 rs.getString("account"),
                 rs.getString("bank_category"),
+                rs.getString("category_id"),
                 rs.getString("corrected_category"),
+                rs.getString("subcategory_id"),
                 rs.getString("budget_area"),
                 rs.getString("budget_group"),
                 rs.getString("subcategory"),
+                rs.getString("flow_type"),
+                rs.getString("budget_group_id"),
+                rs.getString("budget_group_label"),
+                rs.getString("review_status"),
+                rs.getString("review_reason"),
                 rs.getString("budget_bucket"),
                 rs.getString("fixedness"),
                 rs.getString("transaction_type"),
@@ -946,6 +1090,11 @@ public class BudgetReportRepository implements BudgetReportStore {
         jdbc.update(sql, params);
     }
 
+    private BigDecimal decimal(String sql, MapSqlParameterSource params) {
+        var value = jdbc.queryForObject(sql, params, BigDecimal.class);
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
     private MapSqlParameterSource params(int year) {
         return new MapSqlParameterSource("year", year);
     }
@@ -972,6 +1121,9 @@ public class BudgetReportRepository implements BudgetReportStore {
         var totals = new LinkedHashMap<String, SubcategoryAggregate>();
         for (var row : rows) {
             if (row.spend().signum() <= 0) {
+                continue;
+            }
+            if (row.subcategory() == null || row.subcategory().isBlank()) {
                 continue;
             }
             var key = row.correctedCategory() + " · " + row.subcategory();
@@ -1001,6 +1153,180 @@ public class BudgetReportRepository implements BudgetReportStore {
                 .map(agg -> new AnalyticsReport.HierarchySpend(agg.area, agg.group, agg.category, agg.subcategory, agg.spend, agg.count))
                 .sorted(Comparator.comparing(AnalyticsReport.HierarchySpend::spend).reversed())
                 .limit(80)
+                .toList();
+    }
+
+    private List<AnalyticsReport.FinancialFlow> financialFlows(List<TransactionRecord> rows) {
+        var totals = new LinkedHashMap<String, FinancialFlowAggregate>();
+        for (var row : rows) {
+            if (!FINANCIAL_FLOW_CATEGORIES.contains(row.correctedCategory()) || row.excludedOutgoing().signum() <= 0) {
+                continue;
+            }
+            var agg = totals.computeIfAbsent(row.correctedCategory(), ignored -> new FinancialFlowAggregate());
+            agg.outgoing = agg.outgoing.add(row.excludedOutgoing());
+            agg.count++;
+        }
+        return totals.entrySet().stream()
+                .map(entry -> new AnalyticsReport.FinancialFlow(entry.getKey(), entry.getValue().outgoing, entry.getValue().count))
+                .sorted(Comparator.comparing(AnalyticsReport.FinancialFlow::outgoing).reversed())
+                .toList();
+    }
+
+    private List<AnalyticsReport.MonthlyCategoryTrend> monthlyCategoryTrends(List<TransactionRecord> rows) {
+        var totals = new LinkedHashMap<String, MonthlyDimensionAggregate>();
+        for (var row : rows) {
+            if (row.spend().signum() <= 0) {
+                continue;
+            }
+            var category = normalizedLabel(row.correctedCategory());
+            var key = row.month() + "\u001F" + category;
+            var agg = totals.computeIfAbsent(key, ignored -> new MonthlyDimensionAggregate(row.month(), category));
+            agg.spend = agg.spend.add(row.spend());
+            agg.count++;
+        }
+        return totals.values().stream()
+                .map(agg -> new AnalyticsReport.MonthlyCategoryTrend(monthLabel(agg.monthKey), agg.monthKey, agg.dimension, agg.spend, agg.count))
+                .sorted(Comparator.comparing(AnalyticsReport.MonthlyCategoryTrend::monthKey)
+                        .thenComparing(AnalyticsReport.MonthlyCategoryTrend::spend, Comparator.reverseOrder()))
+                .toList();
+    }
+
+    private List<AnalyticsReport.MonthlyBucketTrend> monthlyBucketTrends(List<TransactionRecord> rows) {
+        var totals = new LinkedHashMap<String, MonthlyDimensionAggregate>();
+        for (var row : rows) {
+            if (row.spend().signum() <= 0) {
+                continue;
+            }
+            var bucket = normalizedLabel(row.bucket());
+            var key = row.month() + "\u001F" + bucket;
+            var agg = totals.computeIfAbsent(key, ignored -> new MonthlyDimensionAggregate(row.month(), bucket));
+            agg.spend = agg.spend.add(row.spend());
+            agg.count++;
+        }
+        return totals.values().stream()
+                .map(agg -> new AnalyticsReport.MonthlyBucketTrend(monthLabel(agg.monthKey), agg.monthKey, agg.dimension, agg.spend, agg.count))
+                .sorted(Comparator.comparing(AnalyticsReport.MonthlyBucketTrend::monthKey)
+                        .thenComparing(AnalyticsReport.MonthlyBucketTrend::spend, Comparator.reverseOrder()))
+                .toList();
+    }
+
+    private List<AnalyticsReport.MonthlyMerchantTrend> monthlyMerchantTrends(List<TransactionRecord> rows) {
+        var topMerchants = rows.stream()
+                .filter(row -> row.spend().signum() > 0)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        row -> normalizedLabel(row.merchant()),
+                        java.util.stream.Collectors.reducing(BigDecimal.ZERO, TransactionRecord::spend, BigDecimal::add)
+                ))
+                .entrySet().stream()
+                .sorted(Map.Entry.<String, BigDecimal>comparingByValue().reversed())
+                .limit(10)
+                .map(Map.Entry::getKey)
+                .collect(java.util.stream.Collectors.toSet());
+        var totals = new LinkedHashMap<String, MonthlyDimensionAggregate>();
+        for (var row : rows) {
+            if (row.spend().signum() <= 0) {
+                continue;
+            }
+            var merchant = normalizedLabel(row.merchant());
+            if (!topMerchants.contains(merchant)) {
+                continue;
+            }
+            var key = row.month() + "\u001F" + merchant;
+            var agg = totals.computeIfAbsent(key, ignored -> new MonthlyDimensionAggregate(row.month(), merchant));
+            agg.spend = agg.spend.add(row.spend());
+            agg.count++;
+        }
+        return totals.values().stream()
+                .map(agg -> new AnalyticsReport.MonthlyMerchantTrend(monthLabel(agg.monthKey), agg.monthKey, agg.dimension, agg.spend, agg.count))
+                .sorted(Comparator.comparing(AnalyticsReport.MonthlyMerchantTrend::monthKey)
+                        .thenComparing(AnalyticsReport.MonthlyMerchantTrend::spend, Comparator.reverseOrder()))
+                .toList();
+    }
+
+    private List<AnalyticsReport.FixednessBreakdown> fixednessBreakdown(List<TransactionRecord> rows) {
+        var totals = new LinkedHashMap<String, Aggregate>();
+        for (var row : rows) {
+            if (row.spend().signum() <= 0) {
+                continue;
+            }
+            var agg = totals.computeIfAbsent(normalizedLabel(row.fixedness()), ignored -> new Aggregate());
+            agg.spend = agg.spend.add(row.spend());
+            agg.count++;
+        }
+        return totals.entrySet().stream()
+                .map(entry -> new AnalyticsReport.FixednessBreakdown(entry.getKey(), entry.getValue().spend, entry.getValue().count))
+                .sorted(Comparator.comparing(AnalyticsReport.FixednessBreakdown::spend).reversed())
+                .toList();
+    }
+
+    private List<AnalyticsReport.ConfidenceBreakdown> confidenceBreakdown(List<TransactionRecord> rows) {
+        var totals = new LinkedHashMap<String, ConfidenceAggregate>();
+        for (var row : rows) {
+            var agg = totals.computeIfAbsent(normalizedLabel(row.confidence()), ignored -> new ConfidenceAggregate());
+            agg.spend = agg.spend.add(row.spend());
+            agg.income = agg.income.add(row.income());
+            agg.excluded = agg.excluded.add(row.excluded());
+            agg.count++;
+        }
+        return totals.entrySet().stream()
+                .map(entry -> new AnalyticsReport.ConfidenceBreakdown(
+                        entry.getKey(),
+                        entry.getValue().count,
+                        entry.getValue().spend,
+                        entry.getValue().income,
+                        entry.getValue().excluded
+                ))
+                .sorted(Comparator.comparing(AnalyticsReport.ConfidenceBreakdown::count).reversed())
+                .toList();
+    }
+
+    private List<AnalyticsReport.AmountBand> amountBands(List<TransactionRecord> rows) {
+        var bands = List.of(
+                new AmountBandDefinition("0-50", BigDecimal.ZERO, BigDecimal.valueOf(50)),
+                new AmountBandDefinition("50-100", BigDecimal.valueOf(50), BigDecimal.valueOf(100)),
+                new AmountBandDefinition("100-250", BigDecimal.valueOf(100), BigDecimal.valueOf(250)),
+                new AmountBandDefinition("250-500", BigDecimal.valueOf(250), BigDecimal.valueOf(500)),
+                new AmountBandDefinition("500-1000", BigDecimal.valueOf(500), BigDecimal.valueOf(1000)),
+                new AmountBandDefinition("1000+", BigDecimal.valueOf(1000), null)
+        );
+        var totals = new LinkedHashMap<String, AmountBandAggregate>();
+        bands.forEach(band -> totals.put(band.label, new AmountBandAggregate(band)));
+        for (var row : rows) {
+            if (row.spend().signum() <= 0) {
+                continue;
+            }
+            var band = bands.stream()
+                    .filter(candidate -> candidate.contains(row.spend()))
+                    .findFirst()
+                    .orElseThrow();
+            var agg = totals.get(band.label);
+            agg.spend = agg.spend.add(row.spend());
+            agg.count++;
+        }
+        return totals.values().stream()
+                .map(agg -> new AnalyticsReport.AmountBand(agg.definition.label, agg.definition.minAmount, agg.definition.maxAmount, agg.count, agg.spend))
+                .toList();
+    }
+
+    private String normalizedLabel(String value) {
+        return value == null || value.isBlank() ? "Inne" : value;
+    }
+
+    private String monthLabel(String monthKey) {
+        return monthKey == null || monthKey.length() != 7 ? monthKey : monthKey.substring(5, 7) + "." + monthKey.substring(0, 4);
+    }
+
+    private String encodeExamples(List<String> examples) {
+        return examples == null ? "" : String.join("\n", examples);
+    }
+
+    private List<String> decodeExamples(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        return value.lines()
+                .map(String::trim)
+                .filter(line -> !line.isBlank())
                 .toList();
     }
 
@@ -1049,6 +1375,46 @@ public class BudgetReportRepository implements BudgetReportStore {
             this.group = group;
             this.category = category;
             this.subcategory = subcategory;
+        }
+    }
+
+    private static final class FinancialFlowAggregate {
+        private BigDecimal outgoing = BigDecimal.ZERO;
+        private int count;
+    }
+
+    private static final class MonthlyDimensionAggregate {
+        private final String monthKey;
+        private final String dimension;
+        private BigDecimal spend = BigDecimal.ZERO;
+        private int count;
+
+        private MonthlyDimensionAggregate(String monthKey, String dimension) {
+            this.monthKey = monthKey;
+            this.dimension = dimension;
+        }
+    }
+
+    private static final class ConfidenceAggregate {
+        private BigDecimal spend = BigDecimal.ZERO;
+        private BigDecimal income = BigDecimal.ZERO;
+        private BigDecimal excluded = BigDecimal.ZERO;
+        private int count;
+    }
+
+    private record AmountBandDefinition(String label, BigDecimal minAmount, BigDecimal maxAmount) {
+        private boolean contains(BigDecimal amount) {
+            return amount.compareTo(minAmount) >= 0 && (maxAmount == null || amount.compareTo(maxAmount) < 0);
+        }
+    }
+
+    private static final class AmountBandAggregate {
+        private final AmountBandDefinition definition;
+        private BigDecimal spend = BigDecimal.ZERO;
+        private int count;
+
+        private AmountBandAggregate(AmountBandDefinition definition) {
+            this.definition = definition;
         }
     }
 }

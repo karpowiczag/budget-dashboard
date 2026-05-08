@@ -27,14 +27,28 @@ public class BudgetTransactionEntity {
     private String account;
     @Column("bank_category")
     private String bankCategory;
+    @Column("category_id")
+    private String categoryId;
     @Column("corrected_category")
     private String correctedCategory;
+    @Column("subcategory_id")
+    private String subcategoryId;
     @Column("budget_area")
     private String budgetArea;
     @Column("budget_group")
     private String budgetGroup;
     @Column("subcategory")
     private String subcategory;
+    @Column("flow_type")
+    private String flowType;
+    @Column("budget_group_id")
+    private String budgetGroupId;
+    @Column("budget_group_label")
+    private String budgetGroupLabel;
+    @Column("review_status")
+    private String reviewStatus;
+    @Column("review_reason")
+    private String reviewReason;
     @Column("budget_bucket")
     private String budgetBucket;
     @Column("fixedness")
@@ -139,12 +153,28 @@ public class BudgetTransactionEntity {
         this.bankCategory = bankCategory;
     }
 
+    public String getCategoryId() {
+        return categoryId;
+    }
+
+    public void setCategoryId(String categoryId) {
+        this.categoryId = categoryId;
+    }
+
     public String getCorrectedCategory() {
         return correctedCategory;
     }
 
     public void setCorrectedCategory(String correctedCategory) {
         this.correctedCategory = correctedCategory;
+    }
+
+    public String getSubcategoryId() {
+        return subcategoryId;
+    }
+
+    public void setSubcategoryId(String subcategoryId) {
+        this.subcategoryId = subcategoryId;
     }
 
     public String getBudgetArea() {
@@ -169,6 +199,46 @@ public class BudgetTransactionEntity {
 
     public void setSubcategory(String subcategory) {
         this.subcategory = subcategory;
+    }
+
+    public String getFlowType() {
+        return flowType;
+    }
+
+    public void setFlowType(String flowType) {
+        this.flowType = flowType;
+    }
+
+    public String getBudgetGroupId() {
+        return budgetGroupId;
+    }
+
+    public void setBudgetGroupId(String budgetGroupId) {
+        this.budgetGroupId = budgetGroupId;
+    }
+
+    public String getBudgetGroupLabel() {
+        return budgetGroupLabel;
+    }
+
+    public void setBudgetGroupLabel(String budgetGroupLabel) {
+        this.budgetGroupLabel = budgetGroupLabel;
+    }
+
+    public String getReviewStatus() {
+        return reviewStatus;
+    }
+
+    public void setReviewStatus(String reviewStatus) {
+        this.reviewStatus = reviewStatus;
+    }
+
+    public String getReviewReason() {
+        return reviewReason;
+    }
+
+    public void setReviewReason(String reviewReason) {
+        this.reviewReason = reviewReason;
     }
 
     public String getBudgetBucket() {

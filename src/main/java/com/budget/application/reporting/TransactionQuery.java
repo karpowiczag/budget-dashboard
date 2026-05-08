@@ -10,11 +10,15 @@ public record TransactionQuery(
         String month,
         LocalDate date,
         String query,
+        String flow,
         String bucket,
         String area,
         String group,
         String category,
-        String subcategory
+        String subcategory,
+        String fixedness,
+        String confidence,
+        String reviewStatus
 ) {
     private static final int DEFAULT_SIZE = 50;
     private static final int MAX_SIZE = 200;
@@ -30,11 +34,53 @@ public record TransactionQuery(
         sort = sanitizeSort(sort);
         month = trimToNull(month, "month");
         query = trimToNull(query, "query");
+        flow = sanitizeFlow(flow);
         bucket = trimToNull(bucket, "bucket");
         area = trimToNull(area, "area");
         group = trimToNull(group, "group");
         category = trimToNull(category, "category");
         subcategory = trimToNull(subcategory, "subcategory");
+        fixedness = trimToNull(fixedness, "fixedness");
+        confidence = trimToNull(confidence, "confidence");
+        reviewStatus = trimToNull(reviewStatus, "reviewStatus");
+    }
+
+    public TransactionQuery(
+            int year,
+            int page,
+            int size,
+            String sort,
+            String month,
+            LocalDate date,
+            String query,
+            String flow,
+            String bucket,
+            String area,
+            String group,
+            String category,
+            String subcategory
+    ) {
+        this(year, page, size, sort, month, date, query, flow, bucket, area, group, category, subcategory, null, null, null);
+    }
+
+    public TransactionQuery(
+            int year,
+            int page,
+            int size,
+            String sort,
+            String month,
+            LocalDate date,
+            String query,
+            String flow,
+            String bucket,
+            String area,
+            String group,
+            String category,
+            String subcategory,
+            String fixedness,
+            String confidence
+    ) {
+        this(year, page, size, sort, month, date, query, flow, bucket, area, group, category, subcategory, fixedness, confidence, null);
     }
 
     public long offset() {
@@ -49,13 +95,18 @@ public record TransactionQuery(
             case "spend" -> "analysis_spend";
             case "merchant" -> "merchant";
             case "category" -> "corrected_category";
+            case "subcategory" -> "subcategory";
+            case "bucket" -> "budget_bucket";
+            case "fixedness" -> "fixedness";
+            case "confidence" -> "confidence";
+            case "reviewStatus" -> "review_status";
             default -> "posted_date";
         };
         return column + " " + direction + ", id " + direction;
     }
 
     public TransactionQuery withPageSize(int nextPage, int nextSize) {
-        return new TransactionQuery(year, nextPage, nextSize, sort, month, date, query, bucket, area, group, category, subcategory);
+        return new TransactionQuery(year, nextPage, nextSize, sort, month, date, query, flow, bucket, area, group, category, subcategory, fixedness, confidence, reviewStatus);
     }
 
     private static String sanitizeSort(String value) {
@@ -68,10 +119,32 @@ public record TransactionQuery(
             case "spend", "analysisSpend" -> "spend";
             case "merchant" -> "merchant";
             case "category", "correctedCategory" -> "category";
+            case "subcategory" -> "subcategory";
+            case "bucket" -> "bucket";
+            case "fixedness" -> "fixedness";
+            case "confidence" -> "confidence";
+            case "reviewStatus" -> "reviewStatus";
             default -> "postedDate";
         };
         var direction = parts.length == 2 && "asc".equalsIgnoreCase(parts[1]) ? "asc" : "desc";
         return field + "," + direction;
+    }
+
+    private static String sanitizeFlow(String value) {
+        var flow = trimToNull(value, "flow");
+        if (flow == null) {
+            return null;
+        }
+        return switch (flow.toLowerCase(java.util.Locale.ROOT)) {
+            case "income" -> "income";
+            case "spend", "livingexpense", "living-expense" -> "livingExpense";
+            case "excluded" -> "excluded";
+            case "technicaltransfer", "technical-transfer" -> "technicalTransfer";
+            case "financial", "wealthtransfer", "wealth-transfer" -> "wealthTransfer";
+            case "refundcorrection", "refund-correction" -> "refundCorrection";
+            case "review" -> "review";
+            default -> throw new IllegalArgumentException("Unsupported transaction flow: " + value);
+        };
     }
 
     private static String trimToNull(String value, String parameterName) {

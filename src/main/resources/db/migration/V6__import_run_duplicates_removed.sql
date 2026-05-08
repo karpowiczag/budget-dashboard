@@ -1,0 +1,2 @@
+ALTER TABLE import_runs
+    ADD COLUMN IF NOT EXISTS duplicates_removed INTEGER NOT NULL DEFAULT 0;

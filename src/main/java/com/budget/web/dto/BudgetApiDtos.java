@@ -58,7 +58,11 @@ public final class BudgetApiDtos {
             int corrections,
             int lowConfidence,
             int toCheck,
-            BigDecimal toCheckAmount
+            BigDecimal toCheckAmount,
+            BigDecimal savingsAccountNetChange,
+            BigDecimal savingsAccountGrossDeposits,
+            BigDecimal savingsAccountInflows,
+            BigDecimal savingsAccountOutflows
     ) {
     }
 
@@ -87,7 +91,8 @@ public final class BudgetApiDtos {
             String maxMonth,
             BigDecimal maxAmount,
             boolean discretionary,
-            int count
+            int count,
+            List<String> merchantExamples
     ) {
     }
 
@@ -125,11 +130,15 @@ public final class BudgetApiDtos {
             BigDecimal monthlyCutNeeded,
             BigDecimal emergencyFundMin,
             BigDecimal emergencyFundComfort,
+            List<CategoryLimitResponse> parentLimits,
             List<CategoryLimitResponse> categoryLimits
     ) {
     }
 
     public record CategoryLimitResponse(
+            String scope,
+            String name,
+            boolean parent,
             String category,
             String bucket,
             BigDecimal currentMonthly,
@@ -258,8 +267,15 @@ public final class BudgetApiDtos {
             List<CategorySpendResponse> categoryTop,
             List<SubcategorySpendResponse> subcategoryTop,
             List<HierarchySpendResponse> hierarchyTop,
+            List<FinancialFlowResponse> financialFlows,
             List<AnalyticsMerchantSpendResponse> merchants,
-            List<TransactionResponse> oneoffs
+            List<TransactionResponse> oneoffs,
+            List<MonthlyCategoryTrendResponse> monthlyCategoryTrends,
+            List<MonthlyBucketTrendResponse> monthlyBucketTrends,
+            List<MonthlyMerchantTrendResponse> monthlyMerchantTrends,
+            List<FixednessBreakdownResponse> fixednessBreakdown,
+            List<ConfidenceBreakdownResponse> confidenceBreakdown,
+            List<AmountBandResponse> amountBands
     ) {
     }
 
@@ -278,7 +294,28 @@ public final class BudgetApiDtos {
     public record HierarchySpendResponse(String area, String group, String category, String subcategory, BigDecimal spend, int count) {
     }
 
+    public record FinancialFlowResponse(String category, BigDecimal outgoing, int count) {
+    }
+
     public record AnalyticsMerchantSpendResponse(String merchant, BigDecimal sum, int count) {
+    }
+
+    public record MonthlyCategoryTrendResponse(String month, String monthKey, String category, BigDecimal spend, int count) {
+    }
+
+    public record MonthlyBucketTrendResponse(String month, String monthKey, String bucket, BigDecimal spend, int count) {
+    }
+
+    public record MonthlyMerchantTrendResponse(String month, String monthKey, String merchant, BigDecimal spend, int count) {
+    }
+
+    public record FixednessBreakdownResponse(String fixedness, BigDecimal spend, int count) {
+    }
+
+    public record ConfidenceBreakdownResponse(String confidence, int count, BigDecimal spend, BigDecimal income, BigDecimal excluded) {
+    }
+
+    public record AmountBandResponse(String label, BigDecimal minAmount, BigDecimal maxAmount, int count, BigDecimal spend) {
     }
 
     public record TransactionPageResponse(
@@ -300,10 +337,17 @@ public final class BudgetApiDtos {
             String description,
             String account,
             String bankCategory,
+            String categoryId,
             String correctedCategory,
+            String subcategoryId,
             String area,
             String group,
             String subcategory,
+            String flowType,
+            String budgetGroupId,
+            String budgetGroup,
+            String reviewStatus,
+            String reviewReason,
             String bucket,
             String fixedness,
             String type,
@@ -325,6 +369,7 @@ public final class BudgetApiDtos {
             String status,
             List<Integer> years,
             int transactions,
+            int duplicatesRemoved,
             BigDecimal income,
             BigDecimal spend,
             String message
@@ -337,6 +382,7 @@ public final class BudgetApiDtos {
             String inputCsv,
             String status,
             String message,
+            int duplicatesRemoved,
             OffsetDateTime createdAt
     ) {
     }
@@ -350,6 +396,6 @@ public final class BudgetApiDtos {
     ) {
     }
 
-    public record CategoryLimitSettingDto(String category, BigDecimal limit, String action) {
+    public record CategoryLimitSettingDto(String scope, String name, String category, BigDecimal limit, String action, String bucketOverride) {
     }
 }
