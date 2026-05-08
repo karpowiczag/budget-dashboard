@@ -12,7 +12,7 @@ Household budget dashboard for recurring bank CSV exports. Source code is public
 - Spring Boot 4 backend
 - Java 25 LTS
 - GraalVM native image for production
-- Spring Data JDBC repositories over PostgreSQL in production and local H2 for development
+- Spring Data JDBC repositories over PostgreSQL in production and local development
 - Google OAuth in production, allowlisted to one verified Google email
 
 Java 25 usage is documented in [docs/java-25.md](docs/java-25.md).
@@ -46,9 +46,11 @@ npm --prefix frontend run build
 npm --prefix frontend run sync:backend
 ```
 
-Run the Spring app:
+Start local PostgreSQL and run the Spring app:
 
 ```powershell
+docker compose up -d postgres
+$env:DATABASE_URL="postgresql://budget:budget@localhost:15432/budget?sslmode=disable"
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -60,7 +62,7 @@ $env:JAVA_HOME="C:\Users\sanyak\.jdks\openjdk-25.0.1"
 $env:Path="$env:JAVA_HOME\bin;$env:Path"
 ```
 
-By default local auth is disabled and the app uses `data/budget.mv.db`. Upload a bank CSV from the Import tab or rebuild local year folders:
+By default local auth is disabled. Upload a bank CSV from the Import tab or rebuild local year folders:
 
 ```powershell
 Invoke-RestMethod -Method Post http://127.0.0.1:8080/api/v1/imports/rebuild
@@ -68,12 +70,19 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8080/api/v1/imports/rebuild
 
 ### Docker Compose
 
-Use Compose when you want local PostgreSQL without installing it on the host:
+Use Compose to run local PostgreSQL without installing it on the host:
 
 ```powershell
 docker compose up -d postgres
 $env:DATABASE_URL="postgresql://budget:budget@localhost:15432/budget?sslmode=disable"
 $env:APP_OAUTH_ENABLED="false"
+.\mvnw.cmd spring-boot:run
+```
+
+H2 is not the normal local runtime anymore. It is available only for explicit disposable runs and tests:
+
+```powershell
+$env:APP_ALLOW_LOCAL_H2="true"
 .\mvnw.cmd spring-boot:run
 ```
 

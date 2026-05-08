@@ -27,7 +27,7 @@ public record BudgetProperties(
 ) {
     public BudgetProperties {
         if (security == null) security = new Security(false, "");
-        if (database == null) database = new Database("");
+        if (database == null) database = new Database("", false);
         if (upload == null) upload = new Upload(12_582_912L);
         if (localImport == null) localImport = new LocalImport(".", true);
         if (budgetSettings == null) budgetSettings = new BudgetSettings(BigDecimal.valueOf(14_000), BigDecimal.valueOf(13_000), 3, 6);
@@ -56,7 +56,7 @@ public record BudgetProperties(
         }
     }
 
-    public record Database(String url) {
+    public record Database(String url, boolean allowLocalH2) {
         public Database {
             if (url == null) url = "";
         }
