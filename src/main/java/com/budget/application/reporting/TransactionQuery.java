@@ -17,7 +17,8 @@ public record TransactionQuery(
         String category,
         String subcategory,
         String fixedness,
-        String confidence
+        String confidence,
+        String reviewStatus
 ) {
     private static final int DEFAULT_SIZE = 50;
     private static final int MAX_SIZE = 200;
@@ -41,6 +42,7 @@ public record TransactionQuery(
         subcategory = trimToNull(subcategory, "subcategory");
         fixedness = trimToNull(fixedness, "fixedness");
         confidence = trimToNull(confidence, "confidence");
+        reviewStatus = trimToNull(reviewStatus, "reviewStatus");
     }
 
     public TransactionQuery(
@@ -58,7 +60,27 @@ public record TransactionQuery(
             String category,
             String subcategory
     ) {
-        this(year, page, size, sort, month, date, query, flow, bucket, area, group, category, subcategory, null, null);
+        this(year, page, size, sort, month, date, query, flow, bucket, area, group, category, subcategory, null, null, null);
+    }
+
+    public TransactionQuery(
+            int year,
+            int page,
+            int size,
+            String sort,
+            String month,
+            LocalDate date,
+            String query,
+            String flow,
+            String bucket,
+            String area,
+            String group,
+            String category,
+            String subcategory,
+            String fixedness,
+            String confidence
+    ) {
+        this(year, page, size, sort, month, date, query, flow, bucket, area, group, category, subcategory, fixedness, confidence, null);
     }
 
     public long offset() {
@@ -74,16 +96,17 @@ public record TransactionQuery(
             case "merchant" -> "merchant";
             case "category" -> "corrected_category";
             case "subcategory" -> "subcategory";
-            case "bucket" -> "bucket";
+            case "bucket" -> "budget_bucket";
             case "fixedness" -> "fixedness";
             case "confidence" -> "confidence";
+            case "reviewStatus" -> "review_status";
             default -> "posted_date";
         };
         return column + " " + direction + ", id " + direction;
     }
 
     public TransactionQuery withPageSize(int nextPage, int nextSize) {
-        return new TransactionQuery(year, nextPage, nextSize, sort, month, date, query, flow, bucket, area, group, category, subcategory, fixedness, confidence);
+        return new TransactionQuery(year, nextPage, nextSize, sort, month, date, query, flow, bucket, area, group, category, subcategory, fixedness, confidence, reviewStatus);
     }
 
     private static String sanitizeSort(String value) {
@@ -100,6 +123,7 @@ public record TransactionQuery(
             case "bucket" -> "bucket";
             case "fixedness" -> "fixedness";
             case "confidence" -> "confidence";
+            case "reviewStatus" -> "reviewStatus";
             default -> "postedDate";
         };
         var direction = parts.length == 2 && "asc".equalsIgnoreCase(parts[1]) ? "asc" : "desc";
@@ -112,7 +136,13 @@ public record TransactionQuery(
             return null;
         }
         return switch (flow.toLowerCase(java.util.Locale.ROOT)) {
-            case "income", "spend", "excluded", "financial" -> flow.toLowerCase(java.util.Locale.ROOT);
+            case "income" -> "income";
+            case "spend", "livingexpense", "living-expense" -> "livingExpense";
+            case "excluded" -> "excluded";
+            case "technicaltransfer", "technical-transfer" -> "technicalTransfer";
+            case "financial", "wealthtransfer", "wealth-transfer" -> "wealthTransfer";
+            case "refundcorrection", "refund-correction" -> "refundCorrection";
+            case "review" -> "review";
             default -> throw new IllegalArgumentException("Unsupported transaction flow: " + value);
         };
     }

@@ -5,8 +5,7 @@ import { LimitGaugeChart } from "../components/charts/LimitGaugeChart.jsx";
 import { Panel } from "../components/ui/Panel.jsx";
 import { money } from "../domain/formatters.js";
 
-export function MonthControlView({ monthDashboard, savingsFocus, onInspect }) {
-  const cards = monthDashboard?.cards || [];
+export function MonthControlView({ monthDashboard, savingsFocus, spendingPlanSections = [], onInspect }) {
   const alerts = monthDashboard?.alerts || [];
   const categoryStatus = monthDashboard?.categoryStatus || [];
   const focus = monthDashboard?.savingsFocus || savingsFocus || {};
@@ -19,18 +18,13 @@ export function MonthControlView({ monthDashboard, savingsFocus, onInspect }) {
     <section className="viewStack">
       <Panel title={monthDashboard?.title || "Kontrola miesiąca"}>
         <div className="monthControl">
-          <div className="monthCards">
-            {cards.map((card) => (
-              <MonthMetricCard
-                key={card.label}
-                card={card}
-                onInspect={card.filter ? () => onInspect?.({ title: `Transakcje: ${card.label}`, filters: card.filter, useTimeScope: true }) : undefined}
-              />
-            ))}
+          <SavingsFocusPanel focus={focus} onInspect={onInspect} />
+
+          <div className={`monthDecisionGrid ${selectedDay ? "" : "single"}`}>
             {selectedDay && (
               <button
                 type="button"
-                className="metricCard inspectable"
+                className="metricCard inspectable selectedDayCard"
                 onClick={() => onInspect?.({ title: `Transakcje: dzień ${String(selectedDay.day).padStart(2, "0")}`, filters: { date: selectedDay.date }, useTimeScope: false })}
               >
                 <span>Dzień {String(selectedDay.day).padStart(2, "0")}</span>
@@ -38,9 +32,27 @@ export function MonthControlView({ monthDashboard, savingsFocus, onInspect }) {
                 <p>{selectedDay.transactions} transakcji · wpływy {money(selectedDay.income)}</p>
               </button>
             )}
-          </div>
 
-          <SavingsFocusPanel focus={focus} onInspect={onInspect} />
+            {!!spendingPlanSections.length && (
+              <div className="spendingPlanRail">
+                <h3>Spending plan miesiąca</h3>
+                <div className="spendingPlanSteps">
+                  {spendingPlanSections.map((section) => (
+                    <button
+                      type="button"
+                      className={`spendingStep ${section.tone || ""}`}
+                      key={section.label}
+                      onClick={() => onInspect?.({ title: `Transakcje: ${section.label}`, filters: section.filter || {}, useTimeScope: true })}
+                    >
+                      <span>{section.label}</span>
+                      <strong>{money(section.value)}</strong>
+                      <p>{formatDetail(section.detail)}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="insightGrid">
             <div className="alerts">
@@ -210,26 +222,6 @@ function actualMonthSpend(row) {
 
 function actualOverLimit(row) {
   return Math.max(0, actualMonthSpend(row) - Number(row.limit || 0));
-}
-
-function MonthMetricCard({ card, onInspect }) {
-  const content = (
-    <>
-      <span>{card.label}</span>
-      <strong>{money(card.value)}</strong>
-      <p>{formatDetail(card.detail)}</p>
-    </>
-  );
-
-  if (onInspect) {
-    return (
-      <button type="button" className={`metricCard inspectable ${card.tone || ""}`} onClick={onInspect} title="Pokaż transakcje">
-        {content}
-      </button>
-    );
-  }
-
-  return <div>{content}</div>;
 }
 
 function formatDetail(detail) {

@@ -80,8 +80,8 @@ class FakeCsvImportIntegrationTest {
 
         assertTransaction("RĘCZNA SPŁATA KARTY KREDYT", "Spłata karty kredytowej", 0, 65_000, 0, "Transfer techniczny");
         assertTransaction("ZWROT ZAKUPU SKLEP TESTOWY", "Zwroty i korekty", 0, 0, 120, "Transfer techniczny");
-        assertTransaction("PRZELEW DO BM MBANKU IKZE", "Oszczędności i inwestycje", 0, 3_000, 0, "Inwestycje");
-        assertTransaction("SKLEP TAJEMNICZY", "Do sprawdzenia", 750, 0, 0, "Do sprawdzenia");
+        assertTransaction("PRZELEW DO BM MBANKU IKZE", "Inwestycje", 0, 3_000, 0, "Inwestycje");
+        assertTransaction("SKLEP TAJEMNICZY", "Niesklasyfikowane", 750, 0, 0, "Do rozbicia");
         assertThat(findTransaction("BIEDRONKA ZAKUP; KASA 1").subcategory()).isEqualTo("Market spożywczy");
 
         assertThat(dashboard2026.recurring())

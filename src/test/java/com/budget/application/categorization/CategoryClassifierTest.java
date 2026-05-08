@@ -9,6 +9,31 @@ class CategoryClassifierTest {
     private final CategoryClassifier classifier = new CategoryClassifier();
 
     @Test
+    void everyTaxonomyRuleTargetsAValidCategory() {
+        assertThat(BudgetTaxonomy.RULES)
+                .isNotEmpty()
+                .allSatisfy(rule -> assertThat(BudgetTaxonomy.CATEGORIES).containsKey(rule.categoryId()));
+    }
+
+    @Test
+    void everyCategoryHasStableFlowAndBudgetGroup() {
+        assertThat(BudgetTaxonomy.CATEGORIES.values())
+                .allSatisfy(category -> {
+                    assertThat(category.id()).matches("[a-z][A-Za-z0-9]*");
+                    assertThat(category.label()).isNotBlank();
+                    assertThat(BudgetTaxonomy.BUDGET_GROUPS).containsKey(category.budgetGroupId());
+                    assertThat(category.flowType()).isIn(
+                            "income",
+                            "livingExpense",
+                            "wealthTransfer",
+                            "technicalTransfer",
+                            "refundCorrection",
+                            "review"
+                    );
+                });
+    }
+
+    @Test
     void classifiesSalaryFromTransferTitle() {
         var category = classifier.classify("", "PRZELEW EXPRESS ELIXIR PRZYCH. TEST EMPLOYER WYNAGRODZENIE", 18000);
 
@@ -73,8 +98,30 @@ class CategoryClassifierTest {
     void fallsBackUnknownExpenseToManualReview() {
         var decision = classifier.classifyDecision("Bez kategorii", "NIEZNANY SKLEP XYZ", -123);
 
-        assertThat(decision.category()).isEqualTo("Do sprawdzenia");
+        assertThat(decision.category()).isEqualTo("Niesklasyfikowane");
+        assertThat(decision.subcategory()).isBlank();
+        assertThat(decision.reviewStatus()).isEqualTo("needsReview");
         assertThat(decision.matchedByTitle()).isFalse();
+    }
+
+    @Test
+    void flagsMarketplaceAsSplitReviewWithoutUsingReviewAsCategory() {
+        var decision = classifier.classifyDecision("Bez kategorii", "ALLEGRO ZAKUPY", -450);
+
+        assertThat(decision.category()).isEqualTo("Marketplace i zakupy online");
+        assertThat(decision.reviewStatus()).isEqualTo("needsSplit");
+        assertThat(decision.budgetGroup()).isEqualTo("Do rozbicia");
+    }
+
+    @Test
+    void splitsMedicalNeedsFromBeautyDiscretionarySpend() {
+        var medical = classifier.classifyDecision("Bez kategorii", "APTEKA TEST", -80);
+        var beauty = classifier.classifyDecision("Bez kategorii", "ROSSMANN TEST", -120);
+
+        assertThat(medical.category()).isEqualTo("Lekarz i apteka");
+        assertThat(medical.budgetGroup()).isEqualTo("Obowiązkowe zmienne");
+        assertThat(beauty.category()).isEqualTo("Uroda i kosmetyki");
+        assertThat(beauty.budgetGroup()).isEqualTo("Nieobowiązkowe");
     }
 
     @Test

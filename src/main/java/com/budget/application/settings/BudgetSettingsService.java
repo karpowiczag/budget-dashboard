@@ -15,6 +15,7 @@ public class BudgetSettingsService {
             "Obowiązkowe zmienne",
             "Do rozbicia",
             "Nieobowiązkowe",
+            "Nieregularne",
             "Inwestycje",
             "Konto oszczędnościowe",
             "Nadpłata kredytu"

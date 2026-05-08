@@ -1,6 +1,7 @@
 package com.budget.config;
 
 import com.budget.application.categorization.PersonalCategoryRules;
+import com.budget.application.categorization.BudgetTaxonomy;
 import com.budget.domain.category.CategoryRule;
 import java.util.regex.Pattern;
 import org.springframework.context.annotation.Bean;
@@ -14,7 +15,7 @@ public class CategorizationConfiguration {
                 .filter(rule -> !rule.pattern().isBlank() && !rule.category().isBlank())
                 .map(rule -> new CategoryRule(
                         Pattern.compile(rule.pattern(), Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE),
-                        rule.category(),
+                        BudgetTaxonomy.categoryIdByLabel(rule.category()),
                         "personal:" + rule.pattern()
                 ))
                 .toList();

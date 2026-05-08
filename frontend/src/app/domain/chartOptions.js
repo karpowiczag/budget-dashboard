@@ -16,7 +16,13 @@ const COLORS = {
 };
 
 export function moneyAxis(value) {
-  return `${Math.round(Number(value || 0) / 1000)}k`;
+  const amount = Number(value || 0);
+  const abs = Math.abs(amount);
+  if (abs >= 1000) {
+    const thousands = amount / 1000;
+    return `${thousands.toLocaleString("pl-PL", { maximumFractionDigits: abs < 10000 ? 1 : 0 })}k`;
+  }
+  return Math.round(amount).toLocaleString("pl-PL");
 }
 
 export function baseGrid(extra = {}) {
@@ -320,8 +326,11 @@ function sankeyLabel(value) {
     "Dostępne środki": "Dostępne",
     "Środki z salda": "Saldo",
     "Wolne środki po przepływach": "Wolne środki",
+    "Nadwyżka operacyjna po kosztach": "Nadwyżka operacyjna",
+    "Nadwyżka do decyzji": "Nadwyżka do decyzji",
+    "Nadwyżka operacyjna": "Nadwyżka operacyjna",
     "Oszczędności/nadpłaty": "Oszczędności",
-    "Oszczędności i inwestycje": "Inwestycje",
+    Inwestycje: "Inwestycje",
     "Konto oszczędnościowe": "Konto oszcz.",
     "Obowiązkowe stałe": "Stałe",
     "Obowiązkowe zmienne": "Zmienne",
@@ -631,7 +640,7 @@ export function buildMerchantFunnelOption(data = []) {
 
 export function buildRecurringTimelineOption(data = []) {
   return {
-    grid: baseGrid({ bottom: 24, right: 20 }),
+    grid: baseGrid({ bottom: 48, left: 18, right: 28, top: 24 }),
     tooltip: tooltip((params) => {
       const item = Array.isArray(params) ? params[0] : params;
       const row = item?.data || {};
@@ -645,9 +654,11 @@ export function buildRecurringTimelineOption(data = []) {
       ...valueAxis({ max: 31, min: 1 }),
       axisLabel: { color: TEXT, fontSize: 12 },
       name: "Dzień",
+      nameGap: 28,
+      nameLocation: "middle",
       splitLine: { lineStyle: { color: GRID_LINE } },
     },
-    yAxis: valueAxis(),
+    yAxis: valueAxis({ name: "Kwota", nameGap: 34, nameLocation: "middle" }),
     series: [
       {
         data: data.map((row) => ({ ...row, value: [Number(row.day || 0), Number(row.amount || 0)] })),

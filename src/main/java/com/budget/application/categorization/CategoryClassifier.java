@@ -54,48 +54,56 @@ public class CategoryClassifier {
         return matchers.stream()
                 .map(matcher -> matcher.match(input))
                 .flatMap(java.util.Optional::stream)
+                .map(decision -> enrich(decision, description))
                 .findFirst()
                 .orElseThrow();
     }
 
+    private CategoryDecision enrich(CategoryDecision decision, String description) {
+        var subcategory = subcategoryClassifier.subcategory(decision.categoryId(), description);
+        var enriched = decision.withSubcategory(subcategory);
+        if (BudgetTaxonomy.CATEGORY_UNKNOWN.equals(decision.categoryId())) {
+            return enriched.withReview(BudgetTaxonomy.REVIEW_NEEDS_REVIEW, "Brak deterministycznej reguły kategorii");
+        }
+        if (BudgetTaxonomy.CATEGORY_MARKETPLACE.equals(decision.categoryId())) {
+            return enriched.withReview(BudgetTaxonomy.REVIEW_NEEDS_SPLIT, "Marketplace wymaga rozbicia po historii zamówienia");
+        }
+        return enriched;
+    }
+
     public String budgetArea(String category) {
-        return BudgetCatalog.BUDGET_AREAS.getOrDefault(category, "Inne");
+        return metadata(category).area();
     }
 
     public String group(String category) {
-        return BudgetCatalog.GROUPS.getOrDefault(category, "Inne");
+        return metadata(category).analyticsGroup();
     }
 
     public String budgetBucket(String category) {
-        return BudgetCatalog.BUDGET_BUCKETS.getOrDefault(category, "Inne");
+        return metadata(category).budgetBucketLabel();
     }
 
     public String fixedness(String category) {
-        if (BudgetCatalog.FIXEDNESS.containsKey(category)) {
-            return BudgetCatalog.FIXEDNESS.get(category);
-        }
-        if (BudgetCatalog.DISCRETIONARY.contains(category)) {
-            return "Uznaniowe";
-        }
-        if (BudgetCatalog.EXCLUDED.contains(category)) {
-            return "Transfer/wyłączone";
-        }
-        return "Do oceny";
+        return metadata(category).fixedness();
     }
 
     public String subcategory(String category, String description) {
-        return subcategoryClassifier.subcategory(category, description);
+        return subcategoryClassifier.subcategory(BudgetTaxonomy.categoryIdByLabel(category), description).label();
     }
 
     public boolean isDiscretionary(String category) {
-        return BudgetCatalog.DISCRETIONARY.contains(category);
+        return metadata(category).discretionary();
     }
 
     public boolean isExcluded(String category) {
-        return BudgetCatalog.EXCLUDED.contains(category);
+        return metadata(category).excluded();
     }
 
     public boolean isRealIncome(String category) {
-        return BudgetCatalog.INCOME_CATEGORIES.contains(category);
+        return metadata(category).realIncome();
+    }
+
+    private BudgetTaxonomy.CategoryDefinition metadata(String category) {
+        return BudgetTaxonomy.category(BudgetTaxonomy.categoryIdByLabel(category));
     }
 }

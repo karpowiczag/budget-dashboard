@@ -66,14 +66,20 @@ vi.mock("../components/charts/SpendBarChart.jsx", () => ({
 afterEach(() => cleanup());
 
 describe("ReportsView", () => {
-  it("contains cashflow, budget mix and keeps drilldown from report charts", async () => {
-    const onDrill = vi.fn();
+  it("groups report charts into a workspace and keeps drilldown from money charts", async () => {
     const onInspect = vi.fn();
 
     render(
       <ReportsView
-        onDrill={onDrill}
         onInspect={onInspect}
+        reportsWorkspace={{
+          reports: [
+            { id: "cashflow", label: "Cashflow", question: "Skąd przyszły pieniądze?", modes: ["breakdown", "trends"] },
+            { id: "spending", label: "Wydatki", question: "Gdzie dominują koszty?", modes: ["breakdown", "trends"] },
+            { id: "income", label: "Dochód", question: "Jak stabilne są wpływy?", modes: ["breakdown", "trends"] },
+            { id: "quality", label: "Jakość danych", question: "Co trzeba sprawdzić?", modes: ["breakdown", "trends"] },
+          ],
+        }}
         reportsSections={{
           activeTimeLabel: "Cały rok",
           yearLabel: "Cały 2026",
@@ -105,45 +111,47 @@ describe("ReportsView", () => {
           financialFlows: [],
           financialFlowTotal: 0,
           financialFlowCount: 0,
-          controllable: {
-            cutNowPotential: 150,
-            reviewPotential: 50,
-            topActions: [{ category: "Jedzenie poza domem", decision: "Do cięcia", potentialMonthly: 150, note: "kontrolowalny wydatek", tone: "cut", filter: { category: "Jedzenie poza domem" } }],
-          },
         }}
       />
     );
 
-    expect(screen.getByText("Kontrolowalne wydatki")).toBeInTheDocument();
-    expect(screen.getByText("Jedzenie poza domem")).toBeInTheDocument();
-    expect(screen.getByText("Cashflow miesięczny")).toBeInTheDocument();
-    expect(screen.getByText("Udział koszyków budżetu")).toBeInTheDocument();
     expect(screen.getByText("Raporty")).toBeInTheDocument();
+    expect(screen.queryByText("Kontrolowalne wydatki")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cashflow" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Wydatki" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dochód" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Jakość danych" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Breakdown" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Trends" })).toBeInTheDocument();
     expect(screen.getAllByText("Zakres: Cały rok").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Rok: Cały 2026").length).toBeGreaterThan(0);
     expect(screen.getByTestId("cashflow-sankey-chart")).toBeInTheDocument();
-    expect(screen.getByTestId("budget-mix-chart")).toBeInTheDocument();
+    expect(screen.getByText("Zakres raportu")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Kategorie" }));
+    await userEvent.click(screen.getByRole("button", { name: "Trends" }));
+    expect(screen.getByText("Cashflow miesięczny")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Wydatki" }));
     expect(screen.getByTestId("category-share-chart")).toBeInTheDocument();
-    expect(screen.getByTestId("category-trend-chart")).toBeInTheDocument();
-    expect(screen.getByTestId("hierarchy-sunburst-chart")).toBeInTheDocument();
-    expect(screen.getByTestId("fixedness-chart")).toBeInTheDocument();
+    expect(screen.getByTestId("pareto-chart")).toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId("pareto-chart"));
-    expect(onDrill).toHaveBeenCalledWith({
-      type: "category",
-      value: "Żywność i chemia",
-      label: "Kategoria: Żywność i chemia",
-    });
     expect(onInspect).toHaveBeenCalledWith({
-      title: "Transakcje: Kategoria: Żywność i chemia",
+      title: "Transakcje: Żywność i chemia",
       filters: { category: "Żywność i chemia" },
       useTimeScope: true,
     });
 
-    await userEvent.click(screen.getByRole("button", { name: "Sprzedawcy" }));
+    await userEvent.click(screen.getByRole("button", { name: "Trends" }));
+    expect(screen.getByTestId("category-trend-chart")).toBeInTheDocument();
+    expect(screen.getByTestId("fixedness-chart")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Dochód" }));
+    expect(screen.getByTestId("budget-mix-chart")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Pokaż" }));
     expect(screen.getByTestId("merchant-share-chart")).toBeInTheDocument();
     expect(screen.getByTestId("merchant-funnel-chart")).toBeInTheDocument();
+    expect(screen.getByTestId("hierarchy-sunburst-chart")).toBeInTheDocument();
   });
 });

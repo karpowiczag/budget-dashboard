@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchAnalytics, fetchCalendar, fetchTransactions } from "./api/budgetApi.js";
 import { budgetQueryKeys } from "./api/queryKeys.js";
+import { AppShell } from "./components/layout/AppShell.jsx";
 import { DashboardFooter } from "./components/layout/DashboardFooter.jsx";
-import { DashboardHeader } from "./components/layout/DashboardHeader.jsx";
-import { DashboardTabs } from "./components/layout/DashboardTabs.jsx";
-import { GlobalTimeFilter } from "./components/layout/GlobalTimeFilter.jsx";
-import { KpiStrip } from "./components/layout/KpiStrip.jsx";
+import { ModuleHeader } from "./components/layout/ModuleHeader.jsx";
+import { SidebarNav } from "./components/layout/SidebarNav.jsx";
+import { TimeScopeControl } from "./components/layout/TimeScopeControl.jsx";
 import { TransactionDrilldownModal } from "./components/tables/TransactionDrilldownModal.jsx";
 import { StateScreen } from "./components/ui/StateScreen.jsx";
 import { useBudgetData } from "./hooks/useBudgetData.js";
@@ -18,6 +18,7 @@ import { RecurringView } from "./views/RecurringView.jsx";
 import { ReportsView } from "./views/ReportsView.jsx";
 import { SavingsPlanView } from "./views/SavingsPlanView.jsx";
 import { TransactionsView } from "./views/TransactionsView.jsx";
+import { WealthView } from "./views/WealthView.jsx";
 import "../styles.css";
 
 export default function App() {
@@ -43,11 +44,12 @@ export default function App() {
   const [customLimits, setCustomLimits] = useState({});
   const [categoryBucketOverrides, setCategoryBucketOverrides] = useState({});
   const [settingsDraft, setSettingsDraft] = useState(null);
-  const [view, setView] = useState("month");
-  const [selectedMonth, setSelectedMonth] = useState("");
-  const [selectedDay, setSelectedDay] = useState("");
-  const [timeScope, setTimeScope] = useState("month");
-  const [drillFilter, setDrillFilter] = useState(null);
+  const [view, setView] = useState("control");
+  const [localTimes, setLocalTimes] = useState({
+    control: { scope: "month", month: "", day: "", drillFilter: null },
+    reports: { scope: "year", month: "", day: "", drillFilter: null },
+    transactions: { scope: "month", month: "", day: "", drillFilter: null },
+  });
   const [transactionPageIndex, setTransactionPageIndex] = useState(0);
   const [transactionInspector, setTransactionInspector] = useState(null);
   const [inspectorPageIndex, setInspectorPageIndex] = useState(0);
@@ -55,15 +57,20 @@ export default function App() {
   useEffect(() => {
     if (!data?.monthly?.length) return;
     const months = data.monthly.filter((row) => row.transactions > 0);
-    setSelectedMonth(months.at(-1)?.month || data.monthly[0].month);
+    const fallbackMonth = months.at(-1)?.month || data.monthly[0].month;
+    setLocalTimes((current) => ({
+      control: { ...current.control, month: current.control.month || fallbackMonth },
+      reports: { ...current.reports, month: current.reports.month || fallbackMonth },
+      transactions: { ...current.transactions, month: current.transactions.month || fallbackMonth },
+    }));
   }, [data]);
 
   useEffect(() => {
-    setSelectedDay("");
-  }, [selectedMonth, year]);
-
-  useEffect(() => {
-    setDrillFilter(null);
+    setLocalTimes((current) => ({
+      control: { ...current.control, month: "", day: "", drillFilter: null },
+      reports: { ...current.reports, month: "", day: "", drillFilter: null },
+      transactions: { ...current.transactions, month: "", day: "", drillFilter: null },
+    }));
     setTransactionPageIndex(0);
     setTransactionInspector(null);
     setInspectorPageIndex(0);
@@ -78,17 +85,15 @@ export default function App() {
 
   useEffect(() => {
     setTransactionPageIndex(0);
-  }, [year, selectedMonth, selectedDay, timeScope, drillFilter, query, bucket, transactionFilters]);
+  }, [year, localTimes.transactions, query, bucket, transactionFilters]);
 
-  const calendarMonth = useMemo(() => monthKeyFromLabel(selectedMonth), [selectedMonth]);
-  const analyticsFilters = useMemo(
-    () => apiFilters({ timeScope, selectedMonth, selectedDay, drillFilter }),
-    [timeScope, selectedMonth, selectedDay, drillFilter],
-  );
+  const controlMonth = useMemo(() => monthKeyFromLabel(localTimes.control.month), [localTimes.control.month]);
+  const reportsFilters = useMemo(() => apiFilters(localTimes.reports), [localTimes.reports]);
+  const transactionsTimeFilters = useMemo(() => apiFilters(localTimes.transactions), [localTimes.transactions]);
   const reportYearAnalyticsFilters = useMemo(() => ({ scope: "year" }), []);
   const transactionQueryFilters = useMemo(
     () => ({
-      ...analyticsFilters,
+      ...transactionsTimeFilters,
       page: transactionPageIndex,
       size: transactionFilters.pageSize,
       sort: transactionFilters.sort,
@@ -101,13 +106,15 @@ export default function App() {
       subcategory: transactionFilters.subcategory,
       fixedness: transactionFilters.fixedness,
       confidence: transactionFilters.confidence,
+      reviewStatus: transactionFilters.reviewStatus,
     }),
-    [analyticsFilters, transactionPageIndex, transactionFilters, query, bucket],
+    [transactionsTimeFilters, transactionPageIndex, transactionFilters, query, bucket],
   );
   const inspectorFilters = useMemo(() => {
     if (!transactionInspector) return null;
+    const sourceTime = localTimes[transactionInspector.timeKey] || localTimes.transactions;
     const scopedFilters = transactionInspector.useTimeScope
-      ? transactionFilterParams(apiFilters({ timeScope, selectedMonth, selectedDay, drillFilter: null }))
+      ? transactionFilterParams(apiFilters(sourceTime))
       : {};
     return {
       ...scopedFilters,
@@ -116,22 +123,27 @@ export default function App() {
       size: 25,
       sort: transactionInspector.sort || "postedDate,desc",
     };
-  }, [timeScope, selectedMonth, selectedDay, transactionInspector, inspectorPageIndex]);
+  }, [localTimes, transactionInspector, inspectorPageIndex]);
 
   const calendarQuery = useQuery({
-    queryKey: budgetQueryKeys.calendar(year, calendarMonth),
-    queryFn: () => fetchCalendar(year, calendarMonth),
-    enabled: !!data && !!year && !!calendarMonth,
+    queryKey: budgetQueryKeys.calendar(year, controlMonth),
+    queryFn: () => fetchCalendar(year, controlMonth),
+    enabled: !!data && !!year && !!controlMonth,
   });
-  const analyticsQuery = useQuery({
-    queryKey: budgetQueryKeys.analytics(year, analyticsFilters),
-    queryFn: () => fetchAnalytics(year, analyticsFilters),
-    enabled: !!data && !!year,
+  const reportsAnalyticsQuery = useQuery({
+    queryKey: budgetQueryKeys.analytics(year, reportsFilters),
+    queryFn: () => fetchAnalytics(year, reportsFilters),
+    enabled: !!data && !!year && view === "reports",
   });
   const reportYearAnalyticsQuery = useQuery({
     queryKey: budgetQueryKeys.analytics(year, reportYearAnalyticsFilters),
     queryFn: () => fetchAnalytics(year, reportYearAnalyticsFilters),
-    enabled: !!data && !!year && view === "reports" && timeScope !== "all",
+    enabled: !!data && !!year && view === "reports" && reportsFilters.scope !== "year",
+  });
+  const transactionsAnalyticsQuery = useQuery({
+    queryKey: budgetQueryKeys.analytics(year, transactionsTimeFilters),
+    queryFn: () => fetchAnalytics(year, transactionsTimeFilters),
+    enabled: !!data && !!year && view === "transactions",
   });
   const transactionsQuery = useQuery({
     queryKey: budgetQueryKeys.transactions(year, transactionQueryFilters),
@@ -145,17 +157,15 @@ export default function App() {
   });
 
   const model = useDashboardModel({
+    activeView: view,
+    controlTime: localTimes.control,
     data,
     years,
-    year,
-    selectedMonth,
-    selectedDay,
-    timeScope,
-    drillFilter,
-    query,
-    bucket,
-    analytics: analyticsQuery.data || null,
-    yearAnalytics: timeScope === "all" ? (analyticsQuery.data || null) : (reportYearAnalyticsQuery.data || null),
+    reportsTime: localTimes.reports,
+    transactionsTime: localTimes.transactions,
+    reportsAnalytics: reportsAnalyticsQuery.data || null,
+    reportsYearAnalytics: reportsFilters.scope === "year" ? (reportsAnalyticsQuery.data || null) : (reportYearAnalyticsQuery.data || null),
+    transactionsAnalytics: transactionsAnalyticsQuery.data || null,
     calendar: calendarQuery.data || null,
     transactionPage: transactionsQuery.data || null,
     customLimits,
@@ -187,39 +197,19 @@ export default function App() {
   }
 
   const planTitle = model.isHistorical ? "Symulacja limitów" : "Plan i limity";
-  const showGlobalTimeFilter = ["month", "reports", "transactions"].includes(view);
-  const timeFilterVariant = view === "month" ? "full" : "compact";
-  const timeFilterCopy = {
-    month: {
-      title: "Zakres kalendarza",
-      description: "Steruje kalendarzem i drilldownem. Limity pokazują aktywny miesiąc planu.",
-    },
-    reports: {
-      title: "Zakres analizy raportu",
-      description: "Filtruje panele oznaczone jako Zakres. Trendy i model budżetu zostają roczne.",
-    },
-    transactions: {
-      title: "Zakres transakcji",
-      description: "Filtruje tabelę, audyt jakości i drilldowny transakcji.",
-    },
-  }[view];
 
-  function handleMonthChange(nextMonth) {
-    setSelectedMonth(nextMonth);
-    setSelectedDay("");
-    setTimeScope(timeScope === "all" || timeScope === "day" ? "month" : timeScope);
+  function updateLocalTime(key, nextTime) {
+    setLocalTimes((current) => ({
+      ...current,
+      [key]: normalizeTime(nextTime),
+    }));
   }
 
-  function handleTimeScopeChange(nextScope) {
-    if (nextScope === "day") {
-      const fallbackDay = selectedDay || model.calendarStats?.selected;
-      if (!fallbackDay) {
-        setTimeScope("month");
-        return;
-      }
-      setSelectedDay(String(fallbackDay));
-    }
-    setTimeScope(nextScope);
+  function clearLocalDrill(key) {
+    setLocalTimes((current) => ({
+      ...current,
+      [key]: { ...current[key], drillFilter: null },
+    }));
   }
 
   function openTransactionInspector(config) {
@@ -228,6 +218,7 @@ export default function App() {
       subtitle: config.subtitle,
       filters: config.filters || {},
       sort: config.sort,
+      timeKey: config.timeKey || timeKeyForView(view),
       useTimeScope: config.useTimeScope ?? true,
     });
     setInspectorPageIndex(0);
@@ -345,38 +336,26 @@ export default function App() {
   }
 
   return (
-    <main>
-      <DashboardHeader data={data} year={year} years={years} onYearChange={setYear} />
-
-      <KpiStrip activeMonths={data.activeMonths} financialFlows={model.financialFlows} kpis={model.kpis} wants={model.wants} onInspect={openTransactionInspector} />
-
-      <DashboardTabs views={model.views} activeView={view} onViewChange={setView} />
-
-      {showGlobalTimeFilter && (
-        <GlobalTimeFilter
-          activeTimeLabel={model.activeTimeLabel}
-          calendarStats={model.calendarStats}
-          description={timeFilterCopy?.description}
-          drillFilter={drillFilter}
-          monthly={model.monthly}
-          selectedMonth={selectedMonth}
-          title={timeFilterCopy?.title}
-          timeScope={timeScope}
-          variant={timeFilterVariant}
-          onClearDrill={() => setDrillFilter(null)}
-          onMonthChange={handleMonthChange}
-          onSelectDay={(day) => {
-            setSelectedDay(day);
-            setTimeScope("day");
-          }}
-          onTimeScopeChange={handleTimeScopeChange}
+    <AppShell
+      sidebar={
+        <SidebarNav
+          activeView={view}
+          data={data}
+          year={year}
+          years={years}
+          views={model.views}
+          onViewChange={setView}
+          onYearChange={setYear}
         />
-      )}
+      }
+    >
+      <ModuleHeader header={model.moduleHeader} action={moduleTimeControl(view, model, localTimes, updateLocalTime, clearLocalDrill)} />
 
-      {view === "month" && (
+      {view === "control" && (
         <MonthControlView
           monthDashboard={model.monthDashboard}
           savingsFocus={model.savingsFocus}
+          spendingPlanSections={model.spendingPlanSections}
           onInspect={openTransactionInspector}
         />
       )}
@@ -411,13 +390,21 @@ export default function App() {
 
       {view === "reports" && (
         <ReportsView
+          dataQualityChart={model.dataQualityChart}
           reportsSections={model.reportsSections}
-          onDrill={setDrillFilter}
+          reportsWorkspace={model.reportsWorkspace}
           onInspect={openTransactionInspector}
         />
       )}
 
-      {view === "recurring" && (
+      {view === "wealth" && (
+        <WealthView
+          wealthDashboard={model.wealthDashboard}
+          onInspect={openTransactionInspector}
+        />
+      )}
+
+      {view === "obligations" && (
         <RecurringView
           recurringSummary={model.recurringSummary}
           onInspect={openTransactionInspector}
@@ -426,7 +413,7 @@ export default function App() {
 
       {view === "transactions" && (
         <TransactionsView
-          activeTimeLabel={model.activeTimeLabel}
+          activeTimeLabel={model.transactionsTimeScope.activeTimeLabel}
           bucket={bucket}
           buckets={model.buckets}
           drillFilteredTransactions={model.drillFilteredTransactions}
@@ -447,9 +434,7 @@ export default function App() {
           onQueryChange={setQuery}
           onResetFilters={resetTransactionFilters}
           onShowFullYear={() => {
-            setSelectedDay("");
-            setTimeScope("all");
-            setDrillFilter(null);
+            updateLocalTime("transactions", { ...localTimes.transactions, scope: "year", day: "", drillFilter: null });
             setTransactionPageIndex(0);
           }}
         />
@@ -471,7 +456,7 @@ export default function App() {
       {transactionInspector && (
         <TransactionDrilldownModal
           title={transactionInspector.title}
-          subtitle={transactionInspector.subtitle || (transactionInspector.useTimeScope ? model.activeTimeLabel : `Cały ${year}`)}
+          subtitle={transactionInspector.subtitle || inspectorSubtitle(transactionInspector, model, year)}
           page={inspectorQuery.data}
           loading={inspectorQuery.isPending}
           error={inspectorQuery.error?.message || ""}
@@ -481,8 +466,48 @@ export default function App() {
       )}
 
       <DashboardFooter />
-    </main>
+    </AppShell>
   );
+}
+
+function moduleTimeControl(view, model, localTimes, updateLocalTime, clearLocalDrill) {
+  const months = model.monthly || [];
+  if (view === "control") {
+    return (
+      <TimeScopeControl
+        calendarStats={model.calendarStats}
+        chips={model.controlTimeScope.chips}
+        months={months}
+        time={localTimes.control}
+        variant="full"
+        onChange={(next) => updateLocalTime("control", next)}
+        onClearDrill={() => clearLocalDrill("control")}
+      />
+    );
+  }
+  if (view === "reports") {
+    return (
+      <TimeScopeControl
+        chips={model.reportsTimeScope.chips}
+        months={months}
+        time={localTimes.reports}
+        onChange={(next) => updateLocalTime("reports", next)}
+        onClearDrill={() => clearLocalDrill("reports")}
+      />
+    );
+  }
+  if (view === "transactions") {
+    return (
+      <TimeScopeControl
+        chips={model.transactionsTimeScope.chips}
+        months={months}
+        time={localTimes.transactions}
+        onChange={(next) => updateLocalTime("transactions", next)}
+        onClearDrill={() => clearLocalDrill("transactions")}
+      />
+    );
+  }
+  return null;
 }
 
 function limitsToMap(categoryLimits = []) {
@@ -506,6 +531,7 @@ const defaultTransactionFilters = {
   subcategory: "Wszystkie",
   fixedness: "Wszystkie",
   confidence: "Wszystkie",
+  reviewStatus: "Wszystkie",
   sort: "postedDate,desc",
   pageSize: 50,
 };
@@ -537,7 +563,11 @@ function mergeBucketOverride(settings, category, bucketOverride) {
   return { ...base, categoryLimits: rows };
 }
 
-export function apiFilters({ timeScope, selectedMonth, selectedDay, drillFilter }) {
+export function apiFilters(input) {
+  const timeScope = input.timeScope || input.scope || "month";
+  const selectedMonth = input.selectedMonth ?? input.month ?? "";
+  const selectedDay = input.selectedDay ?? input.day ?? "";
+  const drillFilter = input.drillFilter || null;
   const month = monthKeyFromLabel(selectedMonth);
   let scope = timeScope === "all" ? "year" : timeScope;
   if ((scope === "month" || scope === "day") && !month) {
@@ -547,15 +577,9 @@ export function apiFilters({ timeScope, selectedMonth, selectedDay, drillFilter 
   if (scope === "day" && (!day.trim() || day === "00")) {
     scope = "month";
   }
-  const filters = {
-    scope,
-  };
-  if (scope !== "year" && month) {
-    filters.month = month;
-  }
-  if (scope === "day" && month) {
-    filters.date = `${month}-${day}`;
-  }
+  const filters = { scope };
+  if (scope !== "year" && month) filters.month = month;
+  if (scope === "day" && month) filters.date = `${month}-${day}`;
   if (drillFilter?.type === "area") filters.area = drillFilter.value;
   if (drillFilter?.type === "group") filters.group = drillFilter.value;
   if (drillFilter?.type === "category") filters.category = drillFilter.value;
@@ -566,4 +590,26 @@ export function apiFilters({ timeScope, selectedMonth, selectedDay, drillFilter 
 function transactionFilterParams(filters) {
   const { scope, ...params } = filters;
   return params;
+}
+
+function normalizeTime(time) {
+  return {
+    scope: time?.scope === "all" ? "year" : (time?.scope || "month"),
+    month: time?.month || "",
+    day: time?.scope === "day" ? String(time?.day || "") : "",
+    drillFilter: time?.drillFilter || null,
+  };
+}
+
+function timeKeyForView(view) {
+  if (view === "reports") return "reports";
+  if (view === "transactions") return "transactions";
+  return "control";
+}
+
+function inspectorSubtitle(inspector, model, year) {
+  if (!inspector.useTimeScope) return `Cały ${year}`;
+  if (inspector.timeKey === "reports") return model.reportsTimeScope.activeTimeLabel;
+  if (inspector.timeKey === "transactions") return model.transactionsTimeScope.activeTimeLabel;
+  return model.controlTimeScope.activeTimeLabel;
 }

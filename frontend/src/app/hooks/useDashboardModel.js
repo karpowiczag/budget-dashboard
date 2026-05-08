@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import {
-  buildDashboardViews,
+  buildSidebarNavigation,
   emptyAnalytics,
   selectBuckets,
   selectCalendarStats,
@@ -9,6 +9,8 @@ import {
   selectDataQualityChart,
   selectFinancialFlows,
   selectImportHealth,
+  selectLocalTimeScope,
+  selectModuleHeader,
   selectMonthDashboard,
   selectMonthFinancialFlow,
   selectParentPlanRows,
@@ -19,22 +21,27 @@ import {
   selectRecommendedCuts,
   selectRecurringSummary,
   selectReportsSections,
+  selectReportsWorkspace,
   selectSavingsFocus,
   selectSavingsRadar,
   selectSavingsWaterfall,
+  selectSpendingPlanSections,
   selectTransactionPresets,
   selectTransactionFilterOptions,
   selectVisibleSpend,
+  selectWealthDashboard,
 } from "../domain/budgetSelectors.js";
 
 export function useDashboardModel({
+  activeView = "control",
+  controlTime,
   data,
   years,
-  selectedMonth,
-  selectedDay,
-  timeScope,
-  analytics,
-  yearAnalytics,
+  reportsTime,
+  transactionsTime,
+  reportsAnalytics,
+  reportsYearAnalytics,
+  transactionsAnalytics,
   calendar,
   transactionPage,
   customLimits,
@@ -50,19 +57,17 @@ export function useDashboardModel({
   const planSummary = useMemo(() => selectPlanSummary(primaryPlanRows), [primaryPlanRows]);
   const savingsFocus = useMemo(() => selectSavingsFocus({ planRows: primaryPlanRows }), [primaryPlanRows]);
   const recommendedCuts = useMemo(() => selectRecommendedCuts({ plan: data?.savingsPlan, planRows: primaryPlanRows, savingsFocus }), [data, primaryPlanRows, savingsFocus]);
-  const monthStats = useMemo(() => selectMonthStats(data, selectedMonth), [data, selectedMonth]);
-  const calendarStats = useMemo(() => selectCalendarStats(calendar, selectedDay), [calendar, selectedDay]);
-  const scopedStats = useMemo(() => analytics || emptyAnalytics(), [analytics]);
-  const yearStats = useMemo(
-    () => yearAnalytics || (timeScope === "all" ? scopedStats : emptyAnalytics()),
-    [yearAnalytics, scopedStats, timeScope],
-  );
+  const monthStats = useMemo(() => selectMonthStats(data, controlTime?.month), [data, controlTime]);
   const filteredTransactions = useMemo(() => transactionPage?.items || [], [transactionPage]);
   const visibleSpend = useMemo(() => selectVisibleSpend(filteredTransactions), [filteredTransactions]);
   const financialFlows = useMemo(() => selectFinancialFlows(data), [data]);
   const transactionFilterOptions = useMemo(() => selectTransactionFilterOptions(data), [data]);
   const transactionPresets = useMemo(() => selectTransactionPresets(), []);
   const importHealth = useMemo(() => selectImportHealth({ data, importRuns, years }), [data, importRuns, years]);
+  const controlCalendarStats = useMemo(() => selectCalendarStats(calendar, controlTime?.day), [calendar, controlTime]);
+  const controlTimeScope = useMemo(() => selectLocalTimeScope({ calendarStats: controlCalendarStats, time: controlTime }), [controlCalendarStats, controlTime]);
+  const reportsTimeScope = useMemo(() => selectLocalTimeScope({ time: reportsTime }), [reportsTime]);
+  const transactionsTimeScope = useMemo(() => selectLocalTimeScope({ time: transactionsTime }), [transactionsTime]);
 
   if (!data) {
     return {
@@ -78,13 +83,14 @@ export function useDashboardModel({
       savingsFocus,
       recommendedCuts,
       monthStats,
-      calendarStats,
-      scopedStats,
+      calendarStats: controlCalendarStats,
+      scopedStats: emptyAnalytics(),
       filteredTransactions,
       visibleSpend,
       transactionPage,
       financialFlows,
       importHealth,
+      views: buildSidebarNavigation(false),
     };
   }
 
@@ -108,21 +114,28 @@ export function useDashboardModel({
   const savingsWaterfall = selectSavingsWaterfall({ plan, planSummary, plannedSpendAfterCuts, plannedInvestmentAfterCuts, recommendedCuts });
   const savingsRadar = selectSavingsRadar(recommendedCuts);
   const categoryStatus = (monthControl?.categoryStatus || []).slice(0, 10);
+  const scopedStats = reportsAnalytics || emptyAnalytics();
+  const transactionStats = transactionsAnalytics || emptyAnalytics();
+  const yearStats = reportsYearAnalytics || (reportsTimeScope.scope === "year" ? scopedStats : emptyAnalytics());
   const oneoffs = (scopedStats.oneoffs?.length ? scopedStats.oneoffs : data.largeOneoffs).slice(0, 14);
   const recurringCalendar = [...(data.recurring || [])]
     .filter((row) => row.avgDay)
     .sort((a, b) => a.avgDay - b.avgDay || Number(b.monthlyAverage) - Number(a.monthlyAverage));
-  const activeTimeLabel = buildActiveTimeLabel(timeScope, selectedMonth, calendarStats);
   const monthDashboard = selectMonthDashboard({
     bucketOverrides,
-    calendarStats,
+    calendarStats: controlCalendarStats,
     financialFlowTotal: monthControlFinancialFlow,
     isHistorical,
     monthControl,
     primaryPlanRows,
   });
+  const spendingPlanSections = selectSpendingPlanSections({
+    financialFlowTotal: monthControlFinancialFlow,
+    monthControl,
+    parentStatus: monthDashboard.categoryStatus,
+  });
   const reportsSections = selectReportsSections({
-    activeTimeLabel,
+    activeTimeLabel: reportsTimeScope.activeTimeLabel,
     year: data.year,
     budgetMix,
     financialFlows,
@@ -139,8 +152,29 @@ export function useDashboardModel({
     wants,
     wantsTarget,
   });
+  const reportsWorkspace = selectReportsWorkspace(reportsSections);
   const recurringSummary = selectRecurringSummary({ monthControl, recurring, recurringCalendar });
-  const dataQualityChart = selectDataQualityChart({ kpis, scopedStats });
+  const dataQualityChart = selectDataQualityChart({ kpis, scopedStats: transactionStats });
+  const wealthDashboard = selectWealthDashboard({ financialFlows, monthly, reportsSections });
+  const activeTimeLabel = activeView === "transactions"
+    ? transactionsTimeScope.activeTimeLabel
+    : activeView === "reports"
+      ? reportsTimeScope.activeTimeLabel
+      : controlTimeScope.activeTimeLabel;
+  const moduleHeader = selectModuleHeader({
+    activeTimeLabel,
+    data,
+    financialFlows,
+    importHealth,
+    monthDashboard,
+    plan,
+    planSummary,
+    reportsSections,
+    transactionPage,
+    view: activeView,
+    visibleSpend,
+    wealthDashboard,
+  });
 
   return {
     buckets,
@@ -155,7 +189,10 @@ export function useDashboardModel({
     savingsFocus,
     recommendedCuts,
     monthStats,
-    calendarStats,
+    calendarStats: controlCalendarStats,
+    controlTimeScope,
+    reportsTimeScope,
+    transactionsTimeScope,
     scopedTransactions: filteredTransactions,
     drillFilteredTransactions: filteredTransactions,
     scopedStats,
@@ -166,8 +203,11 @@ export function useDashboardModel({
     importHealth,
     monthControlFinancialFlow,
     monthDashboard,
+    spendingPlanSections,
     reportsSections,
+    reportsWorkspace,
     recurringSummary,
+    wealthDashboard,
     kpis,
     monthly,
     budgetMix,
@@ -190,12 +230,7 @@ export function useDashboardModel({
     recurringCalendar,
     dataQualityChart,
     activeTimeLabel,
-    views: buildDashboardViews(isHistorical),
+    moduleHeader,
+    views: buildSidebarNavigation(isHistorical),
   };
-}
-
-function buildActiveTimeLabel(timeScope, selectedMonth, calendarStats) {
-  if (timeScope === "all") return "Cały rok";
-  if (timeScope === "month") return `Miesiąc ${selectedMonth}`;
-  return `Dzień ${String(calendarStats?.selected || "").padStart(2, "0")}.${selectedMonth}`;
 }

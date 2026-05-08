@@ -1,6 +1,7 @@
 import { Info } from "lucide-react";
 import { SavingsRadarChart } from "../components/charts/SavingsRadarChart.jsx";
 import { SavingsWaterfallChart } from "../components/charts/SavingsWaterfallChart.jsx";
+import { ReportDataTable } from "../components/tables/ReportDataTable.jsx";
 import { Panel } from "../components/ui/Panel.jsx";
 import { bucketAliasesForLimit } from "../domain/budgetSelectors.js";
 import { money } from "../domain/formatters.js";
@@ -122,40 +123,14 @@ export function SavingsPlanView({
             <p>{minMonths} mies.: {money(coreMonthlyCost * minMonths)} · komfort: {money(coreMonthlyCost * comfortMonths)}</p>
           </div>
           <div>
-            <span>Faktycznie inwestowane</span>
-            <strong>{money(financialFlows.investmentTotal || 0)}</strong>
-            <p>{financialFlows.investmentCount || 0} transakcji inwestycji</p>
-          </div>
-          <div>
-            <span>Konto oszczędnościowe</span>
-            <strong>{money(financialFlows.savingsAccountTotal || 0)}</strong>
-            <p>wpływy {money(financialFlows.savingsAccountInflows || 0)} · wydatki {money(financialFlows.savingsAccountOutflows || 0)}</p>
-          </div>
-          <div>
-            <span>Faktyczne nadpłaty kredytu</span>
-            <strong>{money(financialFlows.loanOverpaymentTotal || 0)}</strong>
-            <p>{financialFlows.loanOverpaymentCount || 0} transakcji nadpłaty kapitału</p>
-          </div>
-          <div>
-            <span>Razem majątek i dług</span>
-            <strong>{money(financialFlows.total)}</strong>
-            <p>inwestycje, konto oszczędnościowe i nadpłaty poza kosztem życia</p>
+            <span>Przepływy majątkowe</span>
+            <strong>{money(financialFlows.total || 0)}</strong>
+            <p>szczegóły są w module Majątek, tutaj liczy się tylko cel planu</p>
           </div>
         </div>
         {settingsStatus && <div className={`inlineStatus ${settingsStatus.type}`}>{settingsStatus.message}</div>}
 
         <RecommendedCutsSummary recommendedCuts={recommendedCuts} isHistorical={isHistorical} />
-
-        <section className="gridTwo embeddedGrid">
-          <div className="planChart">
-            <h3>Scenariusz oszczędzania</h3>
-            <SavingsWaterfallChart data={savingsWaterfall || []} />
-          </div>
-          <div className="planChart">
-            <h3>Mapa decyzji oszczędnościowych</h3>
-            <SavingsRadarChart data={savingsRadar || []} />
-          </div>
-        </section>
 
         <div className="planTable">
           <h3>Główne limity</h3>
@@ -170,6 +145,20 @@ export function SavingsPlanView({
             onLimitChange={onLimitChange}
           />
         </div>
+
+        <details className="planChartsDisclosure">
+          <summary>Wizualizacja scenariusza</summary>
+          <section className="gridTwo embeddedGrid">
+            <div className="planChart">
+              <h3>Scenariusz oszczędzania</h3>
+              <SavingsWaterfallChart data={savingsWaterfall || []} />
+            </div>
+            <div className="planChart">
+              <h3>Mapa decyzji oszczędnościowych</h3>
+              <SavingsRadarChart data={savingsRadar || []} />
+            </div>
+          </section>
+        </details>
       </div>
     </Panel>
   );
@@ -192,7 +181,7 @@ function RecommendedCutsSummary({ recommendedCuts, isHistorical }) {
       <div>
         <span>Logika decyzji</span>
         <strong>{recommendedCuts.groups?.length || 0} grupy</strong>
-        <p>zachcianki tniemy, mieszane i zdrowie najpierw rozbijamy, zobowiązań nie ścinamy automatycznie</p>
+        <p>uznaniowe tniemy, niejasne rozbijamy ręcznie, rachunków i długu nie ścinamy automatycznie</p>
       </div>
     </div>
   );
@@ -201,7 +190,7 @@ function RecommendedCutsSummary({ recommendedCuts, isHistorical }) {
 function MainLimitsList({ bucketOptions, categoryRows = [], categoryExamples = {}, categorySubcategories = {}, isHistorical, rows, onBucketOverrideChange, onLimitChange }) {
   const visibleRows = (rows || [])
     .filter((row) => row.scope === "bucket")
-    .filter((row) => !["Przychody", "Transfer techniczny", "Do sprawdzenia"].includes(row.name || row.category))
+    .filter((row) => !["Przychody", "Transfer techniczny"].includes(row.name || row.category))
     .sort(compareMainLimitRows)
     .slice(0, 7);
   if (!visibleRows.length) {
@@ -259,57 +248,70 @@ function MainLimitBlock({ bucketOptions, categoryRows, categoryExamples, categor
 
       <div className="mainLimitChildren">
         {children.length ? (
-          <table>
-            <thead>
-              <tr>
-                <th>Kategoria</th>
-                <th>Główny limit</th>
-                <th>{averageLabel}</th>
-                <th>Override limitu</th>
-                <th>Ponad override</th>
-                <th>Co robić</th>
-              </tr>
-            </thead>
-            <tbody>
-              {children.map((child) => (
-                <tr key={child.category}>
-                  <td>
-                    <CategoryNameWithTooltip
-                      category={child.category}
-                      examples={categoryExamples[child.category] || []}
-                      subcategories={categorySubcategories[child.category] || []}
-                    />
-                  </td>
-                  <td>
-                    <select
-                      className="bucketSelect"
-                      value={child.bucket}
-                      onChange={(event) => onBucketOverrideChange?.(child.category, event.target.value === child.originalBucket ? "" : event.target.value)}
-                      aria-label={`Główny limit ${child.category}`}
-                    >
-                      {bucketOptions.map((option) => (
-                        <option key={option} value={option}>{option}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="num">{money(child.currentMonthly || child.current)}</td>
-                  <td>
-                    <input
-                      className="limitInput"
-                      type="number"
-                      min="0"
-                      step="50"
-                      value={Math.round(child.limit)}
-                      onChange={(event) => onLimitChange(child.scope || "category", child.name || child.category, Number(event.target.value || 0))}
-                      aria-label={`Limit ${child.category}`}
-                    />
-                  </td>
-                  <td className="num strong">{money(child.potentialMonthly)}</td>
-                  <td>{child.action}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <ReportDataTable
+            className="smallRows planLimitTable"
+            rows={children}
+            columns={[
+              {
+                key: "category",
+                header: "Kategoria",
+                render: (child) => (
+                  <CategoryNameWithTooltip
+                    category={child.category}
+                    examples={categoryExamples[child.category] || []}
+                    subcategories={categorySubcategories[child.category] || []}
+                  />
+                ),
+              },
+              {
+                key: "bucket",
+                header: "Główny limit",
+                render: (child) => (
+                  <select
+                    className="bucketSelect"
+                    value={child.bucket}
+                    onChange={(event) => onBucketOverrideChange?.(child.category, event.target.value === child.originalBucket ? "" : event.target.value)}
+                    aria-label={`Główny limit ${child.category}`}
+                  >
+                    {bucketOptions.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                ),
+              },
+              {
+                key: "currentMonthly",
+                header: averageLabel,
+                className: "num",
+                render: (child) => money(child.currentMonthly || child.current),
+                sortValue: (child) => Number(child.currentMonthly || child.current || 0),
+              },
+              {
+                key: "limit",
+                header: "Override limitu",
+                sortValue: (child) => Number(child.limit || 0),
+                render: (child) => (
+                  <input
+                    className="limitInput"
+                    type="number"
+                    min="0"
+                    step="50"
+                    value={Math.round(child.limit)}
+                    onChange={(event) => onLimitChange(child.scope || "category", child.name || child.category, Number(event.target.value || 0))}
+                    aria-label={`Limit ${child.category}`}
+                  />
+                ),
+              },
+              {
+                key: "potentialMonthly",
+                header: "Ponad override",
+                className: "num strong",
+                render: (child) => money(child.potentialMonthly),
+                sortValue: (child) => Number(child.potentialMonthly || 0),
+              },
+              { key: "action", header: "Co robić" },
+            ]}
+          />
         ) : (
           <div className="empty">Brak kategorii w tym koszyku.</div>
         )}

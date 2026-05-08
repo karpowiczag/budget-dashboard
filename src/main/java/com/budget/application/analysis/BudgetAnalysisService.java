@@ -31,11 +31,12 @@ public class BudgetAnalysisService {
     private static final String BUCKET_VARIABLE_OBLIGATORY = "Obowiązkowe zmienne";
     private static final String BUCKET_REVIEW = "Do rozbicia";
     private static final String BUCKET_FLEXIBLE = "Nieobowiązkowe";
+    private static final String BUCKET_NON_MONTHLY = "Nieregularne";
     private static final String BUCKET_INVESTMENTS = "Inwestycje";
     private static final String BUCKET_SAVINGS_ACCOUNT = "Konto oszczędnościowe";
     private static final String BUCKET_LOAN_OVERPAYMENT = "Nadpłata kredytu";
     private static final Set<String> OBLIGATORY_BUCKETS = Set.of(BUCKET_FIXED_OBLIGATORY, BUCKET_VARIABLE_OBLIGATORY);
-    private static final Set<String> REAL_SAVING_CATEGORIES = Set.of("Oszczędności i inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu");
+    private static final Set<String> REAL_SAVING_CATEGORIES = Set.of("Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu");
     private static final Set<String> DAILY_PACED_CATEGORIES = Set.of(
             "Żywność i chemia",
             "Jedzenie poza domem"
@@ -50,7 +51,8 @@ public class BudgetAnalysisService {
             Map.entry("Sport i hobby", new ConfiguredCategoryLimit(500, "Limit na hobby i sprzęt; większe zakupy tylko z funduszu celowego.")),
             Map.entry("Elektronika", new ConfiguredCategoryLimit(300, "Tylko planowane zakupy; większe rzeczy osobny fundusz.")),
             Map.entry("Prezenty i wsparcie", new ConfiguredCategoryLimit(300, "Miesięczny fundusz prezentowy, nie zakup ad hoc.")),
-            Map.entry("Zdrowie i uroda", new ConfiguredCategoryLimit(1400, "Oddzielić leczenie od kosmetyków/usług i ciąć tylko część uznaniową.")),
+            Map.entry("Lekarz i apteka", new ConfiguredCategoryLimit(1400, "Konieczne zdrowie monitorować, bez automatycznego cięcia.")),
+            Map.entry("Uroda i kosmetyki", new ConfiguredCategoryLimit(500, "Kontrolować osobno od leczenia i ciąć jak uznaniowe.")),
             Map.entry("Zwierzęta", new ConfiguredCategoryLimit(650, "Stały fundusz na karmę/weterynarza; porównać większe opakowania.")),
             Map.entry("Multimedia, książki i prasa", new ConfiguredCategoryLimit(250, "Przegląd subskrypcji i zakupów cyfrowych.")),
             Map.entry("Dom i wyposażenie", new ConfiguredCategoryLimit(500, "Zakupy domowe tylko z listy; większe rzeczy jako fundusz celowy."))
@@ -99,9 +101,9 @@ public class BudgetAnalysisService {
         var unassignedSurplus = money(incomeTotal.subtract(spendTotal).subtract(realSavingsOut));
         var corrections = (int) transactions.stream().filter(tx -> !tx.notes().isBlank()).count();
         var lowConfidenceCount = (int) transactions.stream().filter(tx -> "Niska".equals(tx.confidence())).count();
-        var checkCount = (int) transactions.stream().filter(tx -> "Do sprawdzenia".equals(tx.correctedCategory())).count();
+        var checkCount = (int) transactions.stream().filter(tx -> !"ok".equals(tx.reviewStatus())).count();
         var checkAmount = money(transactions.stream()
-                .filter(tx -> "Do sprawdzenia".equals(tx.correctedCategory()))
+                .filter(tx -> !"ok".equals(tx.reviewStatus()))
                 .map(tx -> tx.amount().abs())
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
         var savingsAccount = savingsAccountKpis(transactions, periodEnd);
@@ -322,10 +324,17 @@ public class BudgetAnalysisService {
                 tx.description(),
                 tx.account(),
                 tx.bankCategory(),
+                tx.categoryId(),
                 tx.correctedCategory(),
+                tx.subcategoryId(),
                 tx.budgetArea(),
                 tx.group(),
                 tx.subcategory(),
+                tx.flowType(),
+                budgetGroupIdForBucket(budgetBucket),
+                budgetGroupLabelForBucket(budgetBucket),
+                tx.reviewStatus(),
+                tx.reviewReason(),
                 budgetBucket,
                 tx.fixedness(),
                 tx.type(),
@@ -341,6 +350,29 @@ public class BudgetAnalysisService {
                 appendNote(tx.notes(), "Ręcznie zmieniony koszyk: " + budgetBucket),
                 tx.matchedRule()
         );
+    }
+
+    private String budgetGroupIdForBucket(String bucket) {
+        return switch (bucket) {
+            case BUCKET_FIXED_OBLIGATORY -> "obligatoryFixed";
+            case BUCKET_VARIABLE_OBLIGATORY -> "obligatoryVariable";
+            case BUCKET_FLEXIBLE -> "discretionary";
+            case BUCKET_NON_MONTHLY -> "nonMonthly";
+            case BUCKET_REVIEW -> "reviewSplit";
+            case BUCKET_INVESTMENTS, BUCKET_SAVINGS_ACCOUNT, BUCKET_LOAN_OVERPAYMENT -> "wealthBuilding";
+            default -> "reviewSplit";
+        };
+    }
+
+    private String budgetGroupLabelForBucket(String bucket) {
+        return switch (budgetGroupIdForBucket(bucket)) {
+            case "obligatoryFixed" -> BUCKET_FIXED_OBLIGATORY;
+            case "obligatoryVariable" -> BUCKET_VARIABLE_OBLIGATORY;
+            case "discretionary" -> BUCKET_FLEXIBLE;
+            case "nonMonthly" -> BUCKET_NON_MONTHLY;
+            case "wealthBuilding" -> "Budowanie majątku";
+            default -> BUCKET_REVIEW;
+        };
     }
 
     private String appendNote(String notes, String note) {
@@ -438,7 +470,7 @@ public class BudgetAnalysisService {
         var variableObligatory = sum(transactions.stream().filter(tx -> BUCKET_VARIABLE_OBLIGATORY.equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
         var review = sum(transactions.stream().filter(tx -> BUCKET_REVIEW.equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
         var flexible = sum(transactions.stream().filter(tx -> BUCKET_FLEXIBLE.equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
-        var investments = sum(transactions.stream().filter(tx -> "Oszczędności i inwestycje".equals(tx.correctedCategory())).toList(), NormalizedTransaction::excludedOutgoing);
+        var investments = sum(transactions.stream().filter(tx -> "Inwestycje".equals(tx.correctedCategory())).toList(), NormalizedTransaction::excludedOutgoing);
         var savingsAccount = sum(transactions.stream().filter(tx -> "Konto oszczędnościowe".equals(tx.correctedCategory())).toList(), NormalizedTransaction::excludedOutgoing);
         var loanOverpayments = sum(transactions.stream().filter(tx -> "Nadpłata kredytu".equals(tx.correctedCategory())).toList(), NormalizedTransaction::excludedOutgoing);
         return List.of(
@@ -587,6 +619,9 @@ public class BudgetAnalysisService {
         if ("bucket".equals(scope) && BUCKET_REVIEW.equals(name)) {
             return money(current.multiply(BigDecimal.valueOf(0.95)));
         }
+        if ("bucket".equals(scope) && BUCKET_NON_MONTHLY.equals(name)) {
+            return money(current.multiply(BigDecimal.valueOf(0.90)));
+        }
         if ("bucket".equals(scope) && OBLIGATORY_BUCKETS.contains(name)) {
             return current;
         }
@@ -709,7 +744,8 @@ public class BudgetAnalysisService {
                 "Zwierzęta", "Zwierzęta",
                 "Paliwo i auto", "Auto",
                 "Elektronika", "Elektronika",
-                "Zdrowie i uroda", "Zdrowie/uroda"
+                "Lekarz i apteka", "Zdrowie",
+                "Uroda i kosmetyki", "Uroda"
         ).entrySet()) {
             var avg = categoryAverages.getOrDefault(entry.getKey(), BigDecimal.ZERO);
             if (avg.signum() > 0) {
@@ -744,7 +780,7 @@ public class BudgetAnalysisService {
 
     private List<BudgetSnapshot.FixednessSummary> fixednessRows(List<NormalizedTransaction> transactions, int activeMonthCount) {
         var rows = new ArrayList<BudgetSnapshot.FixednessSummary>();
-        for (var label : List.of("Stałe", "Zmienne konieczne", "Uznaniowe", "Oszczędności", "Transfer/wyłączone", "Do oceny")) {
+        for (var label : List.of("Stałe", "Zmienne konieczne", "Uznaniowe", "Nieregularne", "Oszczędności", "Transfer/wyłączone", "Do rozbicia", "Do oceny")) {
             var items = transactions.stream().filter(tx -> tx.fixedness().equals(label)).toList();
             var spend = sum(items, NormalizedTransaction::analysisSpend);
             var excludedOutgoing = sum(items, NormalizedTransaction::excludedOutgoing);

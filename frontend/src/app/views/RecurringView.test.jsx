@@ -35,7 +35,8 @@ describe("RecurringView", () => {
       />
     );
 
-    expect(screen.getByText("Cykliczne zobowiązania miesiąca")).toBeInTheDocument();
+    expect(screen.getByText("Zobowiązania miesiąca")).toBeInTheDocument();
+    expect(screen.getByText("Co przyjdzie w tym miesiącu")).toBeInTheDocument();
     expect(screen.getByTestId("recurring-timeline-chart")).toBeInTheDocument();
     expect(screen.getByText("Ubezpieczenie")).toBeInTheDocument();
 

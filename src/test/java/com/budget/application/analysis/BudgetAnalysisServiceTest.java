@@ -179,7 +179,7 @@ class BudgetAnalysisServiceTest {
                 BigDecimal.valueOf(13_000),
                 3,
                 6,
-                List.of(new BudgetSettings.CategoryLimitSetting("category", "Zdrowie i uroda", "Zdrowie i uroda", BigDecimal.valueOf(900), "", "Obowiązkowe zmienne"))
+                List.of(new BudgetSettings.CategoryLimitSetting("category", "Lekarz i apteka", "Lekarz i apteka", BigDecimal.valueOf(900), "", "Nieobowiązkowe"))
         );
         var serviceWithOverride = new BudgetAnalysisService(new TransactionNormalizer(classifier), classifier, settingsService(settings));
         var input = new BudgetInput(2026, "fixture.csv", List.of(
@@ -190,18 +190,18 @@ class BudgetAnalysisServiceTest {
         var result = serviceWithOverride.analyze(input);
 
         assertThat(result.transactions())
-                .filteredOn(tx -> tx.correctedCategory().equals("Zdrowie i uroda"))
+                .filteredOn(tx -> tx.correctedCategory().equals("Lekarz i apteka"))
                 .singleElement()
                 .satisfies(tx -> {
-                    assertThat(tx.budgetBucket()).isEqualTo("Obowiązkowe zmienne");
+                    assertThat(tx.budgetBucket()).isEqualTo("Nieobowiązkowe");
                     assertThat(tx.notes()).contains("Ręcznie zmieniony koszyk");
                 });
         assertThat(result.snapshot().savingsPlan().categoryLimits())
-                .filteredOn(row -> row.category().equals("Zdrowie i uroda"))
+                .filteredOn(row -> row.category().equals("Lekarz i apteka"))
                 .singleElement()
-                .satisfies(row -> assertThat(row.bucket()).isEqualTo("Obowiązkowe zmienne"));
+                .satisfies(row -> assertThat(row.bucket()).isEqualTo("Nieobowiązkowe"));
         assertThat(result.snapshot().savingsPlan().parentLimits())
-                .filteredOn(row -> row.scope().equals("bucket") && row.name().equals("Obowiązkowe zmienne"))
+                .filteredOn(row -> row.scope().equals("bucket") && row.name().equals("Nieobowiązkowe"))
                 .singleElement()
                 .satisfies(row -> assertThat(row.currentMonthly()).isEqualByComparingTo(BigDecimal.valueOf(400)));
     }

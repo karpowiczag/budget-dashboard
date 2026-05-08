@@ -16,23 +16,24 @@ const columns = [
   {
     accessorKey: "correctedCategory",
     header: "Kategoria",
-    cell: ({ row }) => row.original.correctedCategory || row.original.category,
+    cell: ({ row }) => (
+      <span className="stackedCell">
+        <strong>{row.original.correctedCategory || row.original.category}</strong>
+        {row.original.subcategory && <small>{row.original.subcategory}</small>}
+      </span>
+    ),
     meta: { sortField: "category", csvValue: (row) => row.correctedCategory || row.category },
-  },
-  {
-    accessorKey: "subcategory",
-    header: "Podkategoria",
-    meta: { sortField: "subcategory" },
   },
   {
     accessorKey: "bucket",
     header: "Koszyk",
+    cell: ({ row }) => (
+      <span className="stackedCell">
+        <strong>{row.original.bucket}</strong>
+        {row.original.fixedness && <small>{row.original.fixedness}</small>}
+      </span>
+    ),
     meta: { sortField: "bucket" },
-  },
-  {
-    accessorKey: "fixedness",
-    header: "Stałość",
-    meta: { sortField: "fixedness" },
   },
   {
     accessorKey: "amount",
@@ -50,6 +51,12 @@ const columns = [
     cell: ({ row }) => <span className={`badge ${row.original.confidence}`}>{row.original.confidence}</span>,
     meta: { sortField: "confidence" },
   },
+  {
+    accessorKey: "reviewStatus",
+    header: "Review",
+    cell: ({ row }) => reviewLabel(row.original.reviewStatus),
+    meta: { sortField: "reviewStatus" },
+  },
 ];
 
 export function TransactionsTable({ transactions, sort, onSort, exportName = "transakcje" }) {
@@ -64,4 +71,10 @@ export function TransactionsTable({ transactions, sort, onSort, exportName = "tr
       sort={sort}
     />
   );
+}
+
+function reviewLabel(value) {
+  if (value === "needsReview") return "Do sprawdzenia";
+  if (value === "needsSplit") return "Do rozbicia";
+  return "OK";
 }

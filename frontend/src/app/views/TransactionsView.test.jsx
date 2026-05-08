@@ -3,6 +3,18 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TransactionsView } from "./TransactionsView.jsx";
 
+vi.mock("../components/charts/DataQualityChart.jsx", () => ({
+  DataQualityChart: ({ data, onInspect }) => (
+    <div data-testid="data-quality-chart">
+      {(data?.cards || []).map((card) => (
+        <button type="button" key={card.label} onClick={() => onInspect?.({ title: `Transakcje: ${card.label}`, filters: card.filter, useTimeScope: true })}>
+          {card.label}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
 afterEach(() => cleanup());
 
 describe("TransactionsView", () => {
@@ -17,7 +29,7 @@ describe("TransactionsView", () => {
         buckets={["Wszystkie", "Potrzeby"]}
         filterOptions={filterOptions}
         dataQualityChart={{
-          cards: [{ label: "Do sprawdzenia", value: 2, amount: 300, filter: { category: "Do sprawdzenia" } }],
+          cards: [{ label: "Do sprawdzenia", value: 2, amount: 300, filter: { reviewStatus: "needsReview" } }],
           confidence: [],
           amountBands: [],
         }}
@@ -56,7 +68,9 @@ describe("TransactionsView", () => {
     expect(screen.getByText("W zakresie: 3 z 12 transakcji roku")).toBeInTheDocument();
     expect(screen.getByText("Widoczna strona: 1")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pokaż cały rok" })).toBeInTheDocument();
-    expect(screen.getByText("Do sprawdzenia")).toBeInTheDocument();
+    expect(screen.getByText("Audyt danych")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pokaż wykresy" })).toBeInTheDocument();
+    expect(screen.queryByTestId("data-quality-chart")).not.toBeInTheDocument();
     expect(screen.getByText("Strona 2 / 3")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Następna" }));
@@ -65,10 +79,13 @@ describe("TransactionsView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Poprzednia" }));
     expect(onPageChange).toHaveBeenCalledWith(0);
 
-    await userEvent.click(screen.getByRole("button", { name: /Do sprawdzenia/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Pokaż wykresy" }));
+    expect(screen.getByTestId("data-quality-chart")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Do sprawdzenia" }));
     expect(onInspect).toHaveBeenCalledWith({
       title: "Transakcje: Do sprawdzenia",
-      filters: { category: "Do sprawdzenia" },
+      filters: { reviewStatus: "needsReview" },
       useTimeScope: true,
     });
   });
@@ -117,6 +134,9 @@ describe("TransactionsView", () => {
     await userEvent.selectOptions(screen.getByLabelText("Pewność"), "Niska");
     expect(onFilterChange).toHaveBeenCalledWith("confidence", "Niska");
 
+    await userEvent.selectOptions(screen.getByLabelText("Status review"), "needsReview");
+    expect(onFilterChange).toHaveBeenCalledWith("reviewStatus", "needsReview");
+
     await userEvent.selectOptions(screen.getByLabelText("Sortowanie"), "amount,desc");
     expect(onFilterChange).toHaveBeenCalledWith("sort", "amount,desc");
 
@@ -125,6 +145,9 @@ describe("TransactionsView", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Kwota/ }));
     expect(onFilterChange).toHaveBeenCalledWith("sort", "amount,desc");
+
+    await userEvent.click(screen.getByRole("button", { name: /Review/ }));
+    expect(onFilterChange).toHaveBeenCalledWith("sort", "reviewStatus,desc");
 
     await userEvent.click(screen.getByRole("button", { name: /Wyczyść/ }));
     expect(onResetFilters).toHaveBeenCalled();
@@ -139,6 +162,7 @@ const defaultFilters = {
   subcategory: "Wszystkie",
   fixedness: "Wszystkie",
   confidence: "Wszystkie",
+  reviewStatus: "Wszystkie",
   sort: "postedDate,desc",
   pageSize: 50,
 };
@@ -158,6 +182,10 @@ const filterOptions = {
   subcategories: ["Wszystkie", "Żywność i chemia · Market spożywczy"],
   fixedness: ["Wszystkie", "Zmienne konieczne"],
   confidence: ["Wszystkie", "Wysoka", "Niska"],
+  reviewStatus: [
+    { value: "Wszystkie", label: "Wszystkie" },
+    { value: "needsReview", label: "Do sprawdzenia" },
+  ],
   sort: [
     { value: "postedDate,desc", label: "Data: najnowsze" },
     { value: "amount,desc", label: "Kwota: najwyższa" },

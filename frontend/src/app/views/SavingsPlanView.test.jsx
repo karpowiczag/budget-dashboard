@@ -149,9 +149,10 @@ describe("SavingsPlanView", () => {
     expect(screen.getByText("Realistyczne cięcie")).toBeInTheDocument();
     expect(screen.getByText("Główne limity")).toBeInTheDocument();
     expect(screen.queryByText("Override'y kategorii")).not.toBeInTheDocument();
-    expect(screen.getByText("Faktycznie inwestowane")).toBeInTheDocument();
-    expect(screen.getAllByText("Konto oszczędnościowe").length).toBeGreaterThan(0);
-    expect(screen.getByText("Faktyczne nadpłaty kredytu")).toBeInTheDocument();
+    expect(screen.getByText("Przepływy majątkowe")).toBeInTheDocument();
+    expect(screen.getByText("szczegóły są w module Majątek, tutaj liczy się tylko cel planu")).toBeInTheDocument();
+    expect(screen.queryByText("Faktycznie inwestowane")).not.toBeInTheDocument();
+    expect(screen.queryByText("Faktyczne nadpłaty kredytu")).not.toBeInTheDocument();
     expect(screen.getByTestId("savings-waterfall-chart")).toBeInTheDocument();
     expect(screen.getByTestId("savings-radar-chart")).toBeInTheDocument();
   });

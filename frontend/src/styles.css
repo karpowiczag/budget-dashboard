@@ -27,6 +27,273 @@ main {
   padding: 20px 24px;
 }
 
+.appShell {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 248px minmax(0, 1fr);
+  padding: 0;
+}
+
+.appContent {
+  min-width: 0;
+  padding: 18px 20px 20px 0;
+}
+
+.sidebarNav {
+  align-self: start;
+  background: #ffffff;
+  border-right: 1px solid #d8e1ea;
+  box-shadow: 8px 0 24px rgb(31 41 55 / 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100vh;
+  padding: 20px 14px;
+  position: sticky;
+  top: 0;
+}
+
+.sidebarBrand h1 {
+  font-size: 30px;
+}
+
+.sidebarBrand span {
+  color: #64748b;
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 6px;
+}
+
+.sidebarNav nav {
+  display: grid;
+  gap: 6px;
+}
+
+.sidebarNav nav button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #334155;
+  cursor: pointer;
+  display: grid;
+  gap: 2px 10px;
+  grid-template-columns: 22px 1fr;
+  min-height: 46px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.sidebarNav nav button svg {
+  grid-row: span 2;
+}
+
+.sidebarNav nav button span {
+  font-weight: 800;
+}
+
+.sidebarNav nav button em {
+  color: #64748b;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.sidebarNav nav button.active {
+  background: #edf7f5;
+  border-color: #b7ddd8;
+  color: #0f766e;
+}
+
+.sidebarYears {
+  border-top: 1px solid #e2e8f0;
+  display: grid;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.sidebarYears > span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.moduleHeader {
+  background: #ffffff;
+  border: 1px solid #d8e1ea;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgb(31 41 55 / 0.06);
+  display: grid;
+  gap: 14px;
+  margin: 0 auto 12px;
+  max-width: 1720px;
+  padding: 16px;
+}
+
+.moduleIntro {
+  min-width: 0;
+}
+
+.moduleIntro h1 {
+  font-size: 28px;
+}
+
+.moduleIntro span {
+  color: #64748b;
+  display: block;
+  margin-top: 5px;
+}
+
+.moduleAction {
+  min-width: 0;
+}
+
+.moduleCards,
+.wealthCards,
+.spendingPlanSteps {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.moduleCard,
+.spendingStep {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  min-height: 82px;
+  padding: 12px;
+}
+
+.moduleCard span,
+.spendingStep span {
+  color: #64748b;
+  display: block;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.moduleCard strong,
+.spendingStep strong {
+  color: #172033;
+  display: block;
+  font-size: 22px;
+  letter-spacing: 0;
+  margin-top: 5px;
+}
+
+.moduleCard p,
+.spendingStep p {
+  color: #64748b;
+  margin: 4px 0 0;
+}
+
+.moduleCard.good strong,
+.spendingStep.good strong {
+  color: #0f766e;
+}
+
+.moduleCard.warn strong,
+.spendingStep.warn strong {
+  color: #b45309;
+}
+
+.timeScopeControl {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.timeScopeRow,
+.filterChips {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.filterChips {
+  margin-top: 8px;
+}
+
+.filterChips span {
+  background: #eef6ff;
+  border: 1px solid #c7ddff;
+  border-radius: 999px;
+  color: #25476f;
+  display: inline-flex;
+  gap: 6px;
+  padding: 5px 9px;
+}
+
+.filterChips button {
+  background: transparent;
+  border: 0;
+  color: #0f766e;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.localCalendar {
+  margin-top: 10px;
+}
+
+.spendingPlanRail,
+.reportWorkspace {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.spendingPlanRail h3 {
+  margin: 0 0 10px;
+}
+
+.spendingStep {
+  cursor: pointer;
+  text-align: left;
+}
+
+.reportQuickCards {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.workspaceHead {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.workspaceQuestion {
+  color: #64748b;
+  margin: 10px 0 0;
+}
+
+.wealthCards {
+  margin-top: 12px;
+}
+
+.embeddedPanel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.embeddedPanel h3 {
+  margin: 0 0 10px;
+}
+
 .state {
   display: grid;
   min-height: 100vh;
@@ -468,7 +735,11 @@ button.kpi {
 }
 
 .chart.sankey {
-  height: 500px;
+  height: 380px;
+}
+
+.compactChartPanel .chart.sankey {
+  height: 350px;
 }
 
 .chart.tall {
@@ -647,7 +918,7 @@ button.kpi {
 }
 
 .monthCards div,
-.monthCards .metricCard,
+.metricCard,
 .fundItem {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
@@ -661,6 +932,10 @@ button.kpi {
   cursor: default;
   font: inherit;
   text-align: left;
+}
+
+.reportQuickCards .metricCard {
+  min-height: 92px;
 }
 
 .metricCard.inspectable {
@@ -699,10 +974,25 @@ button.kpi {
   margin: 8px 0 0;
 }
 
+.monthDecisionGrid {
+  align-items: start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(210px, 0.24fr) minmax(0, 1fr);
+}
+
+.monthDecisionGrid.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.selectedDayCard {
+  min-height: 118px;
+}
+
 .insightGrid {
   display: grid;
   gap: 14px;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
 }
 
 .alerts,
@@ -972,7 +1262,7 @@ button.kpi {
 .focusRows {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .focusRow,
@@ -1060,14 +1350,14 @@ button.kpi {
 .planCards {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .planCards div {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  min-height: 118px;
+  min-height: 106px;
   padding: 14px;
 }
 
@@ -1156,6 +1446,24 @@ button.kpi {
 
 .planTable table {
   min-width: 1160px;
+}
+
+.planChartsDisclosure {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.planChartsDisclosure > summary {
+  color: #17324d;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.planChartsDisclosure[open] > summary {
+  margin-bottom: 12px;
 }
 
 .mainLimitList {
@@ -1833,8 +2141,18 @@ button.kpi {
   color: #475569;
   display: flex;
   gap: 12px;
+  justify-content: space-between;
   margin-bottom: 12px;
   padding: 10px 12px;
+}
+
+.dataQualityBanner > div {
+  display: grid;
+  gap: 2px;
+}
+
+.dataQualityBanner.neutral {
+  background: #f8fafc;
 }
 
 .dataQualityBanner strong {
@@ -2170,14 +2488,29 @@ th {
   text-align: inherit;
 }
 
-.sortHeader span {
-  display: inline-block;
-  min-width: 10px;
+.sortHeaderLabel {
+  display: inline;
 }
 
 .sortHeader.active {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  color: inherit;
+}
+
+.sortHeaderIcon {
+  color: #94a3b8;
+  flex: 0 0 auto;
+  opacity: 0;
+  transition: color 120ms ease, opacity 120ms ease;
+}
+
+.sortHeader:hover .sortHeaderIcon,
+.sortHeader:focus-visible .sortHeaderIcon,
+.sortHeaderIcon.active {
+  opacity: 1;
+}
+
+.sortHeaderIcon.active {
+  color: #2563eb;
 }
 
 td,
@@ -2201,7 +2534,80 @@ td {
 }
 
 .transactions table {
-  min-width: 1180px;
+  min-width: 920px;
+  table-layout: fixed;
+}
+
+.transactions th,
+.transactions td {
+  font-size: 12px;
+  padding: 8px 9px;
+}
+
+.transactions th:nth-child(1),
+.transactions td:nth-child(1) {
+  width: 78px;
+}
+
+.transactions th:nth-child(2),
+.transactions td:nth-child(2) {
+  width: 260px;
+}
+
+.transactions th:nth-child(3),
+.transactions td:nth-child(3) {
+  width: 170px;
+}
+
+.transactions th:nth-child(4),
+.transactions td:nth-child(4) {
+  width: 150px;
+}
+
+.transactions th:nth-child(5),
+.transactions td:nth-child(5) {
+  width: 92px;
+}
+
+.transactions th:nth-child(6),
+.transactions td:nth-child(6) {
+  width: 88px;
+}
+
+.transactions th:nth-child(7),
+.transactions td:nth-child(7) {
+  width: 90px;
+}
+
+.transactions td:not(.num) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stackedCell {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  white-space: normal;
+}
+
+.stackedCell strong,
+.stackedCell small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stackedCell strong {
+  font-weight: 500;
+}
+
+.stackedCell small {
+  color: #64748b;
+  font-size: 11px;
 }
 
 .num {

@@ -77,13 +77,13 @@ class BudgetSettingsServiceTest {
                 BigDecimal.valueOf(13_000),
                 3,
                 6,
-                List.of(new BudgetSettings.CategoryLimitSetting("category", "Zdrowie i uroda", "Zdrowie i uroda", BigDecimal.valueOf(900), "review", "Obowiązkowe zmienne"))
+                List.of(new BudgetSettings.CategoryLimitSetting("category", "Lekarz i apteka", "Lekarz i apteka", BigDecimal.valueOf(900), "review", "Obowiązkowe zmienne"))
         ));
 
         assertThat(saved.categoryLimits())
                 .singleElement()
                 .satisfies(limit -> {
-                    assertThat(limit.category()).isEqualTo("Zdrowie i uroda");
+                    assertThat(limit.category()).isEqualTo("Lekarz i apteka");
                     assertThat(limit.bucketOverride()).isEqualTo("Obowiązkowe zmienne");
                 });
     }
@@ -95,7 +95,7 @@ class BudgetSettingsServiceTest {
                 BigDecimal.valueOf(13_000),
                 3,
                 6,
-                List.of(new BudgetSettings.CategoryLimitSetting("category", "Zdrowie i uroda", "Zdrowie i uroda", BigDecimal.valueOf(900), "review", "Random"))
+                List.of(new BudgetSettings.CategoryLimitSetting("category", "Lekarz i apteka", "Lekarz i apteka", BigDecimal.valueOf(900), "review", "Random"))
         );
 
         assertThatThrownBy(() -> service.save(settings))

@@ -31,7 +31,7 @@ describe("ImportView", () => {
     expect(screen.getByLabelText(/importuję/i)).toBeDisabled();
   });
 
-  it("shows data health and duplicate audit history", () => {
+  it("shows duplicate audit history without repeating header health cards", () => {
     render(
       <ImportView
         onUpload={vi.fn()}
@@ -49,8 +49,8 @@ describe("ImportView", () => {
       />
     );
 
-    expect(screen.getByRole("heading", { name: "Stan danych" })).toBeInTheDocument();
-    expect(screen.getByText("Usunięte duplikaty")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Stan danych" })).not.toBeInTheDocument();
+    expect(screen.getByText("Lokalny rebuild")).toBeInTheDocument();
     expect(screen.getByText(/duplikaty 4/)).toBeInTheDocument();
   });
 

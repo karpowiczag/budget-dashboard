@@ -14,7 +14,7 @@ final class RegexCategoryRuleMatcher implements CategoryRuleMatcher {
     RegexCategoryRuleMatcher(PersonalCategoryRules personalRules) {
         this.rules = java.util.stream.Stream.concat(
                         personalRules.rules().stream(),
-                        BudgetCatalog.RULES.stream()
+                        BudgetTaxonomy.RULES.stream()
                 )
                 .toList();
     }
@@ -24,7 +24,7 @@ final class RegexCategoryRuleMatcher implements CategoryRuleMatcher {
         var source = input.normalizedDescription();
         for (var rule : rules) {
             if (rule.matches(source)) {
-                return Optional.of(new CategoryDecision(rule.category(), rule.sourcePattern(), true));
+                return Optional.of(CategoryDecision.prelim(rule.categoryId(), rule.sourcePattern(), true));
             }
         }
         return Optional.empty();

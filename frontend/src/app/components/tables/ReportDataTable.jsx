@@ -9,6 +9,7 @@ export function ReportDataTable({ className = "smallRows", columns, emptyMessage
       className: column.className,
       csvValue: column.csvValue || ((row) => row[column.key]),
       disableCsv: column.disableCsv,
+      sortValue: column.sortValue,
       sortField: column.sortField,
     },
   }));

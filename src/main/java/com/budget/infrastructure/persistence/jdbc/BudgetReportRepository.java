@@ -34,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class BudgetReportRepository implements BudgetReportStore {
-    private static final java.util.Set<String> FINANCIAL_FLOW_CATEGORIES = java.util.Set.of("Oszczędności i inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu");
+    private static final java.util.Set<String> FINANCIAL_FLOW_CATEGORIES = java.util.Set.of("Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu");
 
     private final ReportDataJdbcRepository reports;
     private final BudgetTransactionDataJdbcRepository transactions;
@@ -724,12 +724,14 @@ public class BudgetReportRepository implements BudgetReportStore {
         if (query.flow() != null) {
             switch (query.flow()) {
                 case "income" -> clauses.add("income > 0");
-                case "spend" -> clauses.add("analysis_spend > 0");
+                case "livingExpense" -> clauses.add("analysis_spend > 0 AND flow_type = 'livingExpense'");
                 case "excluded" -> clauses.add("excluded > 0");
-                case "financial" -> {
-                    clauses.add("excluded_outgoing > 0 AND corrected_category IN (:financialFlowCategories)");
-                    params.addValue("financialFlowCategories", FINANCIAL_FLOW_CATEGORIES);
+                case "technicalTransfer" -> clauses.add("excluded > 0 AND flow_type = 'technicalTransfer'");
+                case "wealthTransfer" -> {
+                    clauses.add("excluded_outgoing > 0 AND flow_type = 'wealthTransfer'");
                 }
+                case "refundCorrection" -> clauses.add("flow_type = 'refundCorrection'");
+                case "review" -> clauses.add("review_status <> 'ok'");
                 default -> throw new IllegalArgumentException("Unsupported transaction flow: " + query.flow());
             }
         }
@@ -761,13 +763,18 @@ public class BudgetReportRepository implements BudgetReportStore {
             clauses.add("confidence = :confidence");
             params.addValue("confidence", query.confidence());
         }
+        if (query.reviewStatus() != null) {
+            clauses.add("review_status = :reviewStatus");
+            params.addValue("reviewStatus", query.reviewStatus());
+        }
         if (query.query() != null) {
             clauses.add("""
                     LOWER(
                         COALESCE(merchant, '') || ' ' ||
                         COALESCE(description, '') || ' ' ||
                         COALESCE(corrected_category, '') || ' ' ||
-                        COALESCE(subcategory, '')
+                        COALESCE(subcategory, '') || ' ' ||
+                        COALESCE(review_reason, '')
                     ) LIKE :needle
                     """);
             params.addValue("needle", "%" + query.query().toLowerCase() + "%");
@@ -791,10 +798,17 @@ public class BudgetReportRepository implements BudgetReportStore {
         entity.setDescription(tx.description());
         entity.setAccount(tx.account());
         entity.setBankCategory(tx.bankCategory());
+        entity.setCategoryId(tx.categoryId());
         entity.setCorrectedCategory(tx.correctedCategory());
+        entity.setSubcategoryId(tx.subcategoryId());
         entity.setBudgetArea(tx.budgetArea());
         entity.setBudgetGroup(tx.group());
         entity.setSubcategory(tx.subcategory());
+        entity.setFlowType(tx.flowType());
+        entity.setBudgetGroupId(tx.budgetGroupId());
+        entity.setBudgetGroupLabel(tx.budgetGroup());
+        entity.setReviewStatus(tx.reviewStatus());
+        entity.setReviewReason(tx.reviewReason());
         entity.setBudgetBucket(tx.budgetBucket());
         entity.setFixedness(tx.fixedness());
         entity.setTransactionType(tx.type());
@@ -1032,10 +1046,17 @@ public class BudgetReportRepository implements BudgetReportStore {
                 rs.getString("description"),
                 rs.getString("account"),
                 rs.getString("bank_category"),
+                rs.getString("category_id"),
                 rs.getString("corrected_category"),
+                rs.getString("subcategory_id"),
                 rs.getString("budget_area"),
                 rs.getString("budget_group"),
                 rs.getString("subcategory"),
+                rs.getString("flow_type"),
+                rs.getString("budget_group_id"),
+                rs.getString("budget_group_label"),
+                rs.getString("review_status"),
+                rs.getString("review_reason"),
                 rs.getString("budget_bucket"),
                 rs.getString("fixedness"),
                 rs.getString("transaction_type"),
@@ -1100,6 +1121,9 @@ public class BudgetReportRepository implements BudgetReportStore {
         var totals = new LinkedHashMap<String, SubcategoryAggregate>();
         for (var row : rows) {
             if (row.spend().signum() <= 0) {
+                continue;
+            }
+            if (row.subcategory() == null || row.subcategory().isBlank()) {
                 continue;
             }
             var key = row.correctedCategory() + " · " + row.subcategory();

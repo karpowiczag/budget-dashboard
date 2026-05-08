@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import { within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DataTable } from "./DataTable.jsx";
@@ -9,6 +10,27 @@ afterEach(() => {
 });
 
 describe("DataTable", () => {
+  it("sorts local table data by any sortable column", async () => {
+    render(
+      <DataTable
+        columns={[
+          { accessorKey: "name", header: "Nazwa" },
+          { accessorKey: "amount", header: "Kwota", meta: { className: "num" } },
+        ]}
+        data={[
+          { name: "B", amount: 20 },
+          { name: "A", amount: 10 },
+        ]}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /Nazwa/ }));
+    expect(within(screen.getAllByRole("row")[1]).getByText("A")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Kwota/ }));
+    expect(within(screen.getAllByRole("row")[1]).getByText("20")).toBeInTheDocument();
+  });
+
   it("keeps server-side sorting callbacks on headers", async () => {
     const onSort = vi.fn();
 

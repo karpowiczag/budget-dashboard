@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDashboardViews,
+  buildSidebarNavigation,
   selectBudgetBurnDown,
   selectBuckets,
   selectCategoryLimitChart,
@@ -20,33 +21,154 @@ import {
   selectMonthFinancialFlow,
   selectMonthlyParentLimitStatus,
   selectMonthlyDimensionTrends,
+  selectModuleHeader,
   selectParentPlanRows,
   selectPlanRows,
   selectRecurringSummary,
   selectRecommendedCuts,
   selectReportsSections,
+  selectReportsWorkspace,
   selectSavingsFocus,
   selectSavingsRadar,
+  selectSpendingPlanSections,
+  selectLocalTimeScope,
   selectSavingsWaterfall,
   selectTransactionFilterOptions,
   selectTransactionPresets,
+  selectWealthDashboard,
 } from "./budgetSelectors.js";
 
 describe("buildDashboardViews", () => {
-  it("puts month control first and removes the old summary tab", () => {
+  it("builds the sidebar order around current month control and removes the old summary tab", () => {
     expect(buildDashboardViews(false).map((view) => view.id)).toEqual([
-      "month",
+      "control",
       "plan",
       "reports",
-      "recurring",
+      "wealth",
+      "obligations",
       "transactions",
       "import",
+    ]);
+    expect(buildSidebarNavigation(false).map((view) => view.label)).toEqual([
+      "Kontrola",
+      "Plan",
+      "Raporty",
+      "Majątek",
+      "Zobowiązania",
+      "Transakcje",
+      "Import",
     ]);
     expect(buildDashboardViews(false).map((view) => view.label)).not.toContain("Podsumowanie");
   });
 
   it("labels a closed year plan as a simulation", () => {
     expect(buildDashboardViews(true).find((view) => view.id === "plan")).toMatchObject({ label: "Symulacja" });
+  });
+});
+
+describe("module view-model selectors", () => {
+  it("keeps local time scopes independent and exposes filter chips", () => {
+    expect(selectLocalTimeScope({
+      calendarStats: { month: "05.2026" },
+      time: { scope: "day", month: "05.2026", day: "4", drillFilter: { label: "Restauracje" } },
+    })).toMatchObject({
+      activeTimeLabel: "Dzień 04.05.2026",
+      scope: "day",
+      selectedDay: "4",
+      chips: [
+        { label: "Zakres", value: "Dzień 04.05.2026" },
+        { label: "Drilldown", value: "Restauracje" },
+      ],
+    });
+  });
+
+  it("builds the spending plan rail from parent monthly limits", () => {
+    expect(selectSpendingPlanSections({
+      financialFlowTotal: 700,
+      monthControl: { incomeToDate: 5000, remainingBudget: 1200, dailyAllowed: 60 },
+      parentStatus: [
+        { name: "Obowiązkowe stałe", currentMonthSpend: 1000 },
+        { name: "Obowiązkowe zmienne", currentMonthSpend: 900 },
+        { name: "Do rozbicia", currentMonthSpend: 300 },
+        { name: "Nieobowiązkowe", currentMonthSpend: 600 },
+      ],
+    })).toMatchObject([
+      { label: "Dochód", value: 5000, filter: { flow: "income" } },
+      { label: "Rachunki i zobowiązania", value: 1000, filter: { bucket: "Obowiązkowe stałe" } },
+      { label: "Planowane zmienne", value: 1200 },
+      { label: "Elastyczne wydatki", value: 600 },
+      { label: "Oszczędności i nadpłaty", value: 700, filter: { flow: "financial" } },
+      { label: "Zostaje w miesiącu", value: 1200 },
+    ]);
+  });
+
+  it("groups reports into mutually exclusive report workspaces", () => {
+    expect(selectReportsWorkspace({ activeTimeLabel: "Miesiąc 05.2026", yearLabel: "Cały 2026" })).toMatchObject({
+      scope: { activeTimeLabel: "Miesiąc 05.2026", yearLabel: "Cały 2026" },
+      reports: [
+        { id: "cashflow", label: "Cashflow", modes: ["breakdown", "trends"] },
+        { id: "spending", label: "Wydatki", modes: ["breakdown", "trends"] },
+        { id: "income", label: "Dochód", modes: ["breakdown", "trends"] },
+        { id: "quality", label: "Jakość danych", modes: ["breakdown", "trends"] },
+      ],
+    });
+  });
+
+  it("separates wealth-building flows from live account balances", () => {
+    expect(selectWealthDashboard({
+      financialFlows: {
+        rows: [
+          { category: "Inwestycje", outgoing: 500, count: 1 },
+          { category: "Konto oszczędnościowe", outgoing: 300, count: 2 },
+          { category: "Nadpłata kredytu", outgoing: 700, count: 1 },
+        ],
+        investmentTotal: 500,
+        investmentCount: 1,
+        savingsAccountTotal: 300,
+        savingsAccountInflows: 400,
+        savingsAccountOutflows: 100,
+        savingsAccountCount: 2,
+        loanOverpaymentTotal: 700,
+        loanOverpaymentCount: 1,
+        total: 1500,
+      },
+      monthly: [{ month: "05.2026", monthKey: "2026-05", savingsInvestments: 1500, transactions: 4 }],
+      reportsSections: { yearLabel: "Cały 2026" },
+    })).toMatchObject({
+      cards: [
+        { label: "Inwestycje", value: 500, filter: { category: "Inwestycje" } },
+        { label: "Konto oszczędnościowe", value: 300, filter: { category: "Konto oszczędnościowe" } },
+        { label: "Nadpłaty kredytu", value: 700, filter: { category: "Nadpłata kredytu" } },
+        { label: "Razem przepływy", value: 1500, detail: "transakcyjnie, bez sald kont" },
+      ],
+      monthlyTrend: [{ month: "05.2026", filter: { month: "2026-05", flow: "financial" } }],
+      scopeLabel: "Cały 2026",
+    });
+  });
+
+  it("returns context-specific module headers instead of one global KPI strip", () => {
+    expect(selectModuleHeader({
+      view: "control",
+      activeTimeLabel: "Miesiąc 05.2026",
+      data: { monthControl: { remainingBudget: 500, dailyAllowed: 25, spendToDate: 2000 }, kpis: { toCheck: 1, toCheckAmount: 80 } },
+      monthDashboard: { categoryStatus: [{ currentMonthSpend: 600, limit: 500 }] },
+    })).toMatchObject({
+      eyebrow: "Kontrola miesiąca",
+      cards: [
+        { label: "Zostaje", value: 500 },
+        { label: "Wydane", value: 2000 },
+        { label: "Ryzyka limitów", value: 1 },
+        { label: "Do sprawdzenia", value: 80 },
+      ],
+    });
+
+    expect(selectModuleHeader({
+      view: "wealth",
+      wealthDashboard: { cards: [{ label: "Inwestycje", value: 500 }] },
+    })).toMatchObject({
+      eyebrow: "Majątek",
+      cards: [{ label: "Inwestycje", value: 500 }],
+    });
   });
 });
 
@@ -67,7 +189,7 @@ describe("selectFinancialFlows", () => {
     expect(selectFinancialFlows({
       categories: [
         { category: "Żywność i chemia", excluded: 0, count: 5 },
-        { category: "Oszczędności i inwestycje", excluded: 300, count: 2 },
+        { category: "Inwestycje", excluded: 300, count: 2 },
         { category: "Konto oszczędnościowe", excluded: 400, count: 3 },
         { category: "Nadpłata kredytu", excluded: 700, count: 1 },
       ],
@@ -75,9 +197,9 @@ describe("selectFinancialFlows", () => {
       rows: [
         { category: "Nadpłata kredytu", outgoing: 700, count: 1, kind: "loanOverpayment" },
         { category: "Konto oszczędnościowe", outgoing: 400, count: 3, kind: "savingsAccount" },
-        { category: "Oszczędności i inwestycje", outgoing: 300, count: 2, kind: "investment" },
+        { category: "Inwestycje", outgoing: 300, count: 2, kind: "investment" },
       ],
-      investments: [{ category: "Oszczędności i inwestycje", outgoing: 300, count: 2, kind: "investment" }],
+      investments: [{ category: "Inwestycje", outgoing: 300, count: 2, kind: "investment" }],
       savingsAccounts: [{ category: "Konto oszczędnościowe", outgoing: 400, count: 3, kind: "savingsAccount" }],
       loanOverpayments: [{ category: "Nadpłata kredytu", outgoing: 700, count: 1, kind: "loanOverpayment" }],
       investmentTotal: 300,
@@ -98,7 +220,7 @@ describe("selectFinancialFlows", () => {
     expect(selectFinancialFlows({
       kpis: { savingsAccountNetChange: 150 },
       categories: [
-        { category: "Oszczędności i inwestycje", excluded: 300, count: 2 },
+        { category: "Inwestycje", excluded: 300, count: 2 },
         { category: "Konto oszczędnościowe", excluded: 400, count: 3 },
         { category: "Nadpłata kredytu", excluded: 700, count: 1 },
       ],
@@ -185,17 +307,17 @@ describe("selectMonthlyParentLimitStatus", () => {
 
   it("uses manual bucket overrides when aggregating month limit status", () => {
     expect(selectMonthlyParentLimitStatus([
-      { category: "Zdrowie i uroda", bucket: "Do rozbicia", currentMonthSpend: 400, currentMonthProjection: 600 },
+      { category: "Marketplace i zakupy online", bucket: "Do rozbicia", currentMonthSpend: 400, currentMonthProjection: 600 },
     ], [
       { scope: "bucket", name: "Obowiązkowe zmienne", currentMonthly: 0, limit: 700 },
       { scope: "bucket", name: "Do rozbicia", currentMonthly: 0, limit: 700 },
     ], {
-      "Zdrowie i uroda": "Obowiązkowe zmienne",
+      "Marketplace i zakupy online": "Obowiązkowe zmienne",
     })).toMatchObject([
       {
         category: "Obowiązkowe zmienne",
         currentMonthProjection: 600,
-        children: [{ category: "Zdrowie i uroda", bucket: "Obowiązkowe zmienne", bucketOverride: "Obowiązkowe zmienne" }],
+        children: [{ category: "Marketplace i zakupy online", bucket: "Obowiązkowe zmienne", bucketOverride: "Obowiązkowe zmienne" }],
       },
       {
         category: "Do rozbicia",
@@ -211,15 +333,15 @@ describe("manual category bucket overrides", () => {
     const planRows = selectPlanRows({
       savingsPlan: {
         categoryLimits: [
-          { category: "Zdrowie i uroda", bucket: "Potrzeby mieszane", currentMonthly: 1000, limit: 900 },
+          { category: "Marketplace i zakupy online", bucket: "Do rozbicia", currentMonthly: 1000, limit: 900 },
         ],
       },
     }, {}, {
-      "Zdrowie i uroda": "Obowiązkowe zmienne",
+      "Marketplace i zakupy online": "Obowiązkowe zmienne",
     });
 
     expect(planRows).toMatchObject([
-      { category: "Zdrowie i uroda", originalBucket: "Do rozbicia", bucket: "Obowiązkowe zmienne", bucketOverride: "Obowiązkowe zmienne" },
+      { category: "Marketplace i zakupy online", originalBucket: "Do rozbicia", bucket: "Obowiązkowe zmienne", bucketOverride: "Obowiązkowe zmienne" },
     ]);
     expect(selectParentPlanRows({
       savingsPlan: {
@@ -337,13 +459,13 @@ describe("decision-focused savings selectors", () => {
     const focus = selectSavingsFocus({
       planRows: [
         { category: "Jedzenie poza domem", bucket: "Zachcianki", currentMonthly: 900, limit: 600, potentialMonthly: 300 },
-        { category: "Zdrowie i uroda", bucket: "Potrzeby mieszane", currentMonthly: 1700, limit: 1400, potentialMonthly: 300 },
+        { category: "Marketplace i zakupy online", bucket: "Do rozbicia", currentMonthly: 1700, limit: 1400, potentialMonthly: 300 },
         { category: "Czynsz i wynajem", bucket: "Potrzeby", currentMonthly: 5000, limit: 5000, potentialMonthly: 0 },
       ],
     });
 
     expect(focus.cutNow).toMatchObject([{ category: "Jedzenie poza domem", decision: "Do cięcia" }]);
-    expect(focus.review).toMatchObject([{ category: "Zdrowie i uroda", decision: "Do rozbicia" }]);
+    expect(focus.review).toMatchObject([{ category: "Marketplace i zakupy online", decision: "Do rozbicia" }]);
     expect(focus.protectedRows).toMatchObject([{ category: "Czynsz i wynajem", decision: "Nie ciąć automatycznie" }]);
   });
 
@@ -352,7 +474,7 @@ describe("decision-focused savings selectors", () => {
       plan: { currentMonthlySpend: 18000, currentMonthlyIncome: 30000 },
       planRows: [
         { category: "Jedzenie poza domem", bucket: "Zachcianki", currentMonthly: 900, limit: 600, potentialMonthly: 300 },
-        { category: "Zdrowie i uroda", bucket: "Potrzeby mieszane", currentMonthly: 1700, limit: 1400, potentialMonthly: 300 },
+        { category: "Marketplace i zakupy online", bucket: "Do rozbicia", currentMonthly: 1700, limit: 1400, potentialMonthly: 300 },
       ],
     })).toMatchObject({
       realisticCut: 300,
@@ -423,13 +545,14 @@ describe("chart selectors", () => {
     expect(selectDataQualityChart({
       kpis: { toCheck: 2, toCheckAmount: 300, lowConfidence: 1, corrections: 4 },
       scopedStats: {
-        categoryTop: [{ category: "Do sprawdzenia", spend: 250, count: 2 }],
+        categoryTop: [{ category: "Marketplace i zakupy online", spend: 250, count: 2 }],
         confidenceBreakdown: [{ confidence: "Niska", count: 1, spend: 100, income: 0, excluded: 0 }],
         amountBands: [{ label: "100-250", minAmount: 100, maxAmount: 250, count: 3, spend: 500 }],
       },
     })).toMatchObject({
       cards: [
-        { label: "Do sprawdzenia", value: 2, amount: 250 },
+        { label: "Do sprawdzenia", value: 2, amount: 300, filter: { reviewStatus: "needsReview" } },
+        { label: "Do rozbicia", value: 2, filter: { reviewStatus: "needsSplit" } },
         { label: "Niska pewność", value: 1 },
         { label: "Korekty roku", value: 4, filter: null, useTimeScope: false },
       ],
@@ -519,12 +642,12 @@ describe("advanced analytical selectors", () => {
       expect.objectContaining({ source: "Dostępne środki", target: "Wolne środki po przepływach", value: 300 }),
     ]));
     expect(selectCashflowSankey({
-      financialFlows: { rows: [{ category: "Oszczędności i inwestycje", outgoing: 8000 }] },
+      financialFlows: { rows: [{ category: "Inwestycje", outgoing: 8000 }] },
       scopedStats: { income: 5000, spend: 2000 },
     }).links).toEqual(expect.arrayContaining([
       expect.objectContaining({ source: "Wpływy", target: "Dostępne środki", value: 5000 }),
       expect.objectContaining({ source: "Środki z salda", target: "Dostępne środki", value: 5000 }),
-      expect.objectContaining({ source: "Dostępne środki", target: "Oszczędności i inwestycje", value: 8000 }),
+      expect.objectContaining({ source: "Dostępne środki", target: "Inwestycje", value: 8000 }),
     ]));
     expect(selectCashflowSankey({
       financialFlows: { rows: [] },
@@ -571,6 +694,8 @@ describe("selectRecurringSummary", () => {
         { merchant: "B", category: "Czynsz i wynajem", avgDay: 10, months: 5, monthlyAverage: 200 },
         { merchant: "A", category: "Multimedia", avgDay: 2, months: 3, monthlyAverage: 50 },
         { merchant: "DELIKATESY", category: "Żywność i chemia", avgDay: 3, months: 5, monthlyAverage: 500 },
+        { merchant: "ALLEGRO", category: "Marketplace i zakupy online", avgDay: 5, months: 5, monthlyAverage: 180 },
+        { merchant: "ROSSMANN", category: "Uroda i kosmetyki", avgDay: 7, months: 5, monthlyAverage: 140 },
       ],
     })).toMatchObject({
       cards: [
@@ -593,7 +718,8 @@ describe("selectRecurringSummary", () => {
 describe("selectTransactionPresets", () => {
   it("defines audit presets for common transaction investigations", () => {
     expect(selectTransactionPresets()).toEqual(expect.arrayContaining([
-      { label: "Do sprawdzenia", filters: { category: "Do sprawdzenia" } },
+      { label: "Do sprawdzenia", filters: { reviewStatus: "needsReview" } },
+      { label: "Do rozbicia", filters: { reviewStatus: "needsSplit" } },
       { label: "Niska pewność", filters: { confidence: "Niska" } },
       { label: "Transfery techniczne", filters: { flow: "excluded" } },
       { label: "Duże kwoty", filters: { flow: "spend", sort: "amount,asc" } },
@@ -613,7 +739,7 @@ describe("selectImportHealth", () => {
         { label: "Lata w bazie", value: 2 },
         { label: "Transakcje w bazie", value: 150 },
         { label: "Do sprawdzenia", value: 2, amount: 300 },
-        { label: "Usunięte duplikaty", value: 4 },
+        { label: "Usunięte duplikaty", value: 3 },
       ],
     });
   });

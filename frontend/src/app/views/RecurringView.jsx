@@ -7,7 +7,7 @@ export function RecurringView({ recurringSummary, onInspect }) {
 
   return (
     <section className="viewStack">
-      <Panel title="Cykliczne zobowiązania miesiąca">
+      <Panel title="Zobowiązania miesiąca">
         <div className="monthCards">
           {summary.cards.map((card) => (
             <div key={card.label}>
@@ -19,7 +19,7 @@ export function RecurringView({ recurringSummary, onInspect }) {
         </div>
       </Panel>
       <section className="gridTwo">
-        <Panel title="Kalendarz cyklicznych płatności (Top 24)">
+        <Panel title="Co przyjdzie w tym miesiącu">
           <RecurringTimelineChart
             data={summary.recurringTimeline || []}
             onSelect={(entry) => {
@@ -29,7 +29,7 @@ export function RecurringView({ recurringSummary, onInspect }) {
           />
         </Panel>
 
-        <Panel title="Cykliczne płatności (Top 16)">
+        <Panel title="Rozpoznane zobowiązania (Top 16)">
           <div className="recurringCalendar">
             {summary.recurringCalendar.map((row) => (
               <button

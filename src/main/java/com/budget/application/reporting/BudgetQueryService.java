@@ -58,13 +58,13 @@ public class BudgetQueryService {
                     query.year(), query.page(), query.size(), query.sort(),
                     requiredMonth(query.month(), "month"), null,
                     query.query(), query.flow(), query.bucket(), query.area(), query.group(), query.category(), query.subcategory(),
-                    query.fixedness(), query.confidence()
+                    query.fixedness(), query.confidence(), query.reviewStatus()
             );
             case "year" -> new TransactionQuery(
                     query.year(), query.page(), query.size(), query.sort(),
                     null, null,
                     query.query(), query.flow(), query.bucket(), query.area(), query.group(), query.category(), query.subcategory(),
-                    query.fixedness(), query.confidence()
+                    query.fixedness(), query.confidence(), query.reviewStatus()
             );
             default -> throw new IllegalArgumentException("Unsupported analytics scope: " + scope);
         };
@@ -82,7 +82,7 @@ public class BudgetQueryService {
                 query.year(), query.page(), query.size(), query.sort(),
                 dateMonth, query.date(),
                 query.query(), query.flow(), query.bucket(), query.area(), query.group(), query.category(), query.subcategory(),
-                query.fixedness(), query.confidence()
+                query.fixedness(), query.confidence(), query.reviewStatus()
         );
     }
 
@@ -95,7 +95,7 @@ public class BudgetQueryService {
                 query.year(), query.page(), query.size(), query.sort(),
                 month, query.date(),
                 query.query(), query.flow(), query.bucket(), query.area(), query.group(), query.category(), query.subcategory(),
-                query.fixedness(), query.confidence()
+                query.fixedness(), query.confidence(), query.reviewStatus()
         );
     }
 

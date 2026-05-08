@@ -13,7 +13,7 @@ final class PositiveEmployerIncomeMatcher implements CategoryRuleMatcher {
         if (input.positiveAmount()
                 && GOOGLE_EMPLOYER.matcher(description).find()
                 && !GOOGLE_CONSUMER_FLOW.matcher(description).find()) {
-            return Optional.of(new CategoryDecision("Pensja", "employer-income:GOOGLE", true));
+            return Optional.of(CategoryDecision.prelim("salary", "employer-income:GOOGLE", true));
         }
         return Optional.empty();
     }

@@ -3,11 +3,11 @@ const INVESTMENT_MIX_BUCKET = "Inwestycje";
 const SAVINGS_ACCOUNT_MIX_BUCKET = "Konto oszczędnościowe";
 const LOAN_OVERPAYMENT_MIX_BUCKET = "Nadpłata kredytu";
 const SURPLUS_BUCKET_PREFIX = "Nadwyżka";
-const FINANCIAL_FLOW_CATEGORIES = new Set(["Oszczędności i inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu"]);
+const FINANCIAL_FLOW_CATEGORIES = new Set(["Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu"]);
 const OBLIGATORY_BUCKETS = new Set(["Obowiązkowe stałe", "Obowiązkowe zmienne", "Potrzeby"]);
 const CUT_NOW_BUCKETS = new Set(["Nieobowiązkowe", "Zachcianki", "Zachcianki do rozbicia"]);
 const REVIEW_BUCKETS = new Set(["Do rozbicia", "Marketplace do rozbicia", "Potrzeby mieszane"]);
-const REVIEW_CATEGORIES = new Set(["Zdrowie i uroda", "Do sprawdzenia", "Marketplace"]);
+const REVIEW_CATEGORIES = new Set(["Marketplace i zakupy online", "Marketplace"]);
 const PROTECTED_CATEGORIES = new Set([
   "Czynsz i wynajem",
   "Prąd",
@@ -16,7 +16,7 @@ const PROTECTED_CATEGORIES = new Set([
   "Podatki",
   "Spłaty i raty",
   "Nadpłata kredytu",
-  "Oszczędności i inwestycje",
+  "Inwestycje",
   "Konto oszczędnościowe",
   "Pensja",
 ]);
@@ -34,31 +34,59 @@ const RECURRING_FALSE_POSITIVE_CATEGORIES = new Set([
   "Jedzenie poza domem",
   "Odzież i obuwie",
   "Marketplace",
-  "Zdrowie i uroda",
+  "Marketplace i zakupy online",
+  "Uroda i kosmetyki",
+  "Lekarz i apteka",
+  "Dom i wyposażenie",
+  "Elektronika",
+  "Sport i hobby",
+  "Podróże i wyjazdy",
+  "Prezenty i wsparcie",
+  "Inne osobiste",
   "Transport i parking",
 ]);
-const GENERIC_SUBCATEGORY_LABELS = new Set(["Ogólne"]);
-const PRIMARY_LIMIT_EXCLUDED = new Set(["Przychody", "Transfer techniczny", "Do sprawdzenia"]);
+const RECURRING_ALLOWED_MERCHANT_PATTERN = /(ABONAMENT|SUBSCRIPTION|NETFLIX|SPOTIFY|DISNEY|YOUTUBE|APPLE|GOOGLE|ADOBE|MICROSOFT|CANVA|PLUS|ORANGE|PLAY|T-MOBILE|TAURON|PGE|ENERGA|ENEA|GAZ|WODA|CZYNSZ|NAJEM|KREDYT|RATA|UBEZPIECZ|POLISA|INTERNET|KORBANK|NETIA|VECTRA|UPC)/i;
+const GENERIC_SUBCATEGORY_LABELS = new Set(["", "Ogólne"]);
+const PRIMARY_LIMIT_EXCLUDED = new Set(["Przychody", "Transfer techniczny"]);
 const BUCKET_LIMIT_ALIASES = {
   "Obowiązkowe stałe": ["Obowiązkowe stałe"],
   "Obowiązkowe zmienne": ["Obowiązkowe zmienne", "Potrzeby"],
   "Do rozbicia": ["Do rozbicia", "Potrzeby mieszane", "Marketplace do rozbicia", "Zachcianki do rozbicia"],
   Nieobowiązkowe: ["Nieobowiązkowe", "Zachcianki"],
+  Nieregularne: ["Nieregularne"],
   Inwestycje: ["Inwestycje", "Oszczędzanie/inwestycje"],
   "Konto oszczędnościowe": ["Konto oszczędnościowe"],
   "Nadpłata kredytu": ["Nadpłata kredytu"],
 };
-export const BUDGET_BUCKET_OPTIONS = ["Obowiązkowe stałe", "Obowiązkowe zmienne", "Do rozbicia", "Nieobowiązkowe", "Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu"];
+export const BUDGET_BUCKET_OPTIONS = ["Obowiązkowe stałe", "Obowiązkowe zmienne", "Do rozbicia", "Nieobowiązkowe", "Nieregularne", "Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu"];
 
 export function buildDashboardViews(isHistorical) {
+  return buildSidebarNavigation(isHistorical);
+}
+
+export function buildSidebarNavigation(isHistorical) {
   return [
-    { id: "month", label: "Miesiąc" },
+    { id: "control", label: "Kontrola", description: "Ten miesiąc" },
     { id: "plan", label: isHistorical ? "Symulacja" : "Plan" },
     { id: "reports", label: "Raporty" },
-    { id: "recurring", label: "Cykliczne" },
+    { id: "wealth", label: "Majątek" },
+    { id: "obligations", label: "Zobowiązania" },
     { id: "transactions", label: "Transakcje" },
     { id: "import", label: "Import" },
   ];
+}
+
+export function selectLocalTimeScope({ calendarStats, time }) {
+  const scope = time?.scope || "month";
+  const selectedMonth = time?.month || "";
+  const selectedDay = time?.day || "";
+  const drillFilter = time?.drillFilter || null;
+  const activeTimeLabel = buildActiveTimeLabel(scope, selectedMonth, calendarStats, selectedDay);
+  const chips = [
+    { label: "Zakres", value: activeTimeLabel },
+    drillFilter ? { label: "Drilldown", value: drillFilter.label || drillFilter.value || "aktywny" } : null,
+  ].filter(Boolean);
+  return { activeTimeLabel, chips, drillFilter, scope, selectedDay, selectedMonth };
 }
 
 export function monthKeyFromLabel(monthLabel) {
@@ -89,6 +117,7 @@ export function selectTransactionFilterOptions(data) {
       { value: "income", label: "Dochód" },
       { value: "financial", label: "Oszczędności/nadpłaty" },
       { value: "excluded", label: "Wyłączone/techniczne" },
+      { value: "review", label: "Do sprawdzenia" },
     ],
     areas: withAll(unique(hierarchy.map((row) => row.area))),
     groups: withAll(unique(hierarchy.map((row) => row.group))),
@@ -96,10 +125,17 @@ export function selectTransactionFilterOptions(data) {
     subcategories: [
       { value: "Wszystkie", label: "Wszystkie" },
       ...uniquePairs(hierarchy, (row) => `${row.category}|${row.subcategory}`)
+        .filter((row) => !GENERIC_SUBCATEGORY_LABELS.has(row.subcategory))
         .map((row) => ({ value: row.subcategory, label: `${row.category} · ${row.subcategory}` })),
     ],
     fixedness: withAll(unique(fixedness.map((row) => row.type))),
     confidence: ["Wszystkie", "Wysoka", "Średnia", "Niska"],
+    reviewStatus: [
+      { value: "Wszystkie", label: "Wszystkie" },
+      { value: "ok", label: "OK" },
+      { value: "needsReview", label: "Do sprawdzenia" },
+      { value: "needsSplit", label: "Do rozbicia" },
+    ],
     sort: [
       { value: "postedDate,desc", label: "Data: najnowsze" },
       { value: "postedDate,asc", label: "Data: najstarsze" },
@@ -119,6 +155,8 @@ export function selectTransactionFilterOptions(data) {
       { value: "fixedness,desc", label: "Stałość Z-A" },
       { value: "confidence,asc", label: "Pewność A-Z" },
       { value: "confidence,desc", label: "Pewność Z-A" },
+      { value: "reviewStatus,asc", label: "Review A-Z" },
+      { value: "reviewStatus,desc", label: "Review Z-A" },
     ],
     pageSizes: [25, 50, 100, 200],
   };
@@ -224,7 +262,9 @@ export function selectSavingsFocus({ monthControl, planRows }) {
   const cutNow = rows.filter((row) => row.decision === "Do cięcia");
   const review = rows.filter((row) => row.decision === "Do rozbicia");
   const protectedRows = rows.filter((row) => row.decision === "Nie ciąć automatycznie");
-  const topActions = [...cutNow, ...review].slice(0, 5);
+  const actionableCutNow = cutNow.filter((row) => Number(row.potentialMonthly || 0) > 0);
+  const actionableReview = review.filter((row) => Number(row.potentialMonthly || 0) > 0 || Number(row.current || 0) > 0);
+  const topActions = [...actionableCutNow, ...actionableReview].slice(0, 5);
   return {
     topActions,
     cutNow,
@@ -487,6 +527,29 @@ export function selectMonthDashboard({ bucketOverrides = {}, calendarStats, fina
   };
 }
 
+export function selectSpendingPlanSections({ financialFlowTotal = 0, monthControl, parentStatus = [] }) {
+  if (!monthControl) return [];
+  const valueFor = (name) => parentStatus.find((row) => (row.name || row.category) === name)?.currentMonthSpend || 0;
+  const obligatoryFixed = valueFor("Obowiązkowe stałe");
+  const obligatoryVariable = valueFor("Obowiązkowe zmienne");
+  const review = valueFor("Do rozbicia");
+  const flexible = valueFor("Nieobowiązkowe");
+  return [
+    { label: "Dochód", value: Number(monthControl.incomeToDate || 0), detail: "rozpoznane wpływy miesiąca", filter: { flow: "income" }, tone: "good" },
+    { label: "Rachunki i zobowiązania", value: Number(obligatoryFixed || 0), detail: "stałe płatności i raty", filter: { bucket: "Obowiązkowe stałe" } },
+    { label: "Planowane zmienne", value: Number(obligatoryVariable || 0) + Number(review || 0), detail: "potrzeby oraz kategorie do rozbicia", filter: { bucket: "Obowiązkowe zmienne" } },
+    { label: "Elastyczne wydatki", value: Number(flexible || 0), detail: "nieobowiązkowe i kontrolowalne", filter: { bucket: "Nieobowiązkowe" }, tone: "warn" },
+    { label: "Oszczędności i nadpłaty", value: Number(financialFlowTotal || 0), detail: "poza kosztem życia", filter: { flow: "financial" }, tone: "good" },
+    {
+      label: "Zostaje w miesiącu",
+      value: Number(monthControl.remainingBudget || 0),
+      detail: `${Number(monthControl.dailyAllowed || 0)} dziennie`,
+      filter: { flow: "spend" },
+      tone: Number(monthControl.remainingBudget || 0) < 0 ? "warn" : "good",
+    },
+  ];
+}
+
 export function selectReportsSections({
   activeTimeLabel,
   year,
@@ -558,6 +621,159 @@ export function selectReportsSections({
   };
 }
 
+export function selectReportsWorkspace(sections = {}) {
+  return {
+    scope: {
+      activeTimeLabel: sections.activeTimeLabel || "Zakres",
+      yearLabel: sections.yearLabel || "Cały rok",
+    },
+    reports: [
+      {
+        id: "cashflow",
+        label: "Cashflow",
+        question: "Skąd przyszły pieniądze i gdzie odpłynęły?",
+        modes: ["breakdown", "trends"],
+      },
+      {
+        id: "spending",
+        label: "Wydatki",
+        question: "Które kategorie i koszyki dominują koszt życia?",
+        modes: ["breakdown", "trends"],
+      },
+      {
+        id: "income",
+        label: "Dochód",
+        question: "Jak stabilne są wpływy i nadwyżka operacyjna?",
+        modes: ["breakdown", "trends"],
+      },
+      {
+        id: "quality",
+        label: "Jakość danych",
+        question: "Co trzeba sprawdzić, zanim ufamy raportowi?",
+        modes: ["breakdown", "trends"],
+      },
+    ],
+  };
+}
+
+export function selectWealthDashboard({ financialFlows, monthly = [], reportsSections = {} }) {
+  const flows = financialFlows || selectFinancialFlows(null);
+  const monthlyTrend = (monthly || [])
+    .filter((row) => Number(row.transactions || 0) > 0)
+    .map((row) => ({
+      month: row.month,
+      monthKey: row.monthKey,
+      spend: Number(row.savingsInvestments || 0),
+      category: "Majątek i dług",
+      count: Number(row.transactions || 0),
+      filter: { month: row.monthKey, flow: "financial" },
+    }));
+  const sankeyLinks = [];
+  flows.rows.forEach((row) => addSankeyLink(sankeyLinks, "Przepływy majątkowe", row.category, row.outgoing, { flow: "financial", category: row.category }));
+  const sankeyNodes = Array.from(new Set(sankeyLinks.flatMap((link) => [link.source, link.target]))).map((name) => ({ name }));
+  return {
+    cards: [
+      { label: "Inwestycje", value: flows.investmentTotal, detail: `${flows.investmentCount} transakcji`, filter: { category: "Inwestycje" }, tone: "good" },
+      { label: "Konto oszczędnościowe", value: flows.savingsAccountTotal, detail: `wpływy ${flows.savingsAccountInflows} · wydatki ${flows.savingsAccountOutflows}`, filter: { category: "Konto oszczędnościowe" }, tone: "good" },
+      { label: "Nadpłaty kredytu", value: flows.loanOverpaymentTotal, detail: `${flows.loanOverpaymentCount} transakcji`, filter: { category: "Nadpłata kredytu" }, tone: "good" },
+      { label: "Razem przepływy", value: flows.total, detail: "transakcyjnie, bez sald kont", filter: { flow: "financial" }, tone: "neutral" },
+    ],
+    flows: flows.rows,
+    monthlyTrend,
+    sankey: { nodes: sankeyNodes, links: sankeyLinks },
+    waterfall: [
+      { label: "Inwestycje", amount: Number(flows.investmentTotal || 0), absAmount: Math.abs(Number(flows.investmentTotal || 0)), kind: "delta" },
+      { label: "Konto oszczędnościowe netto", amount: Number(flows.savingsAccountTotal || 0), absAmount: Math.abs(Number(flows.savingsAccountTotal || 0)), kind: "delta" },
+      { label: "Nadpłaty kredytu", amount: Number(flows.loanOverpaymentTotal || 0), absAmount: Math.abs(Number(flows.loanOverpaymentTotal || 0)), kind: "delta" },
+      { label: "Razem", amount: Number(flows.total || 0), absAmount: Math.abs(Number(flows.total || 0)), kind: "total" },
+    ],
+    scopeLabel: reportsSections.yearLabel || "Cały rok",
+  };
+}
+
+export function selectModuleHeader({
+  activeTimeLabel,
+  data,
+  financialFlows,
+  importHealth,
+  monthDashboard,
+  plan,
+  planSummary,
+  reportsSections,
+  transactionPage,
+  view,
+  visibleSpend,
+  wealthDashboard,
+}) {
+  const controlRisks = (monthDashboard?.categoryStatus || []).filter((row) => Number(row.currentMonthSpend || row.current || 0) > Number(row.limit || 0)).length;
+  const toCheckAmount = Number(data?.kpis?.toCheckAmount || 0);
+  const headers = {
+    control: {
+      eyebrow: "Kontrola miesiąca",
+      title: "Ile możemy bezpiecznie wydać?",
+      subtitle: "Najpierw decyzje na dziś: limit, ryzyka, transakcje do sprawdzenia.",
+      cards: [
+        { label: "Zostaje", value: Number(data?.monthControl?.remainingBudget || 0), detail: `${Number(data?.monthControl?.dailyAllowed || 0)} dziennie`, tone: Number(data?.monthControl?.remainingBudget || 0) < 0 ? "warn" : "good" },
+        { label: "Wydane", value: Number(data?.monthControl?.spendToDate || 0), detail: activeTimeLabel || data?.monthControl?.month },
+        { label: "Ryzyka limitów", value: controlRisks, detail: "główne limity ponad plan", number: true, tone: controlRisks ? "warn" : "good" },
+        { label: "Do sprawdzenia", value: toCheckAmount, detail: `${Number(data?.kpis?.toCheck || 0)} transakcji`, tone: toCheckAmount ? "warn" : "good" },
+      ],
+    },
+    plan: {
+      eyebrow: "Plan limitów",
+      title: "Jakie miesięczne limity ustawiamy?",
+      subtitle: "Najpierw kilka głównych limitów, potem rozwinięcia kategorii tylko tam, gdzie trzeba.",
+      cards: [
+        { label: "Target wydatków", value: Number(plan?.targetMonthlySpend || 0), detail: "miesięcznie" },
+        { label: "Po limitach", value: Number(plan?.currentMonthlySpend || 0) - Number(planSummary?.potentialMonthly || 0), detail: "symulowany koszt życia" },
+        { label: "Potencjał limitów", value: Number(planSummary?.potentialMonthly || 0), detail: `${Number(planSummary?.potentialYearly || 0)} rocznie`, tone: "good" },
+        { label: "Fundusz min.", value: Number(plan?.coreMonthlyCost || 0) * 3, detail: "3 miesiące kosztów" },
+      ],
+    },
+    reports: {
+      eyebrow: "Raporty",
+      title: "Co się zmienia w czasie?",
+      subtitle: "Eksploracja historii: cashflow, wydatki, dochód i jakość danych.",
+      cards: [
+        { label: "Zakres", value: reportsSections?.activeTimeLabel || activeTimeLabel || "Cały rok", textValue: true, detail: "lokalny filtr raportu" },
+        { label: "Wydatki", value: Number(reportsSections?.scopedStats?.spend || 0), detail: `${Number(reportsSections?.scopedStats?.transactionCount || 0)} transakcji` },
+        { label: "Wpływy", value: Number(reportsSections?.scopedStats?.income || 0), detail: "rozpoznane dochody", tone: "good" },
+        { label: "Net flow", value: Number(reportsSections?.scopedStats?.income || 0) - Number(reportsSections?.scopedStats?.spend || 0), detail: "przed przepływami majątkowymi" },
+      ],
+    },
+    wealth: {
+      eyebrow: "Majątek",
+      title: "Ile przesuwamy w oszczędności, inwestycje i dług?",
+      subtitle: "To przepływy z importowanych transakcji, nie live saldo kont.",
+      cards: wealthDashboard?.cards || [],
+    },
+    obligations: {
+      eyebrow: "Zobowiązania",
+      title: "Co wraca co miesiąc?",
+      subtitle: "Stałe rachunki, raty, abonamenty i rezerwy, bez fałszywych cyklicznych zakupów.",
+      cards: [],
+    },
+    transactions: {
+      eyebrow: "Audyt danych",
+      title: "Transakcje i kategoryzacja",
+      subtitle: "Tabela jest źródłem prawdy do sprawdzania filtrów, kategorii i drilldownów.",
+      cards: [
+        { label: "Zakres", value: activeTimeLabel || "Cały rok", textValue: true, detail: "lokalny filtr tabeli" },
+        { label: "Wiersze", value: Number(transactionPage?.totalItems || 0), detail: "po filtrach", number: true },
+        { label: "Strona", value: Number(visibleSpend || 0), detail: "suma wydatków na stronie" },
+        { label: "Do sprawdzenia", value: toCheckAmount, detail: `${Number(data?.kpis?.toCheck || 0)} transakcji`, tone: toCheckAmount ? "warn" : "good" },
+      ],
+    },
+    import: {
+      eyebrow: "Import danych",
+      title: "Stan danych i rebuild CSV",
+      subtitle: "Operacyjny ekran importu, bez analityki i bez prywatnych plików w repo.",
+      cards: importHealth?.cards || [],
+    },
+  };
+  return headers[view] || headers.control;
+}
+
 export function selectRecurringSummary({ monthControl, recurring, recurringCalendar }) {
   const obligations = selectRecurringObligations(recurring || recurringCalendar || []);
   const filteredCalendar = recurringCalendar?.length ? selectRecurringObligations(recurringCalendar) : [];
@@ -596,7 +812,7 @@ export function selectRecurringObligations(recurring = []) {
     const amount = Number(row.monthlyAverage || 0);
     if (RECURRING_OBLIGATION_CATEGORIES.has(category)) return months >= 2 && amount > 0;
     if (RECURRING_FALSE_POSITIVE_CATEGORIES.has(category)) return false;
-    return months >= 4 && amount >= 100;
+    return months >= 4 && amount >= 100 && RECURRING_ALLOWED_MERCHANT_PATTERN.test(row.merchant || "");
   });
 }
 
@@ -703,13 +919,17 @@ export function selectHierarchySunburst(hierarchyTop) {
     const area = row.area || "Inne";
     const group = row.group || "Inne";
     const category = row.category || "Inne";
-    const subcategory = row.subcategory || "Ogólne";
     const spend = Number(row.spend || 0);
     if (spend <= 0) return;
     const areaNode = ensureSunburstNode(roots, area, { area });
     const groupNode = ensureSunburstNode(areaNode.childrenMap, group, { group });
     const categoryNode = ensureSunburstNode(groupNode.childrenMap, category, { category });
-    const subNode = ensureSunburstNode(categoryNode.childrenMap, subcategory, { subcategory });
+    if (!row.subcategory || GENERIC_SUBCATEGORY_LABELS.has(row.subcategory)) {
+      categoryNode.value += spend;
+      categoryNode.count += Number(row.count || 0);
+      return;
+    }
+    const subNode = ensureSunburstNode(categoryNode.childrenMap, row.subcategory, { subcategory: row.subcategory });
     subNode.value += spend;
     subNode.count += Number(row.count || 0);
   });
@@ -822,11 +1042,12 @@ export function selectDataQualityChart({ kpis, scopedStats }) {
     count: Number(row.count || 0),
     spend: Number(row.spend || 0),
   }));
-  const toCheck = (scopedStats?.categoryTop || []).find((row) => row.category === "Do sprawdzenia");
+  const toCheckAmount = Number(kpis?.toCheckAmount || 0);
   const lowConfidence = confidence.find((row) => row.confidence === "Niska");
   return {
     cards: [
-      { label: "Do sprawdzenia", value: Number(toCheck?.count || 0), amount: Number(toCheck?.spend || 0), filter: { category: "Do sprawdzenia" } },
+      { label: "Do sprawdzenia", value: Number(kpis?.toCheck || 0), amount: toCheckAmount, filter: { reviewStatus: "needsReview" }, useTimeScope: false },
+      { label: "Do rozbicia", value: Number((scopedStats?.categoryTop || []).filter((row) => REVIEW_CATEGORIES.has(row.category)).reduce((sum, row) => sum + Number(row.count || 0), 0)), filter: { reviewStatus: "needsSplit" } },
       { label: "Niska pewność", value: Number(lowConfidence?.count || 0), filter: { confidence: "Niska" } },
       { label: "Korekty roku", value: Number(kpis?.corrections || 0), filter: null, useTimeScope: false },
     ],
@@ -840,21 +1061,22 @@ export function selectImportHealth({ data, importRuns, years }) {
   const latestRun = runs[0] || null;
   const yearRows = years || [];
   const totalTransactions = yearRows.reduce((sum, row) => sum + Number(row.transactions || 0), 0);
-  const duplicatesRemoved = runs.reduce((sum, row) => sum + Number(row.duplicatesRemoved || 0), 0);
+  const duplicatesRemoved = Number(latestRun?.duplicatesRemoved || 0);
   return {
     latestRun,
     cards: [
-      { label: "Lata w bazie", value: yearRows.length, detail: yearRows.map((row) => row.year).join(", ") || "brak" },
-      { label: "Transakcje w bazie", value: totalTransactions, detail: data?.year ? `aktywny rok: ${data.year}` : "po importach" },
-      { label: "Do sprawdzenia", value: Number(data?.kpis?.toCheck || 0), amount: Number(data?.kpis?.toCheckAmount || 0), detail: "aktywny rok" },
-      { label: "Usunięte duplikaty", value: duplicatesRemoved, detail: latestRun ? "ostatnie 50 importów" : "brak historii" },
+      { label: "Lata w bazie", value: yearRows.length, detail: yearRows.map((row) => row.year).join(", ") || "brak", number: true },
+      { label: "Transakcje w bazie", value: totalTransactions, detail: data?.year ? `aktywny rok: ${data.year}` : "po importach", number: true },
+      { label: "Do sprawdzenia", value: Number(data?.kpis?.toCheck || 0), amount: Number(data?.kpis?.toCheckAmount || 0), detail: "aktywny rok", number: true },
+      { label: "Usunięte duplikaty", value: duplicatesRemoved, detail: latestRun ? "ostatni import/rebuild" : "brak historii", number: true },
     ],
   };
 }
 
 export function selectTransactionPresets() {
   return [
-    { label: "Do sprawdzenia", filters: { category: "Do sprawdzenia" } },
+    { label: "Do sprawdzenia", filters: { reviewStatus: "needsReview" } },
+    { label: "Do rozbicia", filters: { reviewStatus: "needsSplit" } },
     { label: "Niska pewność", filters: { confidence: "Niska" } },
     { label: "Transfery techniczne", filters: { flow: "excluded" } },
     { label: "Inwestycje", filters: { flow: "financial", bucket: "Inwestycje" } },
@@ -953,6 +1175,13 @@ function financialFlowKind(category) {
   if (category === "Nadpłata kredytu") return "loanOverpayment";
   if (category === "Konto oszczędnościowe") return "savingsAccount";
   return "investment";
+}
+
+function buildActiveTimeLabel(scope, selectedMonth, calendarStats, selectedDay = "") {
+  if (scope === "all" || scope === "year") return "Cały rok";
+  if (scope === "month") return selectedMonth ? `Miesiąc ${selectedMonth}` : "Wybrany miesiąc";
+  const day = selectedDay || calendarStats?.selected || "";
+  return selectedMonth && day ? `Dzień ${String(day).padStart(2, "0")}.${selectedMonth}` : "Wybrany dzień";
 }
 
 export function selectMonthFinancialFlow(data, monthKey) {
@@ -1119,7 +1348,7 @@ function savingsDecision(row) {
 
 function savingsDecisionNote(row, decision) {
   if (decision === "Do cięcia") return "kontrolowalny wydatek";
-  if (decision === "Do rozbicia") return row.category === "Zdrowie i uroda" ? "oddziel leczenie od urody" : "sprawdź transakcje przed cięciem";
+  if (decision === "Do rozbicia") return row.category === "Marketplace i zakupy online" ? "rozbij po historii zamówień" : "sprawdź transakcje przed cięciem";
   return "potrzeba lub zobowiązanie";
 }
 
@@ -1137,9 +1366,10 @@ function comparePrimaryPlanRows(left, right) {
     "Obowiązkowe zmienne": 1,
     "Do rozbicia": 2,
     Nieobowiązkowe: 3,
-    Inwestycje: 4,
-    "Konto oszczędnościowe": 5,
-    "Nadpłata kredytu": 6,
+    Nieregularne: 4,
+    Inwestycje: 5,
+    "Konto oszczędnościowe": 6,
+    "Nadpłata kredytu": 7,
     Potrzeby: 0,
     "Potrzeby mieszane": 2,
     Zachcianki: 3,

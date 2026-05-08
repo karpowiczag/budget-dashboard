@@ -136,7 +136,7 @@ paths:
           schema:
             type: string
             default: postedDate,desc
-            enum: [postedDate,desc, postedDate,asc, amount,desc, amount,asc, spend,desc, spend,asc, merchant,asc, merchant,desc, category,asc, category,desc, subcategory,asc, subcategory,desc, bucket,asc, bucket,desc, fixedness,asc, fixedness,desc, confidence,asc, confidence,desc]
+            enum: [postedDate,desc, postedDate,asc, amount,desc, amount,asc, spend,desc, spend,asc, merchant,asc, merchant,desc, category,asc, category,desc, subcategory,asc, subcategory,desc, bucket,asc, bucket,desc, fixedness,asc, fixedness,desc, confidence,asc, confidence,desc, reviewStatus,asc, reviewStatus,desc]
         - name: month
           in: query
           schema:
@@ -157,7 +157,7 @@ paths:
           description: High-level transaction flow filter for drill-down views.
           schema:
             type: string
-            enum: [income, spend, excluded, financial]
+            enum: [income, spend, livingExpense, excluded, financial, wealthTransfer, technicalTransfer, refundCorrection, review]
         - name: bucket
           in: query
           schema:
@@ -167,6 +167,21 @@ paths:
         - $ref: "#/components/parameters/GroupFilter"
         - $ref: "#/components/parameters/CategoryFilter"
         - $ref: "#/components/parameters/SubcategoryFilter"
+        - name: fixedness
+          in: query
+          schema:
+            type: string
+            maxLength: 160
+        - name: confidence
+          in: query
+          schema:
+            type: string
+            enum: [Wysoka, Średnia, Niska]
+        - name: reviewStatus
+          in: query
+          schema:
+            type: string
+            enum: [ok, needsReview, needsSplit]
       responses:
         "200":
           description: Paginated normalized transactions.
@@ -1029,7 +1044,7 @@ components:
           type: string
     Transaction:
       type: object
-      required: [id, lp, postedDate, month, merchant, description, account, bankCategory, correctedCategory, area, group, subcategory, bucket, fixedness, type, amount, income, spend, discretionary, excluded, excludedOutgoing, excludedIncoming, excludedNet, confidence, notes, matchedRule]
+      required: [id, lp, postedDate, month, merchant, description, account, bankCategory, categoryId, correctedCategory, subcategoryId, area, group, subcategory, flowType, budgetGroupId, budgetGroup, reviewStatus, reviewReason, bucket, fixedness, type, amount, income, spend, discretionary, excluded, excludedOutgoing, excludedIncoming, excludedNet, confidence, notes, matchedRule]
       properties:
         id:
           type: integer
@@ -1049,13 +1064,30 @@ components:
           type: string
         bankCategory:
           type: string
+        categoryId:
+          type: string
         correctedCategory:
+          type: string
+        subcategoryId:
           type: string
         area:
           type: string
         group:
           type: string
         subcategory:
+          type: string
+        flowType:
+          type: string
+          enum: [income, livingExpense, wealthTransfer, technicalTransfer, refundCorrection, review]
+        budgetGroupId:
+          type: string
+          enum: [income, obligatoryFixed, obligatoryVariable, discretionary, nonMonthly, wealthBuilding, reviewSplit, technicalExcluded]
+        budgetGroup:
+          type: string
+        reviewStatus:
+          type: string
+          enum: [ok, needsReview, needsSplit]
+        reviewReason:
           type: string
         bucket:
           type: string

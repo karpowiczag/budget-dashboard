@@ -29,6 +29,7 @@ export function TransactionsView({
   onShowFullYear,
 }) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [qualityOpen, setQualityOpen] = useState(false);
   const totalItems = transactionPage?.totalItems || filteredTransactions.length;
   const page = transactionPage?.page || 0;
   const totalPages = transactionPage?.totalPages || 0;
@@ -54,10 +55,15 @@ export function TransactionsView({
       }
     >
       <div className="dataQualityBanner">
-        <strong>Audyt danych</strong>
-        <span>Niska pewność, do sprawdzenia, korekty i podejrzane kwoty.</span>
+        <div>
+          <strong>Audyt danych</strong>
+          <span>Niska pewność, do sprawdzenia, korekty i podejrzane kwoty.</span>
+        </div>
+        <button type="button" className="secondaryButton" onClick={() => setQualityOpen((open) => !open)}>
+          {qualityOpen ? "Ukryj wykresy" : "Pokaż wykresy"}
+        </button>
       </div>
-      <DataQualityChart data={dataQualityChart} onInspect={onInspect} />
+      {qualityOpen && <DataQualityChart data={dataQualityChart} onInspect={onInspect} />}
 
       {!!(presets || []).length && (
         <div className="presetBar" aria-label="Szybkie filtry transakcji">
@@ -139,6 +145,12 @@ export function TransactionsView({
               value={filters.confidence}
               options={toOptions(options.confidence)}
               onChange={(value) => onFilterChange("confidence", value)}
+            />
+            <OptionSelect
+              label="Status review"
+              value={filters.reviewStatus}
+              options={normalizeOptions(options.reviewStatus)}
+              onChange={(value) => onFilterChange("reviewStatus", value)}
             />
           </div>
         )}

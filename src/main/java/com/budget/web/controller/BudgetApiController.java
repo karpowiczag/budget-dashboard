@@ -98,7 +98,8 @@ public class BudgetApiController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String subcategory,
             @RequestParam(required = false) String fixedness,
-            @RequestParam(required = false) String confidence
+            @RequestParam(required = false) String confidence,
+            @RequestParam(required = false) String reviewStatus
     ) {
         return mapper.toTransactionPage(queryService.transactions(new TransactionQuery(
                 year,
@@ -115,7 +116,8 @@ public class BudgetApiController {
                 category,
                 subcategory,
                 fixedness,
-                confidence
+                confidence,
+                reviewStatus
         )));
     }
 
