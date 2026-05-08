@@ -1,6 +1,7 @@
 package com.budget.web.dto;
 
 import com.budget.application.fire.FireSummary;
+import com.budget.application.fire.FireSettings;
 import com.budget.application.importing.ImportSummary;
 import com.budget.application.reporting.AnalyticsReport;
 import com.budget.application.reporting.CalendarReport;
@@ -10,6 +11,7 @@ import com.budget.application.reporting.YearSummary;
 import com.budget.application.settings.BudgetSettings;
 import com.budget.domain.importjob.ImportRun;
 import com.budget.domain.report.BudgetSnapshot;
+import java.nio.file.Path;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -207,7 +209,15 @@ public class BudgetApiMapper {
                 summary.gapToFireNumber(),
                 summary.bridgeCapitalToAge60(),
                 summary.bridgeCapitalToAge65(),
+                summary.liquidBridgeGapToAge60(),
+                summary.liquidBridgeGapToAge65(),
+                summary.taxableCapitalValue(),
+                summary.taxableUnrealizedGain(),
+                summary.estimatedCapitalGainsTax(),
                 summary.currentMonthlyWealthContribution(),
+                toFireContributionPlan(summary.contributionPlan()),
+                toFireWithdrawalPlan(summary.withdrawalPlan()),
+                toFireDataQuality(summary.dataQuality()),
                 map(summary.scenarios(), row -> new BudgetApiDtos.FireScenarioResponse(
                         row.id(),
                         row.label(),
@@ -242,6 +252,13 @@ public class BudgetApiMapper {
                         row.action(),
                         row.priority()
                 )),
+                map(summary.actionItems(), row -> new BudgetApiDtos.FireActionItemResponse(
+                        row.priority(),
+                        row.type(),
+                        row.title(),
+                        row.detail(),
+                        row.amount()
+                )),
                 map(summary.milestones(), row -> new BudgetApiDtos.FireMilestoneResponse(
                         row.age(),
                         row.label(),
@@ -262,6 +279,87 @@ public class BudgetApiMapper {
                         row.positions(),
                         row.value()
                 ))
+        );
+    }
+
+    public BudgetApiDtos.FireSettingsDto toFireSettings(FireSettings settings) {
+        return new BudgetApiDtos.FireSettingsDto(
+                settings.reportsPath().toString(),
+                settings.currentAge(),
+                settings.targetAge(),
+                settings.monthlySpendOverride(),
+                settings.monthlyContributionOverride(),
+                settings.safeWithdrawalRate(),
+                settings.pessimisticRealReturn(),
+                settings.expectedRealReturn(),
+                settings.optimisticRealReturn(),
+                settings.targetEquityShare(),
+                settings.targetBondShare(),
+                settings.targetCashShare(),
+                settings.targetAlternativeShare(),
+                settings.rebalanceBand()
+        );
+    }
+
+    public FireSettings toFireSettings(BudgetApiDtos.FireSettingsDto dto) {
+        if (dto == null) {
+            return null;
+        }
+        return new FireSettings(
+                Path.of(dto.reportsPath() == null || dto.reportsPath().isBlank() ? "fire/investments_reports" : dto.reportsPath()),
+                dto.currentAge(),
+                dto.targetAge(),
+                dto.monthlySpendOverride(),
+                dto.monthlyContributionOverride(),
+                dto.safeWithdrawalRate(),
+                dto.pessimisticRealReturn(),
+                dto.expectedRealReturn(),
+                dto.optimisticRealReturn(),
+                dto.targetEquityShare(),
+                dto.targetBondShare(),
+                dto.targetCashShare(),
+                dto.targetAlternativeShare(),
+                dto.rebalanceBand()
+        );
+    }
+
+    private BudgetApiDtos.FireContributionPlanResponse toFireContributionPlan(FireSummary.FireContributionPlan row) {
+        return new BudgetApiDtos.FireContributionPlanResponse(
+                row.currentMonthly(),
+                row.requiredMonthlyBase(),
+                row.additionalMonthlyNeeded(),
+                row.annualIkeCapacityForHousehold(),
+                row.annualIkzeCapacityForHousehold(),
+                row.monthlyRetirementWrapperCapacity(),
+                row.recommendation()
+        );
+    }
+
+    private BudgetApiDtos.FireWithdrawalPlanResponse toFireWithdrawalPlan(FireSummary.FireWithdrawalPlan row) {
+        return new BudgetApiDtos.FireWithdrawalPlanResponse(
+                row.monthlyTarget(),
+                row.annualTarget(),
+                row.liquidCapital(),
+                row.yearsCoveredByLiquidCapital(),
+                row.bridgeNeedToAge60(),
+                row.bridgeNeedToAge65(),
+                row.estimatedTaxReserve(),
+                row.sequence()
+        );
+    }
+
+    private BudgetApiDtos.FireDataQualityResponse toFireDataQuality(FireSummary.FireDataQuality row) {
+        return new BudgetApiDtos.FireDataQualityResponse(
+                row.newestReportDate(),
+                row.sourceCount(),
+                row.positionCount(),
+                row.staleSourceCount(),
+                row.unknownAssetClassCount(),
+                row.unknownAssetClassValue(),
+                row.unknownWrapperCount(),
+                row.unknownWrapperValue(),
+                row.status(),
+                row.note()
         );
     }
 

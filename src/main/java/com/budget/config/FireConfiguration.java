@@ -14,6 +14,8 @@ public class FireConfiguration {
                 Path.of(fire.reportsPath()),
                 fire.currentAge(),
                 fire.targetAge(),
+                fire.monthlySpendOverride(),
+                fire.monthlyContributionOverride(),
                 fire.safeWithdrawalRate(),
                 fire.pessimisticRealReturn(),
                 fire.expectedRealReturn(),

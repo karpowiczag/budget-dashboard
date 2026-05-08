@@ -7,8 +7,8 @@ import com.budget.web.controller.FireApiController;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.parser.OpenAPIV3Parser;
-import java.nio.file.Path;
 import java.lang.reflect.ParameterizedType;
+import java.nio.file.Path;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +34,9 @@ class OpenApiContractTest {
             Map.entry("importRuns", "listImportRuns"),
             Map.entry("budgetSettings", "getBudgetSettings"),
             Map.entry("saveBudgetSettings", "updateBudgetSettings"),
-            Map.entry("summary", "getFireSummary")
+            Map.entry("summary", "getFireSummary"),
+            Map.entry("settings", "getFireSettings"),
+            Map.entry("saveSettings", "updateFireSettings")
     );
     private static final Map<String, String> SUCCESS_SCHEMAS = Map.ofEntries(
             Map.entry("getSession", "SessionResponse"),
@@ -48,7 +50,9 @@ class OpenApiContractTest {
             Map.entry("listImportRuns", "[ImportRun]"),
             Map.entry("getBudgetSettings", "BudgetSettings"),
             Map.entry("updateBudgetSettings", "BudgetSettings"),
-            Map.entry("getFireSummary", "FireSummary")
+            Map.entry("getFireSummary", "FireSummary"),
+            Map.entry("getFireSettings", "FireSettings"),
+            Map.entry("updateFireSettings", "FireSettings")
     );
 
     @Autowired
@@ -95,7 +99,7 @@ class OpenApiContractTest {
         assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "fixednessBreakdown", "FixednessBreakdown");
         assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "confidenceBreakdown", "ConfidenceBreakdown");
         assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "amountBands", "AmountBand");
-        assertThat(openApi.getComponents().getSchemas()).containsKeys("BudgetSettings", "CategoryLimitSetting");
+        assertThat(openApi.getComponents().getSchemas()).containsKeys("BudgetSettings", "CategoryLimitSetting", "FireSettings");
     }
 
     private io.swagger.v3.oas.models.Operation operation(PathItem pathItem, RequestMethod method) {

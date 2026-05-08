@@ -927,6 +927,11 @@ button.kpi {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.compactCards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 8px;
+}
+
 .monthCards div,
 .metricCard,
 .fundItem {
@@ -989,6 +994,38 @@ button.kpi {
   display: block;
   line-height: 1.35;
   margin-top: 8px;
+}
+
+.mutedText {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 10px 0 0;
+}
+
+.fireSettingsGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.allocationCheck {
+  align-self: end;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 12px;
+}
+
+.allocationCheck.ok {
+  background: #ecfdf5;
+  color: #166534;
+}
+
+.allocationCheck.warn {
+  background: #fef2f2;
+  color: #991b1b;
 }
 
 .monthDecisionGrid {

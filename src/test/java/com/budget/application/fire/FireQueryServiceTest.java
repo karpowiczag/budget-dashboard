@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -29,6 +30,8 @@ class FireQueryServiceTest {
                 Path.of("fire/investments_reports"),
                 36,
                 50,
+                null,
+                null,
                 BigDecimal.valueOf(0.035),
                 BigDecimal.valueOf(0.02),
                 BigDecimal.valueOf(0.04),
@@ -50,13 +53,16 @@ class FireQueryServiceTest {
         ));
         when(budgetStore.findYears()).thenReturn(List.of());
 
-        var summary = new FireQueryService(portfolioReader, budgetStore, settings).summary();
+        var summary = new FireQueryService(portfolioReader, budgetStore, new FireSettingsService(settings, new MemoryStore())).summary();
 
         assertThat(summary.reportsLoaded()).isTrue();
         assertThat(summary.currentPortfolioValue()).isEqualByComparingTo("200000.00");
         assertThat(summary.retirementLockedValue()).isEqualByComparingTo("50000.00");
         assertThat(summary.liquidFireCapital()).isEqualByComparingTo("150000.00");
         assertThat(summary.fireNumber()).isEqualByComparingTo("4800000.00");
+        assertThat(summary.contributionPlan().annualIkeCapacityForHousehold()).isEqualByComparingTo("56520");
+        assertThat(summary.withdrawalPlan().estimatedTaxReserve()).isEqualByComparingTo("0.00");
+        assertThat(summary.dataQuality().status()).isEqualTo("ok");
         assertThat(summary.scenarios()).hasSize(3);
         assertThat(summary.allocation()).extracting(FireSummary.FireAllocation::assetClass).contains("Akcje", "Gotówka", "Obligacje");
         assertThat(summary.legalRules()).extracting(FireSummary.FireLegalRule::id).contains("ike-limit", "ikze-limit", "zus-age");
@@ -80,5 +86,17 @@ class FireQueryServiceTest {
                 BigDecimal.ZERO.setScale(2),
                 BigDecimal.ZERO.setScale(2)
         );
+    }
+
+    private static final class MemoryStore implements FireSettingsStore {
+        @Override
+        public Optional<FireSettings> findDefaultSettings() {
+            return Optional.empty();
+        }
+
+        @Override
+        public FireSettings saveDefaultSettings(FireSettings settings) {
+            return settings;
+        }
     }
 }

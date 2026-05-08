@@ -35,6 +35,8 @@ public record BudgetProperties(
                 "fire/investments_reports",
                 36,
                 50,
+                null,
+                null,
                 BigDecimal.valueOf(0.035),
                 BigDecimal.valueOf(0.02),
                 BigDecimal.valueOf(0.04),
@@ -85,10 +87,12 @@ public record BudgetProperties(
             String reportsPath,
             @Positive int currentAge,
             @Positive int targetAge,
+            BigDecimal monthlySpendOverride,
+            BigDecimal monthlyContributionOverride,
             @Positive BigDecimal safeWithdrawalRate,
-            @Positive BigDecimal pessimisticRealReturn,
-            @Positive BigDecimal expectedRealReturn,
-            @Positive BigDecimal optimisticRealReturn,
+            BigDecimal pessimisticRealReturn,
+            BigDecimal expectedRealReturn,
+            BigDecimal optimisticRealReturn,
             BigDecimal targetEquityShare,
             BigDecimal targetBondShare,
             BigDecimal targetCashShare,
@@ -98,6 +102,8 @@ public record BudgetProperties(
         public Fire {
             if (reportsPath == null || reportsPath.isBlank()) reportsPath = "fire/investments_reports";
             if (targetAge <= currentAge) targetAge = currentAge + 1;
+            if (monthlySpendOverride != null && monthlySpendOverride.signum() <= 0) monthlySpendOverride = null;
+            if (monthlyContributionOverride != null && monthlyContributionOverride.signum() < 0) monthlyContributionOverride = null;
             if (safeWithdrawalRate == null) safeWithdrawalRate = BigDecimal.valueOf(0.035);
             if (pessimisticRealReturn == null) pessimisticRealReturn = BigDecimal.valueOf(0.02);
             if (expectedRealReturn == null) expectedRealReturn = BigDecimal.valueOf(0.04);

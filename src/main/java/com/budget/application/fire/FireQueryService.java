@@ -21,16 +21,17 @@ public class FireQueryService {
 
     private final FirePortfolioReader portfolioReader;
     private final BudgetReportStore budgetStore;
-    private final FireSettings settings;
+    private final FireSettingsService settingsService;
 
-    public FireQueryService(FirePortfolioReader portfolioReader, BudgetReportStore budgetStore, FireSettings settings) {
+    public FireQueryService(FirePortfolioReader portfolioReader, BudgetReportStore budgetStore, FireSettingsService settingsService) {
         this.portfolioReader = portfolioReader;
         this.budgetStore = budgetStore;
-        this.settings = settings;
+        this.settingsService = settingsService;
     }
 
     public FireSummary summary() {
-        var snapshot = readSnapshot();
+        var settings = settingsService.current();
+        var snapshot = readSnapshot(settings);
         var positions = snapshot.positions();
         var currentValue = sum(positions, FirePortfolioPosition::valuePln);
         var costBasis = sum(positions, FirePortfolioPosition::costBasisPln);
@@ -42,17 +43,37 @@ public class FireQueryService {
                 .filter(position -> position.wrapper().equals("Emerytalne długoterminowe"))
                 .toList(), FirePortfolioPosition::valuePln);
         var liquidFireCapital = currentValue.subtract(retirementLocked).max(BigDecimal.ZERO);
-        var monthlySpendTarget = latestMonthlySpendTarget();
+        var monthlySpendTarget = settings.monthlySpendOverride() == null
+                ? latestMonthlySpendTarget()
+                : money(settings.monthlySpendOverride());
         var annualSpendTarget = monthlySpendTarget.multiply(TWELVE);
         var fireNumber = divide(annualSpendTarget, settings.safeWithdrawalRate(), 2);
         var yearsToFire = settings.targetAge() - settings.currentAge();
-        var monthlyContribution = latestMonthlyWealthContribution();
-        var scenarios = scenarios(currentValue, fireNumber, monthlyContribution, yearsToFire);
-        var allocation = allocation(positions, currentValue);
+        var monthlyContribution = settings.monthlyContributionOverride() == null
+                ? latestMonthlyWealthContribution()
+                : money(settings.monthlyContributionOverride());
+        var scenarios = scenarios(settings, currentValue, fireNumber, monthlyContribution, yearsToFire);
+        var allocation = allocation(settings, positions, currentValue);
         var wrappers = wrappers(positions, currentValue);
-        var rebalancing = rebalancing(allocation, currentValue);
-        var bridgeTo60 = bridgeCapital(annualSpendTarget, 60);
-        var bridgeTo65 = bridgeCapital(annualSpendTarget, 65);
+        var rebalancing = rebalancing(settings, allocation, currentValue);
+        var bridgeTo60 = bridgeCapital(settings, annualSpendTarget, 60);
+        var bridgeTo65 = bridgeCapital(settings, annualSpendTarget, 65);
+        var taxablePositions = positions.stream()
+                .filter(position -> position.wrapper().equals("Rachunek opodatkowany"))
+                .toList();
+        var taxableCapital = sum(taxablePositions, FirePortfolioPosition::valuePln);
+        var taxableGain = sum(taxablePositions, FirePortfolioPosition::gainPln);
+        var estimatedTax = money(taxableGain.max(BigDecimal.ZERO).multiply(new BigDecimal("0.19")));
+        var liquidBridgeGapTo60 = money(bridgeTo60.subtract(liquidFireCapital).max(BigDecimal.ZERO));
+        var liquidBridgeGapTo65 = money(bridgeTo65.subtract(liquidFireCapital).max(BigDecimal.ZERO));
+        var baseScenario = scenarios.stream()
+                .filter(scenario -> scenario.id().equals("base"))
+                .findFirst()
+                .orElseGet(scenarios::getFirst);
+        var contributionPlan = contributionPlan(monthlyContribution, baseScenario);
+        var withdrawalPlan = withdrawalPlan(monthlySpendTarget, annualSpendTarget, liquidFireCapital, bridgeTo60, bridgeTo65, estimatedTax);
+        var dataQuality = dataQuality(snapshot, positions);
+        var actionItems = actionItems(baseScenario, contributionPlan, liquidBridgeGapTo60, dataQuality, rebalancing);
 
         return new FireSummary(
                 snapshot.asOf(),
@@ -76,18 +97,27 @@ public class FireQueryService {
                 money(fireNumber.subtract(currentValue).max(BigDecimal.ZERO)),
                 bridgeTo60,
                 bridgeTo65,
+                liquidBridgeGapTo60,
+                liquidBridgeGapTo65,
+                money(taxableCapital),
+                money(taxableGain),
+                estimatedTax,
                 money(monthlyContribution),
+                contributionPlan,
+                withdrawalPlan,
+                dataQuality,
                 scenarios,
                 allocation,
                 wrappers,
                 rebalancing,
-                milestones(annualSpendTarget, fireNumber, bridgeTo60, bridgeTo65),
+                actionItems,
+                milestones(settings, annualSpendTarget, fireNumber, bridgeTo60, bridgeTo65),
                 legalRules(),
                 sources(positions)
         );
     }
 
-    private com.budget.domain.fire.FirePortfolioSnapshot readSnapshot() {
+    private com.budget.domain.fire.FirePortfolioSnapshot readSnapshot(FireSettings settings) {
         try {
             return portfolioReader.read(settings.reportsPath());
         } catch (IOException e) {
@@ -124,7 +154,7 @@ public class FireQueryService {
         }
     }
 
-    private List<FireSummary.FireScenario> scenarios(BigDecimal currentValue, BigDecimal fireNumber, BigDecimal currentMonthly, int yearsToFire) {
+    private List<FireSummary.FireScenario> scenarios(FireSettings settings, BigDecimal currentValue, BigDecimal fireNumber, BigDecimal currentMonthly, int yearsToFire) {
         return List.of(
                 scenario("low", "Ostrożny", settings.pessimisticRealReturn(), currentValue, fireNumber, currentMonthly, yearsToFire),
                 scenario("base", "Bazowy", settings.expectedRealReturn(), currentValue, fireNumber, currentMonthly, yearsToFire),
@@ -174,12 +204,12 @@ public class FireQueryService {
         return BigDecimal.valueOf(remaining / contributionFactor);
     }
 
-    private List<FireSummary.FireAllocation> allocation(List<FirePortfolioPosition> positions, BigDecimal total) {
+    private List<FireSummary.FireAllocation> allocation(FireSettings settings, List<FirePortfolioPosition> positions, BigDecimal total) {
         var grouped = new LinkedHashMap<String, BigDecimal>();
         for (var position : positions) {
             grouped.merge(position.assetClass(), position.valuePln(), BigDecimal::add);
         }
-        var targets = targetAllocation();
+        var targets = targetAllocation(settings);
         return grouped.entrySet().stream()
                 .map(entry -> {
                     var share = share(entry.getValue(), total);
@@ -198,7 +228,7 @@ public class FireQueryService {
                 .toList();
     }
 
-    private Map<String, BigDecimal> targetAllocation() {
+    private Map<String, BigDecimal> targetAllocation(FireSettings settings) {
         var targets = new LinkedHashMap<String, BigDecimal>();
         targets.put("Akcje", settings.targetEquityShare());
         targets.put("Obligacje", settings.targetBondShare());
@@ -228,7 +258,7 @@ public class FireQueryService {
                 .toList();
     }
 
-    private List<FireSummary.FireRebalanceAction> rebalancing(List<FireSummary.FireAllocation> allocation, BigDecimal total) {
+    private List<FireSummary.FireRebalanceAction> rebalancing(FireSettings settings, List<FireSummary.FireAllocation> allocation, BigDecimal total) {
         return allocation.stream()
                 .map(row -> {
                     var amountToTarget = row.targetShare().subtract(row.share()).multiply(total);
@@ -251,18 +281,159 @@ public class FireQueryService {
                 .toList();
     }
 
-    private BigDecimal bridgeCapital(BigDecimal annualSpendTarget, int accessAge) {
+    private BigDecimal bridgeCapital(FireSettings settings, BigDecimal annualSpendTarget, int accessAge) {
         var years = Math.max(0, accessAge - settings.targetAge());
         return money(annualSpendTarget.multiply(BigDecimal.valueOf(years)));
     }
 
-    private List<FireSummary.FireMilestone> milestones(BigDecimal annualSpendTarget, BigDecimal fireNumber, BigDecimal bridgeTo60, BigDecimal bridgeTo65) {
+    private List<FireSummary.FireMilestone> milestones(FireSettings settings, BigDecimal annualSpendTarget, BigDecimal fireNumber, BigDecimal bridgeTo60, BigDecimal bridgeTo65) {
         return List.of(
                 new FireSummary.FireMilestone(settings.targetAge(), "FIRE target", "Kapitał generujący planowany roczny budżet według SWR.", money(fireNumber)),
                 new FireSummary.FireMilestone(60, "Dostęp do IKE / wiek ZUS kobiet", "Pomost 50-60 powinien być pokryty płynnym kapitałem poza IKZE.", bridgeTo60),
                 new FireSummary.FireMilestone(65, "IKZE i wiek ZUS mężczyzn", "Konserwatywny pomost do wieku 65 lat dla środków emerytalnych i ZUS.", bridgeTo65),
                 new FireSummary.FireMilestone(0, "Roczny koszt życia", "Cel wydatków rocznych użyty w modelu FIRE.", money(annualSpendTarget))
         );
+    }
+
+    private FireSummary.FireContributionPlan contributionPlan(BigDecimal currentMonthly, FireSummary.FireScenario baseScenario) {
+        var required = money(baseScenario.requiredMonthlyContribution());
+        var additional = money(required.subtract(currentMonthly).max(BigDecimal.ZERO));
+        var ikeCapacity = BigDecimal.valueOf(28_260L * 2);
+        var ikzeCapacity = BigDecimal.valueOf(11_304L * 2);
+        var monthlyWrapperCapacity = money(ikeCapacity.add(ikzeCapacity).divide(TWELVE, 2, RoundingMode.HALF_UP));
+        var recommendation = additional.signum() == 0
+                ? "Plan bazowy domyka cel FIRE przy obecnym tempie wpłat. Utrzymaj automatyczne wpłaty i rebalansuj nowymi środkami."
+                : "Brakującą miesięczną kwotę kieruj najpierw w roczne limity IKE/IKZE, a nadwyżkę w płynny portfel pomostowy do wieku 60/65.";
+        return new FireSummary.FireContributionPlan(
+                money(currentMonthly),
+                required,
+                additional,
+                ikeCapacity,
+                ikzeCapacity,
+                monthlyWrapperCapacity,
+                recommendation
+        );
+    }
+
+    private FireSummary.FireWithdrawalPlan withdrawalPlan(
+            BigDecimal monthlySpendTarget,
+            BigDecimal annualSpendTarget,
+            BigDecimal liquidFireCapital,
+            BigDecimal bridgeTo60,
+            BigDecimal bridgeTo65,
+            BigDecimal estimatedTax
+    ) {
+        var yearsCovered = annualSpendTarget.signum() == 0
+                ? BigDecimal.ZERO
+                : liquidFireCapital.divide(annualSpendTarget, 2, RoundingMode.HALF_UP);
+        return new FireSummary.FireWithdrawalPlan(
+                money(monthlySpendTarget),
+                money(annualSpendTarget),
+                money(liquidFireCapital),
+                yearsCovered,
+                bridgeTo60,
+                bridgeTo65,
+                estimatedTax,
+                "Najpierw poduszka i portfel opodatkowany na pomost 50-60/65, IKE nie ruszać przed warunkami wypłaty, IKZE traktować jako kapitał po 65 r.ż."
+        );
+    }
+
+    private FireSummary.FireDataQuality dataQuality(
+            com.budget.domain.fire.FirePortfolioSnapshot snapshot,
+            List<FirePortfolioPosition> positions
+    ) {
+        var newest = positions.stream()
+                .map(FirePortfolioPosition::priceDate)
+                .filter(java.util.Objects::nonNull)
+                .max(LocalDate::compareTo)
+                .orElse(snapshot.asOf());
+        var staleThreshold = LocalDate.now().minusDays(45);
+        var staleSources = sources(positions).stream()
+                .filter(source -> source.asOf() == null || source.asOf().isBefore(staleThreshold))
+                .count();
+        var unknownAssets = positions.stream()
+                .filter(position -> position.assetClass().equals("Inne"))
+                .toList();
+        var unknownWrappers = positions.stream()
+                .filter(position -> position.wrapper().equals("Inne"))
+                .toList();
+        var status = positions.isEmpty()
+                ? "missing"
+                : staleSources > 0 || !unknownAssets.isEmpty() || !unknownWrappers.isEmpty() ? "needsReview" : "ok";
+        var note = switch (status) {
+            case "missing" -> "Brak lokalnych raportów MyFund, więc projekcja nie ma bazy portfela.";
+            case "needsReview" -> "Część raportów jest stara albo wymaga ręcznej mapy aktywów/opakowań.";
+            default -> "Raporty są aktualne i wszystkie pozycje mają rozpoznaną klasę oraz segment płynności.";
+        };
+        return new FireSummary.FireDataQuality(
+                newest,
+                snapshot.sourceFiles().size(),
+                positions.size(),
+                Math.toIntExact(staleSources),
+                unknownAssets.size(),
+                money(sum(unknownAssets, FirePortfolioPosition::valuePln)),
+                unknownWrappers.size(),
+                money(sum(unknownWrappers, FirePortfolioPosition::valuePln)),
+                status,
+                note
+        );
+    }
+
+    private List<FireSummary.FireActionItem> actionItems(
+            FireSummary.FireScenario baseScenario,
+            FireSummary.FireContributionPlan contributionPlan,
+            BigDecimal liquidBridgeGapTo60,
+            FireSummary.FireDataQuality dataQuality,
+            List<FireSummary.FireRebalanceAction> rebalancing
+    ) {
+        var items = new ArrayList<FireSummary.FireActionItem>();
+        if (!dataQuality.status().equals("ok")) {
+            items.add(new FireSummary.FireActionItem(
+                    "P1",
+                    "data",
+                    "Doprowadź dane MyFund do stanu produkcyjnego",
+                    dataQuality.note(),
+                    BigDecimal.ZERO
+            ));
+        }
+        if (contributionPlan.additionalMonthlyNeeded().signum() > 0) {
+            items.add(new FireSummary.FireActionItem(
+                    "P1",
+                    "contribution",
+                    "Zwiększ miesięczne wpłaty do planu FIRE",
+                    "Scenariusz bazowy wymaga większego tempa niż obecny plan wpłat.",
+                    contributionPlan.additionalMonthlyNeeded()
+            ));
+        }
+        if (liquidBridgeGapTo60.signum() > 0) {
+            items.add(new FireSummary.FireActionItem(
+                    "P1",
+                    "bridge",
+                    "Zbuduj płynny kapitał pomostowy do 60 r.ż.",
+                    "Część kapitału emerytalnego może być niedostępna w wieku 50 lat, więc sam FIRE number nie wystarczy.",
+                    liquidBridgeGapTo60
+            ));
+        }
+        rebalancing.stream()
+                .filter(row -> row.priority().equals("Wysoki"))
+                .findFirst()
+                .ifPresent(row -> items.add(new FireSummary.FireActionItem(
+                        "P2",
+                        "rebalance",
+                        "Skoryguj alokację nowymi wpłatami",
+                        row.assetClass() + ": " + row.action(),
+                        row.amountToTarget()
+                )));
+        if (items.isEmpty() && baseScenario.onTrack()) {
+            items.add(new FireSummary.FireActionItem(
+                    "P3",
+                    "maintenance",
+                    "Utrzymaj automatyzację",
+                    "Model bazowy jest na ścieżce. Najważniejsze jest utrzymanie wpłat, kontroli wydatków i okresowego rebalancingu.",
+                    BigDecimal.ZERO
+            ));
+        }
+        return items;
     }
 
     private List<FireSummary.FireLegalRule> legalRules() {

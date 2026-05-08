@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchAnalytics, fetchCalendar, fetchFireSummary, fetchTransactions } from "./api/budgetApi.js";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchAnalytics, fetchCalendar, fetchFireSettings, fetchFireSummary, fetchTransactions, updateFireSettings } from "./api/budgetApi.js";
 import { budgetQueryKeys } from "./api/queryKeys.js";
 import { AppShell } from "./components/layout/AppShell.jsx";
 import { DashboardFooter } from "./components/layout/DashboardFooter.jsx";
@@ -23,6 +23,7 @@ import { WealthView } from "./views/WealthView.jsx";
 import "../styles.css";
 
 export default function App() {
+  const queryClient = useQueryClient();
   const {
     years,
     year,
@@ -45,6 +46,7 @@ export default function App() {
   const [customLimits, setCustomLimits] = useState({});
   const [categoryBucketOverrides, setCategoryBucketOverrides] = useState({});
   const [settingsDraft, setSettingsDraft] = useState(null);
+  const [fireSettingsStatus, setFireSettingsStatus] = useState(null);
   const [view, setView] = useState("control");
   const [localTimes, setLocalTimes] = useState({
     control: { scope: "month", month: "", day: "", drillFilter: null },
@@ -155,6 +157,14 @@ export default function App() {
     queryKey: budgetQueryKeys.fire,
     queryFn: fetchFireSummary,
     enabled: !!data && view === "fire",
+  });
+  const fireSettingsQuery = useQuery({
+    queryKey: budgetQueryKeys.fireSettings,
+    queryFn: fetchFireSettings,
+    enabled: view === "fire",
+  });
+  const fireSettingsMutation = useMutation({
+    mutationFn: updateFireSettings,
   });
   const inspectorQuery = useQuery({
     queryKey: budgetQueryKeys.transactions(year, inspectorFilters),
@@ -298,6 +308,20 @@ export default function App() {
     }));
   }
 
+  async function handleSaveFireSettings(settings) {
+    setFireSettingsStatus({ type: "info", message: "Zapisuję ustawienia FIRE..." });
+    try {
+      const saved = await fireSettingsMutation.mutateAsync(settings);
+      queryClient.setQueryData(budgetQueryKeys.fireSettings, saved);
+      await queryClient.invalidateQueries({ queryKey: budgetQueryKeys.fire });
+      setFireSettingsStatus({ type: "success", message: "Ustawienia FIRE zapisane i prognoza odświeżona." });
+      return saved;
+    } catch (error) {
+      setFireSettingsStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
   async function handleSaveSettings() {
     const base = settingsDraft || budgetSettings || {};
     const allLimitRows = [...(model.parentPlanRows || []), ...(model.planRows || [])];
@@ -412,7 +436,13 @@ export default function App() {
       )}
 
       {view === "fire" && (
-        <FireView fireSummary={fireQuery.data || model.fireSummary} />
+        <FireView
+          fireSettings={fireSettingsQuery.data}
+          fireSummary={fireQuery.data || model.fireSummary}
+          saving={fireSettingsMutation.isPending}
+          settingsStatus={fireSettingsStatus}
+          onSaveSettings={handleSaveFireSettings}
+        />
       )}
 
       {view === "obligations" && (

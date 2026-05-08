@@ -7,6 +7,8 @@ public record FireSettings(
         Path reportsPath,
         int currentAge,
         int targetAge,
+        BigDecimal monthlySpendOverride,
+        BigDecimal monthlyContributionOverride,
         BigDecimal safeWithdrawalRate,
         BigDecimal pessimisticRealReturn,
         BigDecimal expectedRealReturn,

@@ -286,6 +286,33 @@ paths:
                 $ref: "#/components/schemas/FireSummary"
         "400":
           $ref: "#/components/responses/Problem"
+  /api/v1/fire/settings:
+    get:
+      operationId: getFireSettings
+      responses:
+        "200":
+          description: Current FIRE planning settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FireSettings"
+    put:
+      operationId: updateFireSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FireSettings"
+      responses:
+        "200":
+          description: Updated FIRE planning settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FireSettings"
+        "400":
+          $ref: "#/components/responses/Problem"
 components:
   parameters:
     Year:
@@ -1210,7 +1237,7 @@ components:
           description: Optional manual high-level budget bucket override for category-scope settings.
     FireSummary:
       type: object
-      required: [reportsLoaded, reportsPath, sourceCount, positionCount, currentAge, targetAge, yearsToFire, currentPortfolioValue, costBasis, unrealizedGain, emergencyFundValue, retirementLockedValue, liquidFireCapital, annualSpendTarget, monthlySpendTarget, safeWithdrawalRate, fireNumber, gapToFireNumber, bridgeCapitalToAge60, bridgeCapitalToAge65, currentMonthlyWealthContribution, scenarios, allocation, wrappers, rebalancing, milestones, legalRules, sources]
+      required: [reportsLoaded, reportsPath, sourceCount, positionCount, currentAge, targetAge, yearsToFire, currentPortfolioValue, costBasis, unrealizedGain, emergencyFundValue, retirementLockedValue, liquidFireCapital, annualSpendTarget, monthlySpendTarget, safeWithdrawalRate, fireNumber, gapToFireNumber, bridgeCapitalToAge60, bridgeCapitalToAge65, liquidBridgeGapToAge60, liquidBridgeGapToAge65, taxableCapitalValue, taxableUnrealizedGain, estimatedCapitalGainsTax, currentMonthlyWealthContribution, contributionPlan, withdrawalPlan, dataQuality, scenarios, allocation, wrappers, rebalancing, actionItems, milestones, legalRules, sources]
       properties:
         asOf:
           type: string
@@ -1219,6 +1246,7 @@ components:
           type: boolean
         reportsPath:
           type: string
+          readOnly: true
         sourceCount:
           type: integer
         positionCount:
@@ -1255,8 +1283,24 @@ components:
           $ref: "#/components/schemas/Money"
         bridgeCapitalToAge65:
           $ref: "#/components/schemas/Money"
+        liquidBridgeGapToAge60:
+          $ref: "#/components/schemas/Money"
+        liquidBridgeGapToAge65:
+          $ref: "#/components/schemas/Money"
+        taxableCapitalValue:
+          $ref: "#/components/schemas/Money"
+        taxableUnrealizedGain:
+          $ref: "#/components/schemas/Money"
+        estimatedCapitalGainsTax:
+          $ref: "#/components/schemas/Money"
         currentMonthlyWealthContribution:
           $ref: "#/components/schemas/Money"
+        contributionPlan:
+          $ref: "#/components/schemas/FireContributionPlan"
+        withdrawalPlan:
+          $ref: "#/components/schemas/FireWithdrawalPlan"
+        dataQuality:
+          $ref: "#/components/schemas/FireDataQuality"
         scenarios:
           type: array
           items:
@@ -1273,6 +1317,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FireRebalanceAction"
+        actionItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireActionItem"
         milestones:
           type: array
           items:
@@ -1353,6 +1401,84 @@ components:
           type: string
         priority:
           type: string
+    FireContributionPlan:
+      type: object
+      required: [currentMonthly, requiredMonthlyBase, additionalMonthlyNeeded, annualIkeCapacityForHousehold, annualIkzeCapacityForHousehold, monthlyRetirementWrapperCapacity, recommendation]
+      properties:
+        currentMonthly:
+          $ref: "#/components/schemas/Money"
+        requiredMonthlyBase:
+          $ref: "#/components/schemas/Money"
+        additionalMonthlyNeeded:
+          $ref: "#/components/schemas/Money"
+        annualIkeCapacityForHousehold:
+          $ref: "#/components/schemas/Money"
+        annualIkzeCapacityForHousehold:
+          $ref: "#/components/schemas/Money"
+        monthlyRetirementWrapperCapacity:
+          $ref: "#/components/schemas/Money"
+        recommendation:
+          type: string
+    FireWithdrawalPlan:
+      type: object
+      required: [monthlyTarget, annualTarget, liquidCapital, yearsCoveredByLiquidCapital, bridgeNeedToAge60, bridgeNeedToAge65, estimatedTaxReserve, sequence]
+      properties:
+        monthlyTarget:
+          $ref: "#/components/schemas/Money"
+        annualTarget:
+          $ref: "#/components/schemas/Money"
+        liquidCapital:
+          $ref: "#/components/schemas/Money"
+        yearsCoveredByLiquidCapital:
+          $ref: "#/components/schemas/Ratio"
+        bridgeNeedToAge60:
+          $ref: "#/components/schemas/Money"
+        bridgeNeedToAge65:
+          $ref: "#/components/schemas/Money"
+        estimatedTaxReserve:
+          $ref: "#/components/schemas/Money"
+        sequence:
+          type: string
+    FireDataQuality:
+      type: object
+      required: [sourceCount, positionCount, staleSourceCount, unknownAssetClassCount, unknownAssetClassValue, unknownWrapperCount, unknownWrapperValue, status, note]
+      properties:
+        newestReportDate:
+          type: string
+          format: date
+        sourceCount:
+          type: integer
+        positionCount:
+          type: integer
+        staleSourceCount:
+          type: integer
+        unknownAssetClassCount:
+          type: integer
+        unknownAssetClassValue:
+          $ref: "#/components/schemas/Money"
+        unknownWrapperCount:
+          type: integer
+        unknownWrapperValue:
+          $ref: "#/components/schemas/Money"
+        status:
+          type: string
+          enum: [ok, needsReview, missing]
+        note:
+          type: string
+    FireActionItem:
+      type: object
+      required: [priority, type, title, detail, amount]
+      properties:
+        priority:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        amount:
+          $ref: "#/components/schemas/Money"
     FireMilestone:
       type: object
       required: [age, label, description, requiredCapital]
@@ -1395,6 +1521,42 @@ components:
           type: integer
         value:
           $ref: "#/components/schemas/Money"
+    FireSettings:
+      type: object
+      required: [reportsPath, currentAge, targetAge, safeWithdrawalRate, pessimisticRealReturn, expectedRealReturn, optimisticRealReturn, targetEquityShare, targetBondShare, targetCashShare, targetAlternativeShare, rebalanceBand]
+      properties:
+        reportsPath:
+          type: string
+        currentAge:
+          type: integer
+          minimum: 18
+          maximum: 90
+        targetAge:
+          type: integer
+          minimum: 18
+          maximum: 90
+        monthlySpendOverride:
+          $ref: "#/components/schemas/Money"
+        monthlyContributionOverride:
+          $ref: "#/components/schemas/Money"
+        safeWithdrawalRate:
+          $ref: "#/components/schemas/Ratio"
+        pessimisticRealReturn:
+          $ref: "#/components/schemas/Ratio"
+        expectedRealReturn:
+          $ref: "#/components/schemas/Ratio"
+        optimisticRealReturn:
+          $ref: "#/components/schemas/Ratio"
+        targetEquityShare:
+          $ref: "#/components/schemas/Ratio"
+        targetBondShare:
+          $ref: "#/components/schemas/Ratio"
+        targetCashShare:
+          $ref: "#/components/schemas/Ratio"
+        targetAlternativeShare:
+          $ref: "#/components/schemas/Ratio"
+        rebalanceBand:
+          $ref: "#/components/schemas/Ratio"
     ProblemDetail:
       type: object
       properties:

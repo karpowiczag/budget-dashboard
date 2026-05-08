@@ -64,6 +64,11 @@ export async function fetchFireSummary() {
   return readJson(response, "Nie mogę wczytać modułu FIRE");
 }
 
+export async function fetchFireSettings() {
+  const response = await fetch("/api/v1/fire/settings");
+  return readJson(response, "Nie mogę wczytać ustawień FIRE");
+}
+
 export async function updateBudgetSettings(settings) {
   const response = await fetch("/api/v1/settings/budget", {
     method: "PUT",
@@ -74,6 +79,18 @@ export async function updateBudgetSettings(settings) {
     body: JSON.stringify(settings),
   });
   return readJson(response, "Nie mogę zapisać ustawień budżetu");
+}
+
+export async function updateFireSettings(settings) {
+  const response = await fetch("/api/v1/fire/settings", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(settings),
+  });
+  return readJson(response, "Nie mogę zapisać ustawień FIRE");
 }
 
 export async function uploadTransactions(file) {

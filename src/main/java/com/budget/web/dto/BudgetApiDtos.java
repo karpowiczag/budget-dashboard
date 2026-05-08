@@ -421,11 +421,20 @@ public final class BudgetApiDtos {
             BigDecimal gapToFireNumber,
             BigDecimal bridgeCapitalToAge60,
             BigDecimal bridgeCapitalToAge65,
+            BigDecimal liquidBridgeGapToAge60,
+            BigDecimal liquidBridgeGapToAge65,
+            BigDecimal taxableCapitalValue,
+            BigDecimal taxableUnrealizedGain,
+            BigDecimal estimatedCapitalGainsTax,
             BigDecimal currentMonthlyWealthContribution,
+            FireContributionPlanResponse contributionPlan,
+            FireWithdrawalPlanResponse withdrawalPlan,
+            FireDataQualityResponse dataQuality,
             List<FireScenarioResponse> scenarios,
             List<FireAllocationResponse> allocation,
             List<FireWrapperResponse> wrappers,
             List<FireRebalanceActionResponse> rebalancing,
+            List<FireActionItemResponse> actionItems,
             List<FireMilestoneResponse> milestones,
             List<FireLegalRuleResponse> legalRules,
             List<FireSourceResponse> sources
@@ -474,6 +483,52 @@ public final class BudgetApiDtos {
     ) {
     }
 
+    public record FireContributionPlanResponse(
+            BigDecimal currentMonthly,
+            BigDecimal requiredMonthlyBase,
+            BigDecimal additionalMonthlyNeeded,
+            BigDecimal annualIkeCapacityForHousehold,
+            BigDecimal annualIkzeCapacityForHousehold,
+            BigDecimal monthlyRetirementWrapperCapacity,
+            String recommendation
+    ) {
+    }
+
+    public record FireWithdrawalPlanResponse(
+            BigDecimal monthlyTarget,
+            BigDecimal annualTarget,
+            BigDecimal liquidCapital,
+            BigDecimal yearsCoveredByLiquidCapital,
+            BigDecimal bridgeNeedToAge60,
+            BigDecimal bridgeNeedToAge65,
+            BigDecimal estimatedTaxReserve,
+            String sequence
+    ) {
+    }
+
+    public record FireDataQualityResponse(
+            LocalDate newestReportDate,
+            int sourceCount,
+            int positionCount,
+            int staleSourceCount,
+            int unknownAssetClassCount,
+            BigDecimal unknownAssetClassValue,
+            int unknownWrapperCount,
+            BigDecimal unknownWrapperValue,
+            String status,
+            String note
+    ) {
+    }
+
+    public record FireActionItemResponse(
+            String priority,
+            String type,
+            String title,
+            String detail,
+            BigDecimal amount
+    ) {
+    }
+
     public record FireMilestoneResponse(
             int age,
             String label,
@@ -497,6 +552,24 @@ public final class BudgetApiDtos {
             LocalDate asOf,
             int positions,
             BigDecimal value
+    ) {
+    }
+
+    public record FireSettingsDto(
+            String reportsPath,
+            int currentAge,
+            int targetAge,
+            BigDecimal monthlySpendOverride,
+            BigDecimal monthlyContributionOverride,
+            BigDecimal safeWithdrawalRate,
+            BigDecimal pessimisticRealReturn,
+            BigDecimal expectedRealReturn,
+            BigDecimal optimisticRealReturn,
+            BigDecimal targetEquityShare,
+            BigDecimal targetBondShare,
+            BigDecimal targetCashShare,
+            BigDecimal targetAlternativeShare,
+            BigDecimal rebalanceBand
     ) {
     }
 }
