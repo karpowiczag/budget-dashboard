@@ -1,3 +1,5 @@
+import { percent } from "./formatters.js";
+
 const SAVINGS_TRANSACTION_BUCKETS = new Set(["Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu", "Oszczędzanie/inwestycje"]);
 const INVESTMENT_MIX_BUCKET = "Inwestycje";
 const SAVINGS_ACCOUNT_MIX_BUCKET = "Konto oszczędnościowe";
@@ -755,9 +757,10 @@ export function selectModuleHeader({
       subtitle: "Prognoza oparta o lokalne raporty MyFund, budżet życia i polskie reguły podatkowo-emerytalne.",
       cards: [
         { label: "Kapitał teraz", value: Number(fireSummary?.currentPortfolioValue || 0), detail: `${Number(fireSummary?.positionCount || 0)} pozycji` },
-        { label: "Cel FIRE", value: Number(fireSummary?.fireNumber || 0), detail: `${Number(fireSummary?.safeWithdrawalRate || 0) * 100}% SWR` },
+        { label: "Cel FIRE", value: Number(fireSummary?.fireNumber || 0), detail: `${percent(fireSummary?.safeWithdrawalRate)} SWR` },
         { label: "Brakuje", value: Number(fireSummary?.gapToFireNumber || 0), detail: `do wieku ${fireSummary?.targetAge || 50}`, tone: Number(fireSummary?.gapToFireNumber || 0) > 0 ? "warn" : "good" },
-        { label: "Pomost 50-60", value: Number(fireSummary?.bridgeCapitalToAge60 || 0), detail: "kapitał płynny przed IKE/ZUS" },
+        { label: "Wpłata z budżetu", value: Number(fireSummary?.budgetLink?.firePortfolioMonthlyContribution || fireSummary?.currentMonthlyWealthContribution || 0), detail: "inwestycje + konto oszcz. netto" },
+        { label: "Luka 50-60", value: Number(fireSummary?.liquidBridgeGapToAge60 || 0), detail: "po zostawieniu poduszki", tone: Number(fireSummary?.liquidBridgeGapToAge60 || 0) > 0 ? "warn" : "good" },
       ],
     },
     obligations: {

@@ -19,6 +19,8 @@ public record FireSummary(
         BigDecimal emergencyFundValue,
         BigDecimal retirementLockedValue,
         BigDecimal liquidFireCapital,
+        BigDecimal bridgeableLiquidCapital,
+        BigDecimal emergencyReserveTarget,
         BigDecimal annualSpendTarget,
         BigDecimal monthlySpendTarget,
         BigDecimal safeWithdrawalRate,
@@ -32,6 +34,7 @@ public record FireSummary(
         BigDecimal taxableUnrealizedGain,
         BigDecimal estimatedCapitalGainsTax,
         BigDecimal currentMonthlyWealthContribution,
+        FireBudgetLink budgetLink,
         FireContributionPlan contributionPlan,
         FireWithdrawalPlan withdrawalPlan,
         FireDataQuality dataQuality,
@@ -45,6 +48,7 @@ public record FireSummary(
         List<FireSource> sources
 ) {
     public FireSummary {
+        if (budgetLink == null) budgetLink = FireBudgetLink.empty();
         if (contributionPlan == null) contributionPlan = FireContributionPlan.empty();
         if (withdrawalPlan == null) withdrawalPlan = FireWithdrawalPlan.empty();
         if (dataQuality == null) dataQuality = FireDataQuality.empty();
@@ -111,6 +115,48 @@ public record FireSummary(
     ) {
         static FireContributionPlan empty() {
             return new FireContributionPlan(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, "");
+        }
+    }
+
+    public record FireBudgetLink(
+            boolean linked,
+            int budgetYear,
+            int activeMonths,
+            BigDecimal monthlyIncome,
+            BigDecimal currentMonthlyLivingSpend,
+            BigDecimal targetMonthlySpend,
+            BigDecimal actualMonthlyInvestments,
+            BigDecimal savingsAccountMonthlyNet,
+            BigDecimal savingsAccountMonthlyGrossDeposits,
+            BigDecimal loanOverpaymentMonthly,
+            BigDecimal firePortfolioMonthlyContribution,
+            BigDecimal targetInvestableSurplus,
+            BigDecimal unassignedSurplusMonthly,
+            BigDecimal emergencyReserveTarget,
+            boolean spendOverrideUsed,
+            boolean contributionOverrideUsed,
+            String note
+    ) {
+        static FireBudgetLink empty() {
+            return new FireBudgetLink(
+                    false,
+                    0,
+                    0,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    false,
+                    false,
+                    "Brak odbudowanego budżetu domowego; FIRE używa tylko override/default."
+            );
         }
     }
 

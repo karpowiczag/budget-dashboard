@@ -1237,7 +1237,7 @@ components:
           description: Optional manual high-level budget bucket override for category-scope settings.
     FireSummary:
       type: object
-      required: [reportsLoaded, reportsPath, sourceCount, positionCount, currentAge, targetAge, yearsToFire, currentPortfolioValue, costBasis, unrealizedGain, emergencyFundValue, retirementLockedValue, liquidFireCapital, annualSpendTarget, monthlySpendTarget, safeWithdrawalRate, fireNumber, gapToFireNumber, bridgeCapitalToAge60, bridgeCapitalToAge65, liquidBridgeGapToAge60, liquidBridgeGapToAge65, taxableCapitalValue, taxableUnrealizedGain, estimatedCapitalGainsTax, currentMonthlyWealthContribution, contributionPlan, withdrawalPlan, dataQuality, scenarios, allocation, wrappers, rebalancing, actionItems, milestones, legalRules, sources]
+      required: [reportsLoaded, reportsPath, sourceCount, positionCount, currentAge, targetAge, yearsToFire, currentPortfolioValue, costBasis, unrealizedGain, emergencyFundValue, retirementLockedValue, liquidFireCapital, bridgeableLiquidCapital, emergencyReserveTarget, annualSpendTarget, monthlySpendTarget, safeWithdrawalRate, fireNumber, gapToFireNumber, bridgeCapitalToAge60, bridgeCapitalToAge65, liquidBridgeGapToAge60, liquidBridgeGapToAge65, taxableCapitalValue, taxableUnrealizedGain, estimatedCapitalGainsTax, currentMonthlyWealthContribution, budgetLink, contributionPlan, withdrawalPlan, dataQuality, scenarios, allocation, wrappers, rebalancing, actionItems, milestones, legalRules, sources]
       properties:
         asOf:
           type: string
@@ -1269,6 +1269,10 @@ components:
           $ref: "#/components/schemas/Money"
         liquidFireCapital:
           $ref: "#/components/schemas/Money"
+        bridgeableLiquidCapital:
+          $ref: "#/components/schemas/Money"
+        emergencyReserveTarget:
+          $ref: "#/components/schemas/Money"
         annualSpendTarget:
           $ref: "#/components/schemas/Money"
         monthlySpendTarget:
@@ -1295,6 +1299,8 @@ components:
           $ref: "#/components/schemas/Money"
         currentMonthlyWealthContribution:
           $ref: "#/components/schemas/Money"
+        budgetLink:
+          $ref: "#/components/schemas/FireBudgetLink"
         contributionPlan:
           $ref: "#/components/schemas/FireContributionPlan"
         withdrawalPlan:
@@ -1418,6 +1424,44 @@ components:
         monthlyRetirementWrapperCapacity:
           $ref: "#/components/schemas/Money"
         recommendation:
+          type: string
+    FireBudgetLink:
+      type: object
+      required: [linked, budgetYear, activeMonths, monthlyIncome, currentMonthlyLivingSpend, targetMonthlySpend, actualMonthlyInvestments, savingsAccountMonthlyNet, savingsAccountMonthlyGrossDeposits, loanOverpaymentMonthly, firePortfolioMonthlyContribution, targetInvestableSurplus, unassignedSurplusMonthly, emergencyReserveTarget, spendOverrideUsed, contributionOverrideUsed, note]
+      properties:
+        linked:
+          type: boolean
+        budgetYear:
+          type: integer
+        activeMonths:
+          type: integer
+        monthlyIncome:
+          $ref: "#/components/schemas/Money"
+        currentMonthlyLivingSpend:
+          $ref: "#/components/schemas/Money"
+        targetMonthlySpend:
+          $ref: "#/components/schemas/Money"
+        actualMonthlyInvestments:
+          $ref: "#/components/schemas/Money"
+        savingsAccountMonthlyNet:
+          $ref: "#/components/schemas/Money"
+        savingsAccountMonthlyGrossDeposits:
+          $ref: "#/components/schemas/Money"
+        loanOverpaymentMonthly:
+          $ref: "#/components/schemas/Money"
+        firePortfolioMonthlyContribution:
+          $ref: "#/components/schemas/Money"
+        targetInvestableSurplus:
+          $ref: "#/components/schemas/Money"
+        unassignedSurplusMonthly:
+          $ref: "#/components/schemas/Money"
+        emergencyReserveTarget:
+          $ref: "#/components/schemas/Money"
+        spendOverrideUsed:
+          type: boolean
+        contributionOverrideUsed:
+          type: boolean
+        note:
           type: string
     FireWithdrawalPlan:
       type: object

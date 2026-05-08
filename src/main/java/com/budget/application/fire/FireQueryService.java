@@ -2,15 +2,19 @@ package com.budget.application.fire;
 
 import com.budget.application.reporting.BudgetReportStore;
 import com.budget.application.reporting.ReportNotFoundException;
+import com.budget.application.reporting.YearSummary;
 import com.budget.domain.fire.FirePortfolioPosition;
+import com.budget.domain.report.BudgetSnapshot;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +22,11 @@ import org.springframework.stereotype.Service;
 public class FireQueryService {
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
     private static final BigDecimal TWELVE = BigDecimal.valueOf(12);
+    private static final String WRAPPER_EMERGENCY = "Poduszka bezpieczeństwa";
+    private static final String WRAPPER_RETIREMENT = "Emerytalne długoterminowe";
+    private static final String WRAPPER_TAXABLE = "Rachunek opodatkowany";
+    private static final String BUCKET_INVESTMENTS = "Inwestycje";
+    private static final String BUCKET_LOAN_OVERPAYMENT = "Nadpłata kredytu";
 
     private final FirePortfolioReader portfolioReader;
     private final BudgetReportStore budgetStore;
@@ -37,43 +46,51 @@ public class FireQueryService {
         var costBasis = sum(positions, FirePortfolioPosition::costBasisPln);
         var gain = sum(positions, FirePortfolioPosition::gainPln);
         var emergencyFund = sum(positions.stream()
-                .filter(position -> position.wrapper().equals("Poduszka bezpieczeństwa"))
+                .filter(position -> position.wrapper().equals(WRAPPER_EMERGENCY))
                 .toList(), FirePortfolioPosition::valuePln);
         var retirementLocked = sum(positions.stream()
-                .filter(position -> position.wrapper().equals("Emerytalne długoterminowe"))
+                .filter(position -> position.wrapper().equals(WRAPPER_RETIREMENT))
                 .toList(), FirePortfolioPosition::valuePln);
         var liquidFireCapital = currentValue.subtract(retirementLocked).max(BigDecimal.ZERO);
+        var budgetLink = budgetLink(settings);
         var monthlySpendTarget = settings.monthlySpendOverride() == null
-                ? latestMonthlySpendTarget()
+                ? budgetSpendTarget(budgetLink)
                 : money(settings.monthlySpendOverride());
         var annualSpendTarget = monthlySpendTarget.multiply(TWELVE);
         var fireNumber = divide(annualSpendTarget, settings.safeWithdrawalRate(), 2);
         var yearsToFire = settings.targetAge() - settings.currentAge();
         var monthlyContribution = settings.monthlyContributionOverride() == null
-                ? latestMonthlyWealthContribution()
+                ? budgetLink.firePortfolioMonthlyContribution()
                 : money(settings.monthlyContributionOverride());
+        budgetLink = applyOverridesToBudgetLink(budgetLink, monthlySpendTarget, monthlyContribution, settings);
         var scenarios = scenarios(settings, currentValue, fireNumber, monthlyContribution, yearsToFire);
-        var allocation = allocation(settings, positions, currentValue);
+        var investmentPositions = positions.stream()
+                .filter(position -> !position.wrapper().equals(WRAPPER_EMERGENCY))
+                .toList();
+        var investmentPortfolioValue = sum(investmentPositions, FirePortfolioPosition::valuePln);
+        var allocation = allocation(settings, investmentPositions, investmentPortfolioValue);
         var wrappers = wrappers(positions, currentValue);
-        var rebalancing = rebalancing(settings, allocation, currentValue);
+        var rebalancing = rebalancing(settings, allocation, investmentPortfolioValue);
         var bridgeTo60 = bridgeCapital(settings, annualSpendTarget, 60);
         var bridgeTo65 = bridgeCapital(settings, annualSpendTarget, 65);
         var taxablePositions = positions.stream()
-                .filter(position -> position.wrapper().equals("Rachunek opodatkowany"))
+                .filter(position -> position.wrapper().equals(WRAPPER_TAXABLE))
                 .toList();
         var taxableCapital = sum(taxablePositions, FirePortfolioPosition::valuePln);
         var taxableGain = sum(taxablePositions, FirePortfolioPosition::gainPln);
         var estimatedTax = money(taxableGain.max(BigDecimal.ZERO).multiply(new BigDecimal("0.19")));
-        var liquidBridgeGapTo60 = money(bridgeTo60.subtract(liquidFireCapital).max(BigDecimal.ZERO));
-        var liquidBridgeGapTo65 = money(bridgeTo65.subtract(liquidFireCapital).max(BigDecimal.ZERO));
+        var bridgeableEmergencyExcess = emergencyFund.subtract(budgetLink.emergencyReserveTarget()).max(BigDecimal.ZERO);
+        var bridgeableLiquidCapital = money(taxableCapital.add(bridgeableEmergencyExcess));
+        var liquidBridgeGapTo60 = money(bridgeTo60.subtract(bridgeableLiquidCapital).max(BigDecimal.ZERO));
+        var liquidBridgeGapTo65 = money(bridgeTo65.subtract(bridgeableLiquidCapital).max(BigDecimal.ZERO));
         var baseScenario = scenarios.stream()
                 .filter(scenario -> scenario.id().equals("base"))
                 .findFirst()
                 .orElseGet(scenarios::getFirst);
-        var contributionPlan = contributionPlan(monthlyContribution, baseScenario);
+        var contributionPlan = contributionPlan(monthlyContribution, baseScenario, budgetLink);
         var withdrawalPlan = withdrawalPlan(monthlySpendTarget, annualSpendTarget, liquidFireCapital, bridgeTo60, bridgeTo65, estimatedTax);
         var dataQuality = dataQuality(snapshot, positions);
-        var actionItems = actionItems(baseScenario, contributionPlan, liquidBridgeGapTo60, dataQuality, rebalancing);
+        var actionItems = actionItems(baseScenario, contributionPlan, liquidBridgeGapTo60, dataQuality, rebalancing, budgetLink);
 
         return new FireSummary(
                 snapshot.asOf(),
@@ -90,6 +107,8 @@ public class FireQueryService {
                 money(emergencyFund),
                 money(retirementLocked),
                 money(liquidFireCapital),
+                money(bridgeableLiquidCapital),
+                money(budgetLink.emergencyReserveTarget()),
                 money(annualSpendTarget),
                 money(monthlySpendTarget),
                 settings.safeWithdrawalRate(),
@@ -103,6 +122,7 @@ public class FireQueryService {
                 money(taxableGain),
                 estimatedTax,
                 money(monthlyContribution),
+                budgetLink,
                 contributionPlan,
                 withdrawalPlan,
                 dataQuality,
@@ -125,33 +145,85 @@ public class FireQueryService {
         }
     }
 
-    private BigDecimal latestMonthlySpendTarget() {
+    private FireSummary.FireBudgetLink budgetLink(FireSettings settings) {
         try {
             var years = budgetStore.findYears();
             if (years.isEmpty()) {
-                return BigDecimal.valueOf(14_000);
+                return FireSummary.FireBudgetLink.empty();
             }
-            var latestYear = years.stream().mapToInt(com.budget.application.reporting.YearSummary::year).max().orElseThrow();
+            var latestYear = years.stream().mapToInt(YearSummary::year).max().orElseThrow();
             var dashboard = budgetStore.findDashboard(latestYear);
-            return money(dashboard.savingsPlan().targetMonthlySpend());
+            var months = BigDecimal.valueOf(Math.max(1, dashboard.activeMonths()));
+            var actualMonthlyInvestments = monthlyAverage(dashboard, BUCKET_INVESTMENTS);
+            var savingsAccountMonthlyNet = money(dashboard.kpis().savingsAccountNetChange().divide(months, 2, RoundingMode.HALF_UP));
+            var savingsAccountMonthlyGross = money(dashboard.kpis().savingsAccountGrossDeposits().divide(months, 2, RoundingMode.HALF_UP));
+            var loanOverpaymentMonthly = monthlyAverage(dashboard, BUCKET_LOAN_OVERPAYMENT);
+            var firePortfolioContribution = money(actualMonthlyInvestments.add(savingsAccountMonthlyNet.max(BigDecimal.ZERO)));
+            var unassignedSurplusMonthly = money(dashboard.kpis().unassignedSurplus().divide(months, 2, RoundingMode.HALF_UP));
+            return new FireSummary.FireBudgetLink(
+                    true,
+                    latestYear,
+                    dashboard.activeMonths(),
+                    money(dashboard.savingsPlan().currentMonthlyIncome()),
+                    money(dashboard.savingsPlan().currentMonthlySpend()),
+                    money(dashboard.savingsPlan().targetMonthlySpend()),
+                    actualMonthlyInvestments,
+                    savingsAccountMonthlyNet,
+                    savingsAccountMonthlyGross,
+                    loanOverpaymentMonthly,
+                    firePortfolioContribution,
+                    money(dashboard.savingsPlan().targetInvestmentTransfer()),
+                    unassignedSurplusMonthly,
+                    money(dashboard.savingsPlan().emergencyFundComfort()),
+                    settings.monthlySpendOverride() != null,
+                    settings.monthlyContributionOverride() != null,
+                    "Prognoza FIRE używa inwestycji + netto konta oszczędnościowego. Nadpłaty kredytu są pokazane osobno jako redukcja długu, a nie wpłata do portfela MyFund."
+            );
         } catch (ReportNotFoundException | IllegalStateException e) {
-            return BigDecimal.valueOf(14_000);
+            return FireSummary.FireBudgetLink.empty();
         }
     }
 
-    private BigDecimal latestMonthlyWealthContribution() {
-        try {
-            var years = budgetStore.findYears();
-            if (years.isEmpty()) {
-                return BigDecimal.ZERO;
-            }
-            var latestYear = years.stream().mapToInt(com.budget.application.reporting.YearSummary::year).max().orElseThrow();
-            var dashboard = budgetStore.findDashboard(latestYear);
-            var months = BigDecimal.valueOf(Math.max(1, dashboard.activeMonths()));
-            return money(dashboard.kpis().realSavingsOutgoing().divide(months, 2, RoundingMode.HALF_UP));
-        } catch (ReportNotFoundException | IllegalStateException e) {
-            return BigDecimal.ZERO;
-        }
+    private BigDecimal budgetSpendTarget(FireSummary.FireBudgetLink budgetLink) {
+        return budgetLink.linked() && budgetLink.targetMonthlySpend().signum() > 0
+                ? money(budgetLink.targetMonthlySpend())
+                : BigDecimal.valueOf(14_000);
+    }
+
+    private BigDecimal monthlyAverage(BudgetSnapshot dashboard, String bucket) {
+        return dashboard.budgetMix().stream()
+                .filter(row -> bucket.equals(row.bucket()))
+                .findFirst()
+                .map(BudgetSnapshot.BudgetMixItem::monthlyAverage)
+                .map(this::money)
+                .orElse(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+    }
+
+    private FireSummary.FireBudgetLink applyOverridesToBudgetLink(
+            FireSummary.FireBudgetLink budgetLink,
+            BigDecimal monthlySpendTarget,
+            BigDecimal monthlyContribution,
+            FireSettings settings
+    ) {
+        return new FireSummary.FireBudgetLink(
+                budgetLink.linked(),
+                budgetLink.budgetYear(),
+                budgetLink.activeMonths(),
+                budgetLink.monthlyIncome(),
+                budgetLink.currentMonthlyLivingSpend(),
+                money(monthlySpendTarget),
+                budgetLink.actualMonthlyInvestments(),
+                budgetLink.savingsAccountMonthlyNet(),
+                budgetLink.savingsAccountMonthlyGrossDeposits(),
+                budgetLink.loanOverpaymentMonthly(),
+                money(monthlyContribution),
+                budgetLink.targetInvestableSurplus(),
+                budgetLink.unassignedSurplusMonthly(),
+                budgetLink.emergencyReserveTarget(),
+                settings.monthlySpendOverride() != null,
+                settings.monthlyContributionOverride() != null,
+                budgetLink.note()
+        );
     }
 
     private List<FireSummary.FireScenario> scenarios(FireSettings settings, BigDecimal currentValue, BigDecimal fireNumber, BigDecimal currentMonthly, int yearsToFire) {
@@ -295,15 +367,25 @@ public class FireQueryService {
         );
     }
 
-    private FireSummary.FireContributionPlan contributionPlan(BigDecimal currentMonthly, FireSummary.FireScenario baseScenario) {
+    private FireSummary.FireContributionPlan contributionPlan(
+            BigDecimal currentMonthly,
+            FireSummary.FireScenario baseScenario,
+            FireSummary.FireBudgetLink budgetLink
+    ) {
         var required = money(baseScenario.requiredMonthlyContribution());
         var additional = money(required.subtract(currentMonthly).max(BigDecimal.ZERO));
         var ikeCapacity = BigDecimal.valueOf(28_260L * 2);
         var ikzeCapacity = BigDecimal.valueOf(11_304L * 2);
         var monthlyWrapperCapacity = money(ikeCapacity.add(ikzeCapacity).divide(TWELVE, 2, RoundingMode.HALF_UP));
+        var source = budgetLink.contributionOverrideUsed()
+                ? "override użytkownika"
+                : "budżet domowy: inwestycje + netto konto oszczędnościowe";
+        var debtNote = budgetLink.loanOverpaymentMonthly().signum() > 0
+                ? " Nadpłaty kredytu (" + monthlyLabel(budgetLink.loanOverpaymentMonthly()) + ") są osobnym strumieniem redukcji długu, nie wpłatą do portfela inwestycyjnego."
+                : "";
         var recommendation = additional.signum() == 0
-                ? "Plan bazowy domyka cel FIRE przy obecnym tempie wpłat. Utrzymaj automatyczne wpłaty i rebalansuj nowymi środkami."
-                : "Brakującą miesięczną kwotę kieruj najpierw w roczne limity IKE/IKZE, a nadwyżkę w płynny portfel pomostowy do wieku 60/65.";
+                ? "Plan bazowy domyka cel FIRE przy obecnym tempie wpłat (" + source + "). Utrzymaj automatyczne wpłaty i rebalansuj nowymi środkami." + debtNote
+                : "Brakuje " + monthlyLabel(additional) + " względem scenariusza bazowego. Źródło obecnej wpłaty: " + source + ". Najpierw wypełniaj IKE/IKZE, nadwyżkę kieruj w płynny portfel pomostowy." + debtNote;
         return new FireSummary.FireContributionPlan(
                 money(currentMonthly),
                 required,
@@ -384,7 +466,8 @@ public class FireQueryService {
             FireSummary.FireContributionPlan contributionPlan,
             BigDecimal liquidBridgeGapTo60,
             FireSummary.FireDataQuality dataQuality,
-            List<FireSummary.FireRebalanceAction> rebalancing
+            List<FireSummary.FireRebalanceAction> rebalancing,
+            FireSummary.FireBudgetLink budgetLink
     ) {
         var items = new ArrayList<FireSummary.FireActionItem>();
         if (!dataQuality.status().equals("ok")) {
@@ -400,9 +483,18 @@ public class FireQueryService {
             items.add(new FireSummary.FireActionItem(
                     "P1",
                     "contribution",
-                    "Zwiększ miesięczne wpłaty do planu FIRE",
-                    "Scenariusz bazowy wymaga większego tempa niż obecny plan wpłat.",
+                    "Zwiększ miesięczne wpłaty inwestycyjne",
+                    "Scenariusz bazowy porównuje wymagane wpłaty z budżetem domowym: inwestycje + netto konto oszczędnościowe. Nadpłaty kredytu są liczone osobno.",
                     contributionPlan.additionalMonthlyNeeded()
+            ));
+        }
+        if (budgetLink.loanOverpaymentMonthly().compareTo(BigDecimal.ZERO) > 0 && contributionPlan.additionalMonthlyNeeded().signum() > 0) {
+            items.add(new FireSummary.FireActionItem(
+                    "P2",
+                    "debt",
+                    "Zdecyduj ile nadpłat kredytu ma konkurować z FIRE",
+                    "Budżet pokazuje regularne nadpłaty kredytu. To poprawia majątek netto, ale nie buduje płynnego portfela na wiek 50.",
+                    budgetLink.loanOverpaymentMonthly()
             ));
         }
         if (liquidBridgeGapTo60.signum() > 0) {
@@ -467,8 +559,8 @@ public class FireQueryService {
 
     private String liquidity(String wrapper) {
         return switch (wrapper) {
-            case "Poduszka bezpieczeństwa" -> "płynne";
-            case "Emerytalne długoterminowe" -> "ograniczone do wieku emerytalnego";
+            case WRAPPER_EMERGENCY -> "płynne";
+            case WRAPPER_RETIREMENT -> "ograniczone do wieku emerytalnego";
             default -> "płynne inwestycyjnie, podatkowo wrażliwe";
         };
     }
@@ -489,6 +581,13 @@ public class FireQueryService {
 
     private BigDecimal money(BigDecimal value) {
         return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private String monthlyLabel(BigDecimal amount) {
+        var formatter = NumberFormat.getNumberInstance(Locale.forLanguageTag("pl-PL"));
+        formatter.setMinimumFractionDigits(0);
+        formatter.setMaximumFractionDigits(0);
+        return formatter.format(money(amount)) + " zł/mies.";
     }
 
     private BigDecimal sum(List<FirePortfolioPosition> positions, java.util.function.Function<FirePortfolioPosition, BigDecimal> extractor) {

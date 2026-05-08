@@ -414,6 +414,8 @@ public final class BudgetApiDtos {
             BigDecimal emergencyFundValue,
             BigDecimal retirementLockedValue,
             BigDecimal liquidFireCapital,
+            BigDecimal bridgeableLiquidCapital,
+            BigDecimal emergencyReserveTarget,
             BigDecimal annualSpendTarget,
             BigDecimal monthlySpendTarget,
             BigDecimal safeWithdrawalRate,
@@ -427,6 +429,7 @@ public final class BudgetApiDtos {
             BigDecimal taxableUnrealizedGain,
             BigDecimal estimatedCapitalGainsTax,
             BigDecimal currentMonthlyWealthContribution,
+            FireBudgetLinkResponse budgetLink,
             FireContributionPlanResponse contributionPlan,
             FireWithdrawalPlanResponse withdrawalPlan,
             FireDataQualityResponse dataQuality,
@@ -491,6 +494,27 @@ public final class BudgetApiDtos {
             BigDecimal annualIkzeCapacityForHousehold,
             BigDecimal monthlyRetirementWrapperCapacity,
             String recommendation
+    ) {
+    }
+
+    public record FireBudgetLinkResponse(
+            boolean linked,
+            int budgetYear,
+            int activeMonths,
+            BigDecimal monthlyIncome,
+            BigDecimal currentMonthlyLivingSpend,
+            BigDecimal targetMonthlySpend,
+            BigDecimal actualMonthlyInvestments,
+            BigDecimal savingsAccountMonthlyNet,
+            BigDecimal savingsAccountMonthlyGrossDeposits,
+            BigDecimal loanOverpaymentMonthly,
+            BigDecimal firePortfolioMonthlyContribution,
+            BigDecimal targetInvestableSurplus,
+            BigDecimal unassignedSurplusMonthly,
+            BigDecimal emergencyReserveTarget,
+            boolean spendOverrideUsed,
+            boolean contributionOverrideUsed,
+            String note
     ) {
     }
 

@@ -202,6 +202,8 @@ public class BudgetApiMapper {
                 summary.emergencyFundValue(),
                 summary.retirementLockedValue(),
                 summary.liquidFireCapital(),
+                summary.bridgeableLiquidCapital(),
+                summary.emergencyReserveTarget(),
                 summary.annualSpendTarget(),
                 summary.monthlySpendTarget(),
                 summary.safeWithdrawalRate(),
@@ -215,6 +217,7 @@ public class BudgetApiMapper {
                 summary.taxableUnrealizedGain(),
                 summary.estimatedCapitalGainsTax(),
                 summary.currentMonthlyWealthContribution(),
+                toFireBudgetLink(summary.budgetLink()),
                 toFireContributionPlan(summary.contributionPlan()),
                 toFireWithdrawalPlan(summary.withdrawalPlan()),
                 toFireDataQuality(summary.dataQuality()),
@@ -332,6 +335,28 @@ public class BudgetApiMapper {
                 row.annualIkzeCapacityForHousehold(),
                 row.monthlyRetirementWrapperCapacity(),
                 row.recommendation()
+        );
+    }
+
+    private BudgetApiDtos.FireBudgetLinkResponse toFireBudgetLink(FireSummary.FireBudgetLink row) {
+        return new BudgetApiDtos.FireBudgetLinkResponse(
+                row.linked(),
+                row.budgetYear(),
+                row.activeMonths(),
+                row.monthlyIncome(),
+                row.currentMonthlyLivingSpend(),
+                row.targetMonthlySpend(),
+                row.actualMonthlyInvestments(),
+                row.savingsAccountMonthlyNet(),
+                row.savingsAccountMonthlyGrossDeposits(),
+                row.loanOverpaymentMonthly(),
+                row.firePortfolioMonthlyContribution(),
+                row.targetInvestableSurplus(),
+                row.unassignedSurplusMonthly(),
+                row.emergencyReserveTarget(),
+                row.spendOverrideUsed(),
+                row.contributionOverrideUsed(),
+                row.note()
         );
     }
 

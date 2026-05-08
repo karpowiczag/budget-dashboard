@@ -27,6 +27,7 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
   }
 
   const baseScenario = summary.scenarios?.find((scenario) => scenario.id === "base") || summary.scenarios?.[0];
+  const budget = summary.budgetLink || {};
   return (
     <section className="viewStack">
       <Panel
@@ -45,9 +46,28 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
           <Metric label="Kapitał dziś" value={money(summary.currentPortfolioValue)} detail={`${summary.positionCount} pozycji`} />
           <Metric label="Cel FIRE" value={money(summary.fireNumber)} detail={`${percent(summary.safeWithdrawalRate)} SWR`} />
           <Metric label="Brakuje" value={money(summary.gapToFireNumber)} detail={`do wieku ${summary.targetAge}`} warn={Number(summary.gapToFireNumber) > 0} />
-          <Metric label="Dopłata bazowa" value={money(baseScenario?.requiredMonthlyContribution)} detail="miesięcznie do celu" />
+          <Metric label="Wymagane / mies." value={money(baseScenario?.requiredMonthlyContribution)} detail="scenariusz bazowy" />
         </div>
         {settingsStatus && <div className={`inlineStatus ${settingsStatus.type}`}>{settingsStatus.message}</div>}
+      </Panel>
+
+      <Panel title="Budżet domowy -> FIRE">
+        <div className="dataQualityBanner neutral">
+          <strong>{budget.linked ? `Źródło: budżet ${budget.budgetYear}` : "Brak połączenia z budżetem"}</strong>
+          <span>{budget.note || "Odbuduj budżet domowy, żeby FIRE używał realnych przepływów."}</span>
+        </div>
+        <div className="metricGrid four">
+          <Metric label="Koszt życia target" value={money(budget.targetMonthlySpend || summary.monthlySpendTarget)} detail={budget.spendOverrideUsed ? "override" : "z planu budżetu"} />
+          <Metric label="Wydatki aktualne" value={money(budget.currentMonthlyLivingSpend)} detail={`${budget.activeMonths || 0} mies. danych`} />
+          <Metric label="Wpłata FIRE" value={money(budget.firePortfolioMonthlyContribution || summary.currentMonthlyWealthContribution)} detail={budget.contributionOverrideUsed ? "override" : "inwestycje + oszcz. netto"} />
+          <Metric label="Nadpłata kredytu" value={money(budget.loanOverpaymentMonthly)} detail="osobno od portfela FIRE" />
+        </div>
+        <div className="metricGrid four">
+          <Metric label="Inwestycje" value={money(budget.actualMonthlyInvestments)} detail="średnio / mies." />
+          <Metric label="Konto oszcz. netto" value={money(budget.savingsAccountMonthlyNet)} detail={`brutto ${money(budget.savingsAccountMonthlyGrossDeposits)}`} />
+          <Metric label="Planowana nadwyżka" value={money(budget.targetInvestableSurplus)} detail="dochód - target kosztów" />
+          <Metric label="Poduszka zostaje" value={money(summary.emergencyReserveTarget || budget.emergencyReserveTarget)} detail="nie liczę jej do pomostu" />
+        </div>
       </Panel>
 
       <section className="gridTwo">
@@ -60,7 +80,7 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
             targetAge={summary.targetAge}
           />
         </Panel>
-        <Panel title="Alokacja aktywów">
+        <Panel title="Alokacja portfela inwestycyjnego">
           <FireAllocationChart data={summary.allocation || []} />
         </Panel>
       </section>
@@ -94,7 +114,7 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
           <div className="planCards compactCards">
             <Metric label="Luka 50-60" value={money(summary.liquidBridgeGapToAge60)} detail="płynny kapitał" warn={Number(summary.liquidBridgeGapToAge60 || 0) > 0} />
             <Metric label="Luka 50-65" value={money(summary.liquidBridgeGapToAge65)} detail="konserwatywnie" warn={Number(summary.liquidBridgeGapToAge65 || 0) > 0} />
-            <Metric label="Pokrycie płynne" value={`${summary.withdrawalPlan?.yearsCoveredByLiquidCapital || 0} lat`} detail="w target spend" />
+            <Metric label="Kapitał pomostowy" value={money(summary.bridgeableLiquidCapital)} detail="po zostawieniu poduszki" />
             <Metric label="Rezerwa podatku" value={money(summary.withdrawalPlan?.estimatedTaxReserve)} detail="Belka od zysków opod." />
           </div>
           <p className="mutedText">{summary.withdrawalPlan?.sequence}</p>
