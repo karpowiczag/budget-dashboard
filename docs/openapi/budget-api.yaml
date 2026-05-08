@@ -1238,7 +1238,7 @@ components:
           description: Optional manual high-level budget bucket override for category-scope settings.
     FireSummary:
       type: object
-      required: [reportsLoaded, reportsPath, sourceCount, positionCount, currentAge, targetAge, yearsToFire, currentPortfolioValue, costBasis, unrealizedGain, emergencyFundValue, retirementLockedValue, liquidFireCapital, bridgeableLiquidCapital, emergencyReserveTarget, annualSpendTarget, monthlySpendTarget, spendTargetConfigured, safeWithdrawalRate, fireNumber, gapToFireNumber, bridgeCapitalToAge60, bridgeCapitalToAge65, liquidBridgeGapToAge60, liquidBridgeGapToAge65, taxableCapitalValue, taxableUnrealizedGain, estimatedCapitalGainsTax, currentMonthlyWealthContribution, budgetLink, contributionPlan, withdrawalPlan, dataQuality, scenarios, allocation, wrappers, rebalancing, actionItems, milestones, legalRules, sources]
+      required: [reportsLoaded, reportsPath, sourceCount, positionCount, currentAge, targetAge, yearsToFire, currentPortfolioValue, costBasis, unrealizedGain, emergencyFundValue, retirementLockedValue, liquidFireCapital, bridgeableLiquidCapital, emergencyReserveTarget, annualSpendTarget, monthlySpendTarget, spendTargetConfigured, safeWithdrawalRate, fireNumber, gapToFireNumber, bridgeCapitalToAge60, bridgeCapitalToAge65, liquidBridgeGapToAge60, liquidBridgeGapToAge65, taxableCapitalValue, taxableUnrealizedGain, estimatedCapitalGainsTax, currentMonthlyWealthContribution, budgetLink, contributionPlan, withdrawalPlan, dataQuality, scenarios, allocation, wrappers, rebalancing, risks, actionItems, milestones, legalRules, sources]
       properties:
         asOf:
           type: string
@@ -1327,6 +1327,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FireRebalanceAction"
+        risks:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireRisk"
         actionItems:
           type: array
           items:
@@ -1410,6 +1414,31 @@ components:
         action:
           type: string
         priority:
+          type: string
+    FireRisk:
+      type: object
+      required: [id, level, area, title, metric, value, threshold, detail, recommendation]
+      properties:
+        id:
+          type: string
+          description: Stable risk identifier.
+        level:
+          type: string
+          enum: [high, medium, low, info]
+        area:
+          type: string
+        title:
+          type: string
+        metric:
+          type: string
+        value:
+          type: string
+          description: Localized display value because risk metrics mix percentages, money and statuses.
+        threshold:
+          type: string
+        detail:
+          type: string
+        recommendation:
           type: string
     FireContributionPlan:
       type: object

@@ -438,6 +438,7 @@ public final class BudgetApiDtos {
             List<FireAllocationResponse> allocation,
             List<FireWrapperResponse> wrappers,
             List<FireRebalanceActionResponse> rebalancing,
+            List<FireRiskResponse> risks,
             List<FireActionItemResponse> actionItems,
             List<FireMilestoneResponse> milestones,
             List<FireLegalRuleResponse> legalRules,
@@ -484,6 +485,19 @@ public final class BudgetApiDtos {
             BigDecimal amountToTarget,
             String action,
             String priority
+    ) {
+    }
+
+    public record FireRiskResponse(
+            String id,
+            String level,
+            String area,
+            String title,
+            String metric,
+            String value,
+            String threshold,
+            String detail,
+            String recommendation
     ) {
     }
 

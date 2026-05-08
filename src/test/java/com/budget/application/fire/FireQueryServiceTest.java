@@ -55,6 +55,7 @@ class FireQueryServiceTest {
         assertThat(summary.allocation()).extracting(FireSummary.FireAllocation::assetClass).contains("Akcje", "Obligacje");
         assertThat(summary.allocation()).extracting(FireSummary.FireAllocation::assetClass).doesNotContain("Gotówka");
         assertThat(summary.wrappers()).extracting(FireSummary.FireWrapper::wrapper).contains("Poduszka bezpieczeństwa");
+        assertThat(summary.risks()).extracting(FireSummary.FireRisk::id).contains("singlePositionConcentration");
         assertThat(summary.legalRules()).extracting(FireSummary.FireLegalRule::id).contains("ike-limit", "ikze-limit", "zus-age");
     }
 
@@ -102,6 +103,31 @@ class FireQueryServiceTest {
         assertThat(summary.budgetLink().targetMonthlySpend()).isEqualByComparingTo("12000.00");
         assertThat(summary.budgetLink().firePortfolioMonthlyContribution()).isEqualByComparingTo("9000.00");
         assertThat(summary.actionItems()).extracting(FireSummary.FireActionItem::title).contains("Ustaw miesięczny cel wydatków FIRE");
+        assertThat(summary.risks()).extracting(FireSummary.FireRisk::id).contains("fireTargetMissing");
+    }
+
+    @Test
+    void flagsPortfolioRisksFromCurrentAllocation() throws Exception {
+        var settings = settingsWithSpend("10000.00");
+        when(portfolioReader.read(settings.reportsPath())).thenReturn(new FirePortfolioSnapshot(
+                LocalDate.parse("2026-05-08"),
+                List.of(
+                        position("Akcje", "Rachunek opodatkowany", "180000"),
+                        position("Obligacje", "Rachunek opodatkowany", "20000")
+                ),
+                List.of("fake.csv")
+        ));
+        when(budgetStore.findYears()).thenReturn(List.of());
+
+        var summary = new FireQueryService(portfolioReader, budgetStore, new FireSettingsService(settings, new MemoryStore())).summary();
+
+        assertThat(summary.risks()).extracting(FireSummary.FireRisk::id)
+                .contains("equityConcentration", "rebalanceDrift", "singlePositionConcentration");
+        assertThat(summary.risks().stream()
+                .filter(risk -> risk.id().equals("equityConcentration"))
+                .findFirst()
+                .orElseThrow()
+                .level()).isEqualTo("high");
     }
 
     @Test

@@ -82,6 +82,29 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
         </div>
       </Panel>
 
+      <Panel title="Ryzyka inwestycyjne">
+        <div className="dataQualityBanner neutral">
+          <strong>Ocena z aktualnych pozycji MyFund</strong>
+          <span>Ryzyka wynikają z alokacji, płynności segmentów, koncentracji pozycji, podatku i jakości danych. To kontrola planu, nie rekomendacja kupna lub sprzedaży instrumentów.</span>
+        </div>
+        <RiskCards risks={summary.risks || []} />
+        <ReportDataTable
+          emptyMessage="Brak istotnych ryzyk dla aktualnych danych."
+          exportName="fire-risks"
+          rows={summary.risks || []}
+          columns={[
+            { key: "level", header: "Poziom", render: (row) => <RiskLevel level={row.level} /> },
+            { key: "area", header: "Obszar" },
+            { key: "title", header: "Ryzyko" },
+            { key: "metric", header: "Metryka" },
+            { key: "value", header: "Wartość", className: "num" },
+            { key: "threshold", header: "Próg", className: "num" },
+            { key: "detail", header: "Dlaczego" },
+            { key: "recommendation", header: "Co zrobić" },
+          ]}
+        />
+      </Panel>
+
       <section className="gridTwo">
         <Panel title="Prognoza do wieku 50">
           <FireProjectionChart
@@ -214,6 +237,36 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
       </section>
     </section>
   );
+}
+
+function RiskCards({ risks }) {
+  const visibleRisks = risks.filter((risk) => ["high", "medium"].includes(risk.level)).slice(0, 4);
+  const cards = visibleRisks.length ? visibleRisks : risks.slice(0, 4);
+  if (!cards.length) {
+    return <div className="emptyState compact">Brak ryzyk do pokazania po aktualnych danych.</div>;
+  }
+  return (
+    <div className="riskCards">
+      {cards.map((risk) => (
+        <article className={`riskCard ${risk.level}`} key={risk.id}>
+          <RiskLevel level={risk.level} />
+          <strong>{risk.title}</strong>
+          <span>{risk.metric}: {risk.value}</span>
+          <p>{risk.detail}</p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function RiskLevel({ level }) {
+  const label = {
+    high: "Wysokie",
+    medium: "Średnie",
+    low: "Niskie",
+    info: "Info",
+  }[level] || level || "Info";
+  return <span className={`riskBadge ${level || "info"}`}>{label}</span>;
 }
 
 function SpendTargetCard({ draft, hasSpendTarget, onChange, onSave, saving, value }) {

@@ -43,6 +43,7 @@ public record FireSummary(
         List<FireAllocation> allocation,
         List<FireWrapper> wrappers,
         List<FireRebalanceAction> rebalancing,
+        List<FireRisk> risks,
         List<FireActionItem> actionItems,
         List<FireMilestone> milestones,
         List<FireLegalRule> legalRules,
@@ -57,6 +58,7 @@ public record FireSummary(
         allocation = allocation == null ? List.of() : List.copyOf(allocation);
         wrappers = wrappers == null ? List.of() : List.copyOf(wrappers);
         rebalancing = rebalancing == null ? List.of() : List.copyOf(rebalancing);
+        risks = risks == null ? List.of() : List.copyOf(risks);
         actionItems = actionItems == null ? List.of() : List.copyOf(actionItems);
         milestones = milestones == null ? List.of() : List.copyOf(milestones);
         legalRules = legalRules == null ? List.of() : List.copyOf(legalRules);
@@ -102,6 +104,19 @@ public record FireSummary(
             BigDecimal amountToTarget,
             String action,
             String priority
+    ) {
+    }
+
+    public record FireRisk(
+            String id,
+            String level,
+            String area,
+            String title,
+            String metric,
+            String value,
+            String threshold,
+            String detail,
+            String recommendation
     ) {
     }
 

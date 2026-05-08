@@ -1041,6 +1041,89 @@ button.kpi {
   margin-top: 8px;
 }
 
+.riskCards {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 14px 0;
+}
+
+.riskCard {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #94a3b8;
+  border-radius: 8px;
+  min-height: 160px;
+  padding: 14px;
+}
+
+.riskCard.high {
+  border-left-color: #b91c1c;
+}
+
+.riskCard.medium {
+  border-left-color: #b45309;
+}
+
+.riskCard.low {
+  border-left-color: #0f766e;
+}
+
+.riskCard.info {
+  border-left-color: #2563eb;
+}
+
+.riskCard strong {
+  display: block;
+  font-size: 16px;
+  line-height: 1.25;
+  margin-top: 10px;
+}
+
+.riskCard span:not(.riskBadge) {
+  color: #475569;
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  margin-top: 8px;
+}
+
+.riskCard p {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 8px 0 0;
+}
+
+.riskBadge {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  min-width: 72px;
+  padding: 4px 9px;
+}
+
+.riskBadge.high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.riskBadge.medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.riskBadge.low {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.riskBadge.info {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .mutedText {
   color: #64748b;
   font-size: 13px;

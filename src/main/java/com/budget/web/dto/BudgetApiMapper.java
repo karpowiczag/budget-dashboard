@@ -256,6 +256,17 @@ public class BudgetApiMapper {
                         row.action(),
                         row.priority()
                 )),
+                map(summary.risks(), row -> new BudgetApiDtos.FireRiskResponse(
+                        row.id(),
+                        row.level(),
+                        row.area(),
+                        row.title(),
+                        row.metric(),
+                        row.value(),
+                        row.threshold(),
+                        row.detail(),
+                        row.recommendation()
+                )),
                 map(summary.actionItems(), row -> new BudgetApiDtos.FireActionItemResponse(
                         row.priority(),
                         row.type(),

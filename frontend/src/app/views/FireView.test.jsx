@@ -32,6 +32,7 @@ describe("FireView", () => {
           allocation: [{ assetClass: "Akcje", value: 160000, share: 0.8, targetShare: 0.8 }],
           wrappers: [{ wrapper: "Rachunek opodatkowany", value: 100000, share: 0.5, positions: 2, liquidity: "płynne" }],
           rebalancing: [{ assetClass: "Akcje", currentShare: 0.8, targetShare: 0.8, drift: 0, amountToTarget: 0, action: "Bez zmian", priority: "Normalny" }],
+          risks: [{ id: "equityConcentration", level: "medium", area: "Alokacja", title: "Portfel jest mocno akcyjny", metric: "Akcje", value: "80,0%", threshold: "85,0%", detail: "Akcje są powyżej celu.", recommendation: "Doważ obligacje." }],
           milestones: [{ age: 50, label: "FIRE target", description: "Cel", requiredCapital: 4800000 }],
           legalRules: [{ id: "ike-limit", label: "Limit IKE 2026", value: "28 260 zł / osoba", note: "Reguła", sourceUrl: "https://example.com" }],
           sources: [{ portfolio: "Test", asOf: "2026-05-08", positions: 4, value: 200000 }],
@@ -42,6 +43,8 @@ describe("FireView", () => {
     expect(screen.getByText("Model planistyczny")).toBeInTheDocument();
     expect(screen.getByText("Kapitał dziś")).toBeInTheDocument();
     expect(screen.getByText("Cel FIRE")).toBeInTheDocument();
+    expect(screen.getByText("Ryzyka inwestycyjne")).toBeInTheDocument();
+    expect(screen.getAllByText("Portfel jest mocno akcyjny").length).toBeGreaterThan(0);
     expect(screen.getByText("Rebalancing")).toBeInTheDocument();
     expect(screen.getByText("Polskie reguły w modelu")).toBeInTheDocument();
     expect(screen.getByTestId("fire-projection-chart")).toBeInTheDocument();
@@ -121,6 +124,50 @@ describe("FireView", () => {
     await user.click(screen.getByRole("button", { name: "Zapisz cel" }));
 
     expect(onSaveSettings).toHaveBeenCalledWith(expect.objectContaining({ monthlySpendOverride: 10000 }));
+  });
+
+  it("renders portfolio risk levels and recommendations", () => {
+    render(
+      <FireView
+        fireSummary={{
+          reportsLoaded: true,
+          currentAge: 36,
+          targetAge: 50,
+          positionCount: 4,
+          currentPortfolioValue: 260000,
+          monthlySpendTarget: 10000,
+          spendTargetConfigured: true,
+          fireNumber: 3428571,
+          gapToFireNumber: 3000000,
+          safeWithdrawalRate: 0.035,
+          scenarios: [],
+          allocation: [],
+          wrappers: [],
+          rebalancing: [],
+          risks: [
+            {
+              id: "singlePositionConcentration",
+              level: "high",
+              area: "Dywersyfikacja",
+              title: "Duża koncentracja pojedynczej pozycji",
+              metric: "Największa pozycja",
+              value: "32,0%",
+              threshold: "15,0%",
+              detail: "Największy instrument ma 32,0% portfela.",
+              recommendation: "Rozcieńczaj koncentrację nowymi wpłatami.",
+            },
+          ],
+          actionItems: [],
+          milestones: [],
+          legalRules: [],
+          sources: [],
+        }}
+      />
+    );
+
+    expect(screen.getAllByText("Wysokie").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Duża koncentracja pojedynczej pozycji").length).toBeGreaterThan(0);
+    expect(screen.getByText("Rozcieńczaj koncentrację nowymi wpłatami.")).toBeInTheDocument();
   });
 
   it("explains where local MyFund reports are expected when data is missing", () => {

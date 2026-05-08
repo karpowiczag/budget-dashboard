@@ -31,6 +31,7 @@ public class FireQueryService {
     private final FirePortfolioReader portfolioReader;
     private final BudgetReportStore budgetStore;
     private final FireSettingsService settingsService;
+    private final FireRiskAnalyzer riskAnalyzer = new FireRiskAnalyzer();
 
     public FireQueryService(FirePortfolioReader portfolioReader, BudgetReportStore budgetStore, FireSettingsService settingsService) {
         this.portfolioReader = portfolioReader;
@@ -91,6 +92,23 @@ public class FireQueryService {
         var contributionPlan = contributionPlan(monthlyContribution, baseScenario, budgetLink, spendTargetConfigured);
         var withdrawalPlan = withdrawalPlan(monthlySpendTarget, annualSpendTarget, liquidFireCapital, bridgeTo60, bridgeTo65, estimatedTax);
         var dataQuality = dataQuality(snapshot, positions);
+        var risks = riskAnalyzer.analyze(new FireRiskAnalyzer.Context(
+                settings,
+                investmentPositions,
+                allocation,
+                rebalancing,
+                budgetLink,
+                dataQuality,
+                investmentPortfolioValue,
+                currentValue,
+                retirementLocked,
+                emergencyFund,
+                taxableCapital,
+                taxableGain,
+                estimatedTax,
+                spendTargetConfigured,
+                liquidBridgeGapTo60
+        ));
         var actionItems = actionItems(baseScenario, contributionPlan, liquidBridgeGapTo60, dataQuality, rebalancing, budgetLink, spendTargetConfigured);
 
         return new FireSummary(
@@ -132,6 +150,7 @@ public class FireQueryService {
                 allocation,
                 wrappers,
                 rebalancing,
+                risks,
                 actionItems,
                 spendTargetConfigured ? milestones(settings, annualSpendTarget, fireNumber, bridgeTo60, bridgeTo65) : List.of(),
                 legalRules(),
@@ -554,10 +573,10 @@ public class FireQueryService {
     private List<FireSummary.FireLegalRule> legalRules() {
         return List.of(
                 new FireSummary.FireLegalRule("belka", "Podatek od zysków kapitałowych", "19%", "Dotyczy m.in. sprzedaży akcji, udziału w funduszach kapitałowych i PIT-38 poza opakowaniami emerytalnymi.", "https://www.podatki.gov.pl/podatki-osobiste/pit/informacje-podstawowe/co-jest-opodatkowane/zbycie-akcji/"),
-                new FireSummary.FireLegalRule("ike-limit", "Limit IKE 2026", "28 260 zł / osoba", "Wypłata z zachowaniem zwolnienia podatkowego zasadniczo po 60 r.ż. albo 55 r.ż. przy uprawnieniach emerytalnych.", "https://www.gov.pl/web/rodzina/ike-limit-wplat"),
+                new FireSummary.FireLegalRule("ike-limit", "Limit IKE 2026", "28 260 zł / osoba", "Wypłata z zachowaniem zwolnienia podatkowego zasadniczo po 60 r.ż. albo 55 r.ż. przy uprawnieniach emerytalnych.", "https://www.knf.gov.pl/?articleId=81021&p_id=18"),
                 new FireSummary.FireLegalRule("ikze-limit", "Limit IKZE 2026", "11 304 zł / osoba", "Dla JDG limit 16 956 zł; kwalifikowana wypłata po 65 r.ż. i 5 latach wpłat, zryczałtowany podatek 10%.", "https://www.knf.gov.pl/?articleId=81022&p_id=18"),
                 new FireSummary.FireLegalRule("zus-age", "Powszechny wiek emerytalny", "60 K / 65 M", "FIRE w wieku 50 lat wymaga osobnego kapitału pomostowego przed świadczeniami ustawowymi.", "https://www.zus.pl/swiadczenia/emerytury/emerytura-dla-osob-urodzonych-po-31-grudnia-1948/emerytura-w-wieku-powszechnym"),
-                new FireSummary.FireLegalRule("rebalance", "Rebalancing", "pasmo 5 p.p.", "Domyślnie doważanie nowymi wpłatami; sprzedaż w rachunkach opodatkowanych tylko przy istotnym odchyleniu.", "https://investor.vanguard.com/investor-resources-education/portfolio-management/rebalancing-your-portfolio")
+                new FireSummary.FireLegalRule("rebalance", "Rebalancing", "pasmo 5 p.p.", "Domyślnie doważanie nowymi wpłatami; sprzedaż w rachunkach opodatkowanych tylko przy istotnym odchyleniu.", "https://www.sec.gov/investor/pubs/assetallocation.htm")
         );
     }
 
