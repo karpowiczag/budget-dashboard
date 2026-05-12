@@ -22,7 +22,7 @@ class ProductionSettingsValidatorTest {
     void dataSourceRejectsBlankDatabaseUrlInProduction() {
         var environment = new MockEnvironment();
         environment.setActiveProfiles("prod");
-        var properties = new BudgetProperties(null, new BudgetProperties.Database(""), null, null, null, null);
+        var properties = new BudgetProperties(null, new BudgetProperties.Database("", false), null, null, null, null, null);
 
         assertThatThrownBy(() -> new DataSourceConfiguration().dataSource(properties, environment))
                 .isInstanceOf(IllegalStateException.class)
@@ -35,7 +35,8 @@ class ProductionSettingsValidatorTest {
         environment.setActiveProfiles("prod");
         var properties = new BudgetProperties(
                 null,
-                new BudgetProperties.Database("jdbc:h2:mem:prod_is_not_allowed"),
+                new BudgetProperties.Database("jdbc:h2:mem:prod_is_not_allowed", false),
+                null,
                 null,
                 null,
                 null,
@@ -45,6 +46,31 @@ class ProductionSettingsValidatorTest {
         assertThatThrownBy(() -> new DataSourceConfiguration().dataSource(properties, environment))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("PostgreSQL");
+    }
+
+    @Test
+    void dataSourceRejectsImplicitH2FallbackInLocalRuns() {
+        var environment = new MockEnvironment();
+        var properties = new BudgetProperties(null, new BudgetProperties.Database("", false), null, null, null, null, null);
+
+        assertThatThrownBy(() -> new DataSourceConfiguration().dataSource(properties, environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DATABASE_URL");
+    }
+
+    @Test
+    void dataSourceAllowsExplicitDisposableLocalH2() {
+        var environment = new MockEnvironment();
+        var properties = new BudgetProperties(null, new BudgetProperties.Database("", true), null, null, null, null, null);
+
+        assertThatCode(() -> {
+            var dataSource = new DataSourceConfiguration().dataSource(properties, environment);
+            assertThat(dataSource).isNotNull();
+            if (dataSource instanceof AutoCloseable closeable) {
+                closeable.close();
+            }
+        })
+                .doesNotThrowAnyException();
     }
 
     @Test

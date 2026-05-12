@@ -3,6 +3,7 @@ package com.budget.application.importing;
 import com.budget.application.analysis.BudgetAnalysisService;
 import com.budget.application.reporting.TransactionQuery;
 import com.budget.application.reporting.BudgetReportStore;
+import com.budget.application.reporting.YearSummary;
 import com.budget.domain.report.BudgetInput;
 import com.budget.domain.report.BudgetAnalysisResult;
 import com.budget.domain.transaction.BankTransaction;
@@ -59,15 +60,15 @@ public class BudgetImportService {
         try {
             validateUpload(file, fileName);
             var result = importUploadStream(file, fileName);
-            auditService.record(result.analysis().year(), fileName, "ok", importMessage("uploaded and imported", result.duplicatesRemoved()), result.duplicatesRemoved());
+            auditService.record(result.year(), fileName, "ok", uploadImportMessage(result.newTransactions(), result.duplicatesRemoved()), result.duplicatesRemoved());
             return new ImportSummary(
                     "ok",
-                    List.of(result.analysis().year()),
-                    result.analysis().transactionCount(),
+                    List.of(result.year()),
+                    result.newTransactions(),
                     result.duplicatesRemoved(),
-                    result.analysis().income(),
-                    result.analysis().spend(),
-                    "CSV imported; raw file was not retained"
+                    result.income(),
+                    result.spend(),
+                    result.message()
             );
         } catch (Exception e) {
             auditService.record(null, fileName, "error", e.getMessage());
@@ -108,11 +109,30 @@ public class BudgetImportService {
         return new ImportSummary("ok", years, transactions, duplicatesRemoved, income, spend, "Local CSV rebuild completed");
     }
 
-    private ImportResult importUploadStream(TransactionImportFile file, String fileName) throws IOException {
+    private UploadImportResult importUploadStream(TransactionImportFile file, String fileName) throws IOException {
         try (var input = file.openStream()) {
             var upload = csvReader.read(input, fileName, null);
-            var merged = mergeWithExistingReport(upload);
-            return new ImportResult(importBudgetInputInTransaction(merged.input()), merged.duplicatesRemoved());
+            var prepared = prepareIncrementalUpload(upload);
+            if (prepared.newTransactions() == 0) {
+                var existing = existingYearSummary(upload.year());
+                return new UploadImportResult(
+                        upload.year(),
+                        0,
+                        prepared.duplicatesRemoved(),
+                        existing == null ? BigDecimal.ZERO : existing.income(),
+                        existing == null ? BigDecimal.ZERO : existing.spend(),
+                        "CSV checked; no new transactions"
+                );
+            }
+            var analysis = importBudgetInputInTransaction(prepared.input());
+            return new UploadImportResult(
+                    analysis.year(),
+                    prepared.newTransactions(),
+                    prepared.duplicatesRemoved(),
+                    analysis.income(),
+                    analysis.spend(),
+                    "CSV imported; raw file was not retained"
+            );
         }
     }
 
@@ -144,13 +164,52 @@ public class BudgetImportService {
         return result;
     }
 
-    private PreparedInput mergeWithExistingReport(BudgetInput upload) {
+    private PreparedInput prepareIncrementalUpload(BudgetInput upload) {
         var existing = existingRawTransactions(upload.year());
-        var sources = existing.isEmpty()
-                ? List.of(upload.transactions())
-                : List.of(existing, upload.transactions());
-        var merged = mergeTransactionSources(sources);
-        return new PreparedInput(new BudgetInput(upload.year(), upload.fileName(), merged.transactions()), merged.duplicatesRemoved());
+        if (existing.isEmpty()) {
+            var merged = mergeTransactionSources(List.of(upload.transactions()));
+            return new PreparedInput(
+                    new BudgetInput(upload.year(), upload.fileName(), merged.transactions()),
+                    merged.duplicatesRemoved(),
+                    merged.transactions().size()
+            );
+        }
+
+        var existingCounts = fingerprintCounts(existing);
+        var seenUploadCounts = new LinkedHashMap<TransactionFingerprint, Integer>();
+        var incremental = new ArrayList<BankTransaction>();
+        var skippedExisting = 0;
+        for (var transaction : upload.transactions()) {
+            var fingerprint = fingerprint(transaction);
+            var seen = seenUploadCounts.merge(fingerprint, 1, Integer::sum);
+            if (seen <= existingCounts.getOrDefault(fingerprint, 0)) {
+                skippedExisting++;
+            } else {
+                incremental.add(transaction);
+            }
+        }
+
+        var newRows = mergeTransactionSources(List.of(incremental));
+        if (newRows.transactions().isEmpty()) {
+            return new PreparedInput(
+                    new BudgetInput(upload.year(), upload.fileName(), existing),
+                    skippedExisting + newRows.duplicatesRemoved(),
+                    0
+            );
+        }
+
+        var merged = new ArrayList<BankTransaction>();
+        merged.addAll(existing);
+        merged.addAll(newRows.transactions());
+        merged.sort(Comparator.comparing(BankTransaction::date)
+                .thenComparing(BankTransaction::account)
+                .thenComparing(BankTransaction::description)
+                .thenComparing(BankTransaction::amount));
+        return new PreparedInput(
+                new BudgetInput(upload.year(), upload.fileName(), merged),
+                skippedExisting + newRows.duplicatesRemoved(),
+                newRows.transactions().size()
+        );
     }
 
     private void validateUpload(TransactionImportFile file, String fileName) {
@@ -261,6 +320,14 @@ public class BudgetImportService {
         );
     }
 
+    private Map<TransactionFingerprint, Integer> fingerprintCounts(List<BankTransaction> transactions) {
+        var counts = new LinkedHashMap<TransactionFingerprint, Integer>();
+        for (var transaction : transactions) {
+            counts.merge(fingerprint(transaction), 1, Integer::sum);
+        }
+        return counts;
+    }
+
     private boolean isUnsettled(BankTransaction transaction) {
         return transaction.description() != null && UNSETTLED_CARD_MARKER.matcher(transaction.description()).find();
     }
@@ -308,6 +375,17 @@ public class BudgetImportService {
         return transactions;
     }
 
+    private YearSummary existingYearSummary(int year) {
+        var summaries = repository.findYears();
+        if (summaries == null) {
+            return null;
+        }
+        return summaries.stream()
+                .filter(row -> row.year() == year)
+                .findFirst()
+                .orElse(null);
+    }
+
     private String sanitize(String fileName) {
         var value = fileName == null || fileName.isBlank() ? "upload.csv" : fileName;
         return Path.of(value).getFileName().toString();
@@ -335,10 +413,27 @@ public class BudgetImportService {
         return duplicatesRemoved > 0 ? base + "; duplicates removed: " + duplicatesRemoved : base;
     }
 
+    private String uploadImportMessage(int newTransactions, int skippedRows) {
+        var base = newTransactions == 0
+                ? "uploaded; no new transactions"
+                : "uploaded incrementally; new transactions: " + newTransactions;
+        return skippedRows > 0 ? base + "; existing/duplicate rows skipped: " + skippedRows : base;
+    }
+
     private record ImportResult(BudgetAnalysisResult analysis, int duplicatesRemoved) {
     }
 
-    private record PreparedInput(BudgetInput input, int duplicatesRemoved) {
+    private record UploadImportResult(
+            int year,
+            int newTransactions,
+            int duplicatesRemoved,
+            BigDecimal income,
+            BigDecimal spend,
+            String message
+    ) {
+    }
+
+    private record PreparedInput(BudgetInput input, int duplicatesRemoved, int newTransactions) {
     }
 
     private record MergedTransactions(List<BankTransaction> transactions, int duplicatesRemoved) {

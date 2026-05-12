@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchAnalytics, fetchCalendar, fetchTransactions } from "./api/budgetApi.js";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchAnalytics, fetchCalendar, fetchFireSettings, fetchFireSummary, fetchTransactions, updateFireSettings } from "./api/budgetApi.js";
 import { budgetQueryKeys } from "./api/queryKeys.js";
 import { AppShell } from "./components/layout/AppShell.jsx";
 import { DashboardFooter } from "./components/layout/DashboardFooter.jsx";
@@ -13,6 +13,7 @@ import { useBudgetData } from "./hooks/useBudgetData.js";
 import { useDashboardModel } from "./hooks/useDashboardModel.js";
 import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel } from "./domain/budgetSelectors.js";
 import { ImportView } from "./views/ImportView.jsx";
+import { FireView } from "./views/FireView.jsx";
 import { MonthControlView } from "./views/MonthControlView.jsx";
 import { RecurringView } from "./views/RecurringView.jsx";
 import { ReportsView } from "./views/ReportsView.jsx";
@@ -22,6 +23,7 @@ import { WealthView } from "./views/WealthView.jsx";
 import "../styles.css";
 
 export default function App() {
+  const queryClient = useQueryClient();
   const {
     years,
     year,
@@ -44,6 +46,7 @@ export default function App() {
   const [customLimits, setCustomLimits] = useState({});
   const [categoryBucketOverrides, setCategoryBucketOverrides] = useState({});
   const [settingsDraft, setSettingsDraft] = useState(null);
+  const [fireSettingsStatus, setFireSettingsStatus] = useState(null);
   const [view, setView] = useState("control");
   const [localTimes, setLocalTimes] = useState({
     control: { scope: "month", month: "", day: "", drillFilter: null },
@@ -150,6 +153,19 @@ export default function App() {
     queryFn: () => fetchTransactions(year, transactionQueryFilters),
     enabled: !!data && !!year,
   });
+  const fireQuery = useQuery({
+    queryKey: budgetQueryKeys.fire,
+    queryFn: fetchFireSummary,
+    enabled: !!data && view === "fire",
+  });
+  const fireSettingsQuery = useQuery({
+    queryKey: budgetQueryKeys.fireSettings,
+    queryFn: fetchFireSettings,
+    enabled: view === "fire",
+  });
+  const fireSettingsMutation = useMutation({
+    mutationFn: updateFireSettings,
+  });
   const inspectorQuery = useQuery({
     queryKey: budgetQueryKeys.transactions(year, inspectorFilters),
     queryFn: () => fetchTransactions(year, inspectorFilters),
@@ -171,6 +187,7 @@ export default function App() {
     customLimits,
     bucketOverrides: categoryBucketOverrides,
     importRuns,
+    fireSummary: fireQuery.data || null,
   });
 
   if (status === "loading") {
@@ -291,6 +308,20 @@ export default function App() {
     }));
   }
 
+  async function handleSaveFireSettings(settings) {
+    setFireSettingsStatus({ type: "info", message: "Zapisuję ustawienia FIRE..." });
+    try {
+      const saved = await fireSettingsMutation.mutateAsync(settings);
+      queryClient.setQueryData(budgetQueryKeys.fireSettings, saved);
+      await queryClient.invalidateQueries({ queryKey: budgetQueryKeys.fire });
+      setFireSettingsStatus({ type: "success", message: "Ustawienia FIRE zapisane i prognoza odświeżona." });
+      return saved;
+    } catch (error) {
+      setFireSettingsStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
   async function handleSaveSettings() {
     const base = settingsDraft || budgetSettings || {};
     const allLimitRows = [...(model.parentPlanRows || []), ...(model.planRows || [])];
@@ -401,6 +432,16 @@ export default function App() {
         <WealthView
           wealthDashboard={model.wealthDashboard}
           onInspect={openTransactionInspector}
+        />
+      )}
+
+      {view === "fire" && (
+        <FireView
+          fireSettings={fireSettingsQuery.data}
+          fireSummary={fireQuery.data || model.fireSummary}
+          saving={fireSettingsMutation.isPending}
+          settingsStatus={fireSettingsStatus}
+          onSaveSettings={handleSaveFireSettings}
         />
       )}
 

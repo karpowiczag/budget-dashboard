@@ -38,7 +38,7 @@ export function ImportView({ activeYear, importHealth, importRuns = [], onRebuil
             <div className={`importRun ${run.status}`} key={run.id}>
               <span>{run.year || "brak roku"}</span>
               <strong>{displayImportName(run)}</strong>
-              <p>{run.status} · duplikaty {run.duplicatesRemoved || 0} · {formatDateTime(run.createdAt)}</p>
+              <p>{run.status} · pominięte/duplikaty {run.duplicatesRemoved || 0} · {formatDateTime(run.createdAt)}</p>
               {run.message && <em>{run.message}</em>}
             </div>
           ))}

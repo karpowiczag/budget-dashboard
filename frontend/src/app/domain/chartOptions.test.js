@@ -8,6 +8,8 @@ import {
   buildCategoryTrendOption,
   buildDailyCalendarHeatmapOption,
   buildFixednessBreakdownOption,
+  buildFireAllocationOption,
+  buildFireProjectionOption,
   buildHierarchySunburstOption,
   buildMerchantFunnelOption,
   buildMerchantShareDonutOption,
@@ -122,5 +124,24 @@ describe("ECharts option builders", () => {
     ]);
     expect(option.series[0].data.map((row) => row.value)).toEqual([0, 2000, 2000, 0]);
     expect(option.series[1].data.map((row) => row.value)).toEqual([20000, 18000, 2500, 4500]);
+  });
+
+  it("builds FIRE projection and allocation charts", () => {
+    const projection = buildFireProjectionOption(
+      [{ id: "base", label: "Bazowy", projectedAtFire: 900000 }],
+      1000000,
+      36,
+      50,
+      200000,
+    );
+    expect(projection.series.map((series) => series.name)).toEqual(["Bazowy", "Cel FIRE"]);
+    expect(projection.series[0].data[0]).toMatchObject({ age: 36, value: 200000 });
+
+    const allocation = buildFireAllocationOption([
+      { assetClass: "Akcje", value: 800, share: 0.8, targetShare: 0.75 },
+      { assetClass: "Obligacje", value: 200, share: 0.2, targetShare: 0.25 },
+    ]);
+    expect(allocation.series[0]).toMatchObject({ type: "pie" });
+    expect(allocation.series[0].data[0]).toMatchObject({ name: "Akcje", value: 800 });
   });
 });

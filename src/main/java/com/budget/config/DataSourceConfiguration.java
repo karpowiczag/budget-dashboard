@@ -29,11 +29,15 @@ public class DataSourceConfiguration {
             configureJdbc(databaseUrl, config);
         } else if (StringUtils.hasText(databaseUrl)) {
             configurePostgres(databaseUrl, config);
-        } else {
+        } else if (properties.database().allowLocalH2()) {
             config.setJdbcUrl("jdbc:h2:file:./data/budget;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH");
             config.setUsername("sa");
             config.setPassword("");
             config.setDriverClassName("org.h2.Driver");
+        } else {
+            throw new IllegalStateException(
+                    "DATABASE_URL must be configured. Use PostgreSQL locally via compose, or set APP_ALLOW_LOCAL_H2=true only for disposable development runs."
+            );
         }
         return new HikariDataSource(config);
     }

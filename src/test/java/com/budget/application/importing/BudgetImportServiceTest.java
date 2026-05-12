@@ -66,7 +66,8 @@ class BudgetImportServiceTest {
         var analysis = mock(BudgetAnalysisService.class);
         var repository = mock(BudgetReportStore.class);
         var audit = mock(ImportAuditService.class);
-        var input = new BudgetInput(2026, "upload.csv", List.of());
+        var transaction = bankTransaction("2026-01-10", "New", -100);
+        var input = new BudgetInput(2026, "upload.csv", List.of(transaction));
         var result = new BudgetAnalysisResult(2026, "upload.csv", null, List.of(), 1, BigDecimal.TEN, BigDecimal.ONE);
         var service = new BudgetImportService(
                 new ImportSettings(1024, Path.of("."), true),
@@ -251,8 +252,184 @@ class BudgetImportServiceTest {
                 () -> new ByteArrayInputStream("csv".getBytes(java.nio.charset.StandardCharsets.UTF_8))
         ));
 
-        assertThat(summary.transactions()).isEqualTo(2);
+        assertThat(summary.transactions()).isEqualTo(1);
         assertThat(inputCaptor.getValue().transactions()).containsExactly(existing, newTransaction);
+    }
+
+    @Test
+    void uploadImportsOnlyUnseenRowsFromExistingYear() throws Exception {
+        var oldExisting = bankTransaction("2026-01-10", "Old existing", -100);
+        var latestExisting = bankTransaction("2026-05-07", "Latest existing", -50);
+        var oldFromUpload = bankTransaction("2026-01-10", "Old existing", -100);
+        var latestDuplicateFromUpload = bankTransaction("2026-05-07", "Latest existing", -50);
+        var newTransaction = bankTransaction("2026-05-08", "New", -75);
+        var csvReader = mock(BankTransactionReader.class);
+        var analysis = mock(BudgetAnalysisService.class);
+        var repository = mock(BudgetReportStore.class);
+        var audit = mock(ImportAuditService.class);
+        var inputCaptor = ArgumentCaptor.forClass(BudgetInput.class);
+        var service = new BudgetImportService(
+                new ImportSettings(2048, tempDir, true),
+                csvReader,
+                analysis,
+                repository,
+                audit,
+                noOpTransactionManager()
+        );
+
+        when(csvReader.read(any(), eq("incremental.csv"), any())).thenReturn(new BudgetInput(
+                2026,
+                "incremental.csv",
+                List.of(oldFromUpload, latestDuplicateFromUpload, newTransaction)
+        ));
+        when(repository.findYears()).thenReturn(List.of(new YearSummary(2026, OffsetDateTime.now(), 2, BigDecimal.valueOf(10_000), BigDecimal.valueOf(150), "old.csv")));
+        when(repository.findTransactions(any())).thenReturn(new TransactionPage(List.of(
+                transactionRecord(oldExisting),
+                transactionRecord(latestExisting)
+        ), 0, 200, 2, 1, "postedDate,asc"));
+        when(analysis.analyze(inputCaptor.capture())).thenAnswer(invocation -> {
+            var input = invocation.getArgument(0, BudgetInput.class);
+            return new BudgetAnalysisResult(input.year(), input.fileName(), null, List.of(), input.transactions().size(), BigDecimal.TEN, BigDecimal.ONE);
+        });
+
+        var summary = service.importUpload(new TransactionImportFile(
+                "incremental.csv",
+                12,
+                "text/csv",
+                () -> new ByteArrayInputStream("csv".getBytes(java.nio.charset.StandardCharsets.UTF_8))
+        ));
+
+        assertThat(summary.transactions()).isEqualTo(1);
+        assertThat(summary.duplicatesRemoved()).isEqualTo(2);
+        assertThat(inputCaptor.getValue().transactions()).containsExactly(oldExisting, latestExisting, newTransaction);
+        verify(audit).record(2026, "incremental.csv", "ok", "uploaded incrementally; new transactions: 1; existing/duplicate rows skipped: 2", 2);
+    }
+
+    @Test
+    void uploadPreservesUnseenBackfilledRowsOlderThanLatestExistingTransaction() throws Exception {
+        var oldExisting = bankTransaction("2026-01-10", "Old existing", -100);
+        var latestExisting = bankTransaction("2026-05-07", "Latest existing", -50);
+        var backfilledTransaction = bankTransaction("2026-01-15", "Late settled merchant", -33.45);
+        var latestDuplicateFromUpload = bankTransaction("2026-05-07", "Latest existing", -50);
+        var csvReader = mock(BankTransactionReader.class);
+        var analysis = mock(BudgetAnalysisService.class);
+        var repository = mock(BudgetReportStore.class);
+        var audit = mock(ImportAuditService.class);
+        var inputCaptor = ArgumentCaptor.forClass(BudgetInput.class);
+        var service = new BudgetImportService(
+                new ImportSettings(2048, tempDir, true),
+                csvReader,
+                analysis,
+                repository,
+                audit,
+                noOpTransactionManager()
+        );
+
+        when(csvReader.read(any(), eq("backfill.csv"), any())).thenReturn(new BudgetInput(
+                2026,
+                "backfill.csv",
+                List.of(latestDuplicateFromUpload, backfilledTransaction)
+        ));
+        when(repository.findYears()).thenReturn(List.of(new YearSummary(2026, OffsetDateTime.now(), 2, BigDecimal.valueOf(10_000), BigDecimal.valueOf(150), "old.csv")));
+        when(repository.findTransactions(any())).thenReturn(new TransactionPage(List.of(
+                transactionRecord(oldExisting),
+                transactionRecord(latestExisting)
+        ), 0, 200, 2, 1, "postedDate,asc"));
+        when(analysis.analyze(inputCaptor.capture())).thenAnswer(invocation -> {
+            var input = invocation.getArgument(0, BudgetInput.class);
+            return new BudgetAnalysisResult(input.year(), input.fileName(), null, List.of(), input.transactions().size(), BigDecimal.TEN, BigDecimal.ONE);
+        });
+
+        var summary = service.importUpload(new TransactionImportFile(
+                "backfill.csv",
+                12,
+                "text/csv",
+                () -> new ByteArrayInputStream("csv".getBytes(java.nio.charset.StandardCharsets.UTF_8))
+        ));
+
+        assertThat(summary.transactions()).isEqualTo(1);
+        assertThat(summary.duplicatesRemoved()).isEqualTo(1);
+        assertThat(inputCaptor.getValue().transactions()).containsExactly(oldExisting, backfilledTransaction, latestExisting);
+        verify(audit).record(2026, "backfill.csv", "ok", "uploaded incrementally; new transactions: 1; existing/duplicate rows skipped: 1", 1);
+    }
+
+    @Test
+    void uploadAllowsNewDifferentTransactionsOnLatestExistingDay() throws Exception {
+        var latestExisting = bankTransaction("2026-05-07", "Restaurant", -23.60);
+        var latestDuplicateFromUpload = bankTransaction("2026-05-07", "Restaurant", -23.60);
+        var sameDayNewTransaction = bankTransaction("2026-05-07", "Pharmacy", -75);
+        var csvReader = mock(BankTransactionReader.class);
+        var analysis = mock(BudgetAnalysisService.class);
+        var repository = mock(BudgetReportStore.class);
+        var audit = mock(ImportAuditService.class);
+        var inputCaptor = ArgumentCaptor.forClass(BudgetInput.class);
+        var service = new BudgetImportService(
+                new ImportSettings(2048, tempDir, true),
+                csvReader,
+                analysis,
+                repository,
+                audit,
+                noOpTransactionManager()
+        );
+
+        when(csvReader.read(any(), eq("same-day.csv"), any())).thenReturn(new BudgetInput(
+                2026,
+                "same-day.csv",
+                List.of(latestDuplicateFromUpload, sameDayNewTransaction)
+        ));
+        when(repository.findYears()).thenReturn(List.of(new YearSummary(2026, OffsetDateTime.now(), 1, BigDecimal.ZERO, BigDecimal.ZERO, "old.csv")));
+        when(repository.findTransactions(any())).thenReturn(new TransactionPage(List.of(transactionRecord(latestExisting)), 0, 200, 1, 1, "postedDate,asc"));
+        when(analysis.analyze(inputCaptor.capture())).thenAnswer(invocation -> {
+            var input = invocation.getArgument(0, BudgetInput.class);
+            return new BudgetAnalysisResult(input.year(), input.fileName(), null, List.of(), input.transactions().size(), BigDecimal.TEN, BigDecimal.ONE);
+        });
+
+        var summary = service.importUpload(new TransactionImportFile(
+                "same-day.csv",
+                12,
+                "text/csv",
+                () -> new ByteArrayInputStream("csv".getBytes(java.nio.charset.StandardCharsets.UTF_8))
+        ));
+
+        assertThat(summary.transactions()).isEqualTo(1);
+        assertThat(summary.duplicatesRemoved()).isEqualTo(1);
+        assertThat(inputCaptor.getValue().transactions()).containsExactly(sameDayNewTransaction, latestExisting);
+    }
+
+    @Test
+    void uploadWithNoRowsAfterLatestExistingTransactionDoesNotRebuildReport() throws Exception {
+        var existing = bankTransaction("2026-05-07", "Existing", -100);
+        var csvReader = mock(BankTransactionReader.class);
+        var analysis = mock(BudgetAnalysisService.class);
+        var repository = mock(BudgetReportStore.class);
+        var audit = mock(ImportAuditService.class);
+        var service = new BudgetImportService(
+                new ImportSettings(2048, tempDir, true),
+                csvReader,
+                analysis,
+                repository,
+                audit,
+                noOpTransactionManager()
+        );
+
+        when(csvReader.read(any(), eq("old.csv"), any())).thenReturn(new BudgetInput(2026, "old.csv", List.of(existing)));
+        when(repository.findYears()).thenReturn(List.of(new YearSummary(2026, OffsetDateTime.now(), 1, BigDecimal.valueOf(18_000), BigDecimal.valueOf(100), "old.csv")));
+        when(repository.findTransactions(any())).thenReturn(new TransactionPage(List.of(transactionRecord(existing)), 0, 200, 1, 1, "postedDate,asc"));
+
+        var summary = service.importUpload(new TransactionImportFile(
+                "old.csv",
+                12,
+                "text/csv",
+                () -> new ByteArrayInputStream("csv".getBytes(java.nio.charset.StandardCharsets.UTF_8))
+        ));
+
+        assertThat(summary.transactions()).isZero();
+        assertThat(summary.duplicatesRemoved()).isEqualTo(1);
+        assertThat(summary.income()).isEqualByComparingTo(BigDecimal.valueOf(18_000));
+        assertThat(summary.spend()).isEqualByComparingTo(BigDecimal.valueOf(100));
+        assertThat(summary.message()).isEqualTo("CSV checked; no new transactions");
+        verifyNoInteractions(analysis);
+        verify(audit).record(2026, "old.csv", "ok", "uploaded; no new transactions; existing/duplicate rows skipped: 1", 1);
     }
 
     @Test

@@ -91,6 +91,13 @@ describe("ReportsView", () => {
           categoryShare: [{ category: "Żywność i chemia", spend: 500, share: 1 }],
           categoryTrends: [{ month: "01.2026", monthKey: "2026-01", category: "Żywność i chemia", spend: 500 }],
           categoryPareto: [{ category: "Żywność i chemia", spend: 500, cumulativeShare: 1 }],
+          costMatrix: {
+            grandTotal: 500,
+            maxCell: 500,
+            months: [{ key: "2026-01", label: "styczeń" }],
+            rows: [{ label: "Żywność i chemia", level: 0, total: 500, months: { "2026-01": 500 }, filter: { category: "Żywność i chemia" } }],
+            totalsByMonth: [{ key: "2026-01", label: "styczeń", spend: 500 }],
+          },
           fixednessChart: [{ fixedness: "Zmienne konieczne", total: 500 }],
           hierarchySunburst: [{ name: "Koszty", value: 500, children: [] }],
           merchantFunnel: [{ merchant: "BIEDRONKA", sum: 500, count: 1 }],
@@ -134,6 +141,8 @@ describe("ReportsView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Wydatki" }));
     expect(screen.getByTestId("category-share-chart")).toBeInTheDocument();
     expect(screen.getByTestId("pareto-chart")).toBeInTheDocument();
+    expect(screen.getByText("Koszty total - kategorie i podkategorie")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /500\s*zł/ })).toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId("pareto-chart"));
     expect(onInspect).toHaveBeenCalledWith({

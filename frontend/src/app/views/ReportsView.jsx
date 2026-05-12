@@ -13,6 +13,7 @@ import { MerchantTrendChart } from "../components/charts/MerchantTrendChart.jsx"
 import { MonthlyCashflowComboChart } from "../components/charts/MonthlyCashflowComboChart.jsx";
 import { OutlierTimelineChart } from "../components/charts/OutlierTimelineChart.jsx";
 import { ReportWorkspace } from "../components/layout/ReportWorkspace.jsx";
+import { CategoryCostMatrixTable } from "../components/tables/CategoryCostMatrixTable.jsx";
 import { ReportDataTable } from "../components/tables/ReportDataTable.jsx";
 import { Panel } from "../components/ui/Panel.jsx";
 import { CHART_COLORS } from "../domain/charts.js";
@@ -110,6 +111,9 @@ export function ReportsView({ dataQualityChart, reportsSections, reportsWorkspac
               <CategoryParetoChart data={sections.categoryPareto || []} onSelect={(entry) => inspectEntry(entry, onInspect)} />
             </Panel>
           </section>
+          <Panel title="Koszty total - kategorie i podkategorie" action={<ScopeBadge type="year" value={sections.yearLabel} />}>
+            <CategoryCostMatrixTable matrix={sections.costMatrix} onInspect={onInspect} />
+          </Panel>
           <Panel title="Podkategorie (Top 14)" action={<ScopeBadge type="scope" value={sections.activeTimeLabel} />}>
             <ReportDataTable
               exportName="podkategorie"

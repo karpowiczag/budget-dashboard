@@ -21,6 +21,7 @@ public record AnalyticsReport(
         List<MerchantSpend> merchants,
         List<TransactionRecord> oneoffs,
         List<MonthlyCategoryTrend> monthlyCategoryTrends,
+        List<MonthlyHierarchyTrend> monthlyHierarchyTrends,
         List<MonthlyBucketTrend> monthlyBucketTrends,
         List<MonthlyMerchantTrend> monthlyMerchantTrends,
         List<FixednessBreakdown> fixednessBreakdown,
@@ -49,6 +50,9 @@ public record AnalyticsReport(
     }
 
     public record MonthlyCategoryTrend(String month, String monthKey, String category, BigDecimal spend, int count) {
+    }
+
+    public record MonthlyHierarchyTrend(String month, String monthKey, String category, String subcategory, BigDecimal spend, int count) {
     }
 
     public record MonthlyBucketTrend(String month, String monthKey, String bucket, BigDecimal spend, int count) {

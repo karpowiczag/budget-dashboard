@@ -79,7 +79,7 @@ export function useBudgetData() {
       const importedYear = payload.years?.at(-1) || nextYears.at(-1)?.year;
       setImportStatus({
         type: "success",
-        message: `Zaimportowano ${payload.transactions} transakcji dla ${importedYear}. Usunięte duplikaty: ${payload.duplicatesRemoved || 0}.`,
+        message: `Zaimportowano ${payload.transactions} nowych transakcji dla ${importedYear}. Pominięte istniejące/duplikaty: ${payload.duplicatesRemoved || 0}.`,
       });
       if (importedYear) {
         setYear(String(importedYear));

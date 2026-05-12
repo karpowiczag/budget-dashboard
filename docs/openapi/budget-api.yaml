@@ -274,6 +274,45 @@ paths:
                 $ref: "#/components/schemas/BudgetSettings"
         "400":
           $ref: "#/components/responses/Problem"
+  /api/v1/fire/summary:
+    get:
+      operationId: getFireSummary
+      responses:
+        "200":
+          description: FIRE tracking summary based on local MyFund portfolio reports and budget snapshots.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FireSummary"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/fire/settings:
+    get:
+      operationId: getFireSettings
+      responses:
+        "200":
+          description: Current FIRE planning settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FireSettings"
+    put:
+      operationId: updateFireSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FireSettings"
+      responses:
+        "200":
+          description: Updated FIRE planning settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FireSettings"
+        "400":
+          $ref: "#/components/responses/Problem"
 components:
   parameters:
     Year:
@@ -549,6 +588,7 @@ components:
         coreMonthlyCost:
           $ref: "#/components/schemas/Money"
         targetMonthlySpend:
+          description: Current household budget spending target, exposed only as budget context. It does not drive the FIRE spending target.
           $ref: "#/components/schemas/Money"
         aggressiveMonthlySpend:
           $ref: "#/components/schemas/Money"
@@ -795,7 +835,7 @@ components:
           $ref: "#/components/schemas/Transaction"
     AnalyticsResponse:
       type: object
-      required: [year, scope, spend, income, transactionCount, areaTop, groupTop, categoryTop, subcategoryTop, hierarchyTop, financialFlows, merchants, oneoffs, monthlyCategoryTrends, monthlyBucketTrends, monthlyMerchantTrends, fixednessBreakdown, confidenceBreakdown, amountBands]
+      required: [year, scope, spend, income, transactionCount, areaTop, groupTop, categoryTop, subcategoryTop, hierarchyTop, financialFlows, merchants, oneoffs, monthlyCategoryTrends, monthlyHierarchyTrends, monthlyBucketTrends, monthlyMerchantTrends, fixednessBreakdown, confidenceBreakdown, amountBands]
       properties:
         year:
           type: integer
@@ -843,6 +883,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MonthlyCategoryTrend"
+        monthlyHierarchyTrends:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyHierarchyTrend"
         monthlyBucketTrends:
           type: array
           items:
@@ -951,6 +995,23 @@ components:
           type: string
         category:
           type: string
+        spend:
+          $ref: "#/components/schemas/Money"
+        count:
+          type: integer
+    MonthlyHierarchyTrend:
+      type: object
+      required: [month, monthKey, category, subcategory, spend, count]
+      properties:
+        month:
+          type: string
+        monthKey:
+          type: string
+        category:
+          type: string
+        subcategory:
+          type: string
+          description: Empty when the source subcategory is generic.
         spend:
           $ref: "#/components/schemas/Money"
         count:
@@ -1129,9 +1190,11 @@ components:
             type: integer
         transactions:
           type: integer
+          description: Number of newly imported transactions for CSV upload, or rebuilt transactions for local rebuild.
         duplicatesRemoved:
           type: integer
           minimum: 0
+          description: Rows skipped because they were already imported, or duplicates removed during rebuild.
         income:
           $ref: "#/components/schemas/Money"
         spend:
@@ -1196,6 +1259,501 @@ components:
           type: string
           enum: ["", "Obowiązkowe stałe", "Obowiązkowe zmienne", "Do rozbicia", "Nieobowiązkowe", "Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu"]
           description: Optional manual high-level budget bucket override for category-scope settings.
+    FireSummary:
+      type: object
+      required: [reportsLoaded, reportsPath, sourceCount, positionCount, currentAge, targetAge, yearsToFire, currentPortfolioValue, costBasis, unrealizedGain, emergencyFundValue, retirementLockedValue, liquidFireCapital, bridgeableLiquidCapital, emergencyReserveTarget, annualSpendTarget, monthlySpendTarget, spendTargetConfigured, safeWithdrawalRate, fireNumber, gapToFireNumber, bridgeCapitalToAge60, bridgeCapitalToAge65, liquidBridgeGapToAge60, liquidBridgeGapToAge65, taxableCapitalValue, taxableUnrealizedGain, estimatedCapitalGainsTax, currentMonthlyWealthContribution, budgetLink, contributionPlan, withdrawalPlan, dataQuality, scenarios, allocation, wrappers, portfolios, rebalancing, risks, actionItems, positionAnalyses, milestones, legalRules, sources]
+      properties:
+        asOf:
+          type: string
+          format: date
+        reportsLoaded:
+          type: boolean
+        reportsPath:
+          type: string
+          readOnly: true
+        sourceCount:
+          type: integer
+        positionCount:
+          type: integer
+        currentAge:
+          type: integer
+        targetAge:
+          type: integer
+        yearsToFire:
+          type: integer
+        currentPortfolioValue:
+          $ref: "#/components/schemas/Money"
+        costBasis:
+          $ref: "#/components/schemas/Money"
+        unrealizedGain:
+          $ref: "#/components/schemas/Money"
+        emergencyFundValue:
+          $ref: "#/components/schemas/Money"
+        retirementLockedValue:
+          $ref: "#/components/schemas/Money"
+        liquidFireCapital:
+          $ref: "#/components/schemas/Money"
+        bridgeableLiquidCapital:
+          $ref: "#/components/schemas/Money"
+        emergencyReserveTarget:
+          $ref: "#/components/schemas/Money"
+        annualSpendTarget:
+          $ref: "#/components/schemas/Money"
+        monthlySpendTarget:
+          $ref: "#/components/schemas/Money"
+        spendTargetConfigured:
+          type: boolean
+          description: True only when the user explicitly configured monthly FIRE spending. When false, the app must not present a guessed FIRE number.
+        safeWithdrawalRate:
+          $ref: "#/components/schemas/Ratio"
+        fireNumber:
+          $ref: "#/components/schemas/Money"
+        gapToFireNumber:
+          $ref: "#/components/schemas/Money"
+        bridgeCapitalToAge60:
+          $ref: "#/components/schemas/Money"
+        bridgeCapitalToAge65:
+          $ref: "#/components/schemas/Money"
+        liquidBridgeGapToAge60:
+          $ref: "#/components/schemas/Money"
+        liquidBridgeGapToAge65:
+          $ref: "#/components/schemas/Money"
+        taxableCapitalValue:
+          $ref: "#/components/schemas/Money"
+        taxableUnrealizedGain:
+          $ref: "#/components/schemas/Money"
+        estimatedCapitalGainsTax:
+          $ref: "#/components/schemas/Money"
+        currentMonthlyWealthContribution:
+          $ref: "#/components/schemas/Money"
+        budgetLink:
+          $ref: "#/components/schemas/FireBudgetLink"
+        contributionPlan:
+          $ref: "#/components/schemas/FireContributionPlan"
+        withdrawalPlan:
+          $ref: "#/components/schemas/FireWithdrawalPlan"
+        dataQuality:
+          $ref: "#/components/schemas/FireDataQuality"
+        scenarios:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireScenario"
+        allocation:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireAllocation"
+        wrappers:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireWrapper"
+        portfolios:
+          type: array
+          items:
+            $ref: "#/components/schemas/FirePortfolioBreakdown"
+        rebalancing:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireRebalanceAction"
+        risks:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireRisk"
+        actionItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireActionItem"
+        positionAnalyses:
+          type: array
+          items:
+            $ref: "#/components/schemas/FirePositionAnalysis"
+        milestones:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireMilestone"
+        legalRules:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireLegalRule"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/FireSource"
+    FireScenario:
+      type: object
+      required: [id, label, realReturn, projectedAtFire, gapAtFire, requiredMonthlyContribution, currentPlanMonthlyContribution, onTrack]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        realReturn:
+          $ref: "#/components/schemas/Ratio"
+        projectedAtFire:
+          $ref: "#/components/schemas/Money"
+        gapAtFire:
+          $ref: "#/components/schemas/Money"
+        requiredMonthlyContribution:
+          $ref: "#/components/schemas/Money"
+        currentPlanMonthlyContribution:
+          $ref: "#/components/schemas/Money"
+        onTrack:
+          type: boolean
+    FireAllocation:
+      type: object
+      required: [assetClass, value, share, targetShare, drift, status]
+      properties:
+        assetClass:
+          type: string
+        value:
+          $ref: "#/components/schemas/Money"
+        share:
+          $ref: "#/components/schemas/Ratio"
+        targetShare:
+          $ref: "#/components/schemas/Ratio"
+        drift:
+          $ref: "#/components/schemas/Ratio"
+        status:
+          type: string
+    FireWrapper:
+      type: object
+      required: [wrapper, value, share, positions, liquidity]
+      properties:
+        wrapper:
+          type: string
+        value:
+          $ref: "#/components/schemas/Money"
+        share:
+          $ref: "#/components/schemas/Ratio"
+        positions:
+          type: integer
+        liquidity:
+          type: string
+    FirePortfolioBreakdown:
+      type: object
+      required: [portfolio, value, share, investmentValue, emergencyValue, retirementLockedValue, taxableValue, positions, role, note]
+      properties:
+        portfolio:
+          type: string
+        value:
+          $ref: "#/components/schemas/Money"
+        share:
+          $ref: "#/components/schemas/Ratio"
+        investmentValue:
+          $ref: "#/components/schemas/Money"
+        emergencyValue:
+          $ref: "#/components/schemas/Money"
+        retirementLockedValue:
+          $ref: "#/components/schemas/Money"
+        taxableValue:
+          $ref: "#/components/schemas/Money"
+        positions:
+          type: integer
+        role:
+          type: string
+        note:
+          type: string
+    FireRebalanceAction:
+      type: object
+      required: [assetClass, currentShare, targetShare, drift, amountToTarget, action, priority]
+      properties:
+        assetClass:
+          type: string
+        currentShare:
+          $ref: "#/components/schemas/Ratio"
+        targetShare:
+          $ref: "#/components/schemas/Ratio"
+        drift:
+          $ref: "#/components/schemas/Ratio"
+        amountToTarget:
+          $ref: "#/components/schemas/Money"
+        action:
+          type: string
+        priority:
+          type: string
+    FireRisk:
+      type: object
+      required: [id, level, area, title, metric, value, threshold, detail, recommendation]
+      properties:
+        id:
+          type: string
+          description: Stable risk identifier.
+        level:
+          type: string
+          enum: [high, medium, low, info]
+        area:
+          type: string
+        title:
+          type: string
+        metric:
+          type: string
+        value:
+          type: string
+          description: Localized display value because risk metrics mix percentages, money and statuses.
+        threshold:
+          type: string
+        detail:
+          type: string
+        recommendation:
+          type: string
+    FireContributionPlan:
+      type: object
+      required: [currentMonthly, requiredMonthlyBase, additionalMonthlyNeeded, annualIkeCapacityForHousehold, annualIkzeCapacityForHousehold, monthlyRetirementWrapperCapacity, recommendation]
+      properties:
+        currentMonthly:
+          $ref: "#/components/schemas/Money"
+        requiredMonthlyBase:
+          $ref: "#/components/schemas/Money"
+        additionalMonthlyNeeded:
+          $ref: "#/components/schemas/Money"
+        annualIkeCapacityForHousehold:
+          $ref: "#/components/schemas/Money"
+        annualIkzeCapacityForHousehold:
+          $ref: "#/components/schemas/Money"
+        monthlyRetirementWrapperCapacity:
+          $ref: "#/components/schemas/Money"
+        recommendation:
+          type: string
+    FireBudgetLink:
+      type: object
+      required: [linked, budgetYear, activeMonths, monthlyIncome, currentMonthlyLivingSpend, targetMonthlySpend, actualMonthlyInvestments, savingsAccountMonthlyNet, savingsAccountMonthlyGrossDeposits, loanOverpaymentMonthly, firePortfolioMonthlyContribution, targetInvestableSurplus, unassignedSurplusMonthly, emergencyReserveTarget, spendOverrideUsed, contributionOverrideUsed, note]
+      properties:
+        linked:
+          type: boolean
+        budgetYear:
+          type: integer
+        activeMonths:
+          type: integer
+        monthlyIncome:
+          $ref: "#/components/schemas/Money"
+        currentMonthlyLivingSpend:
+          $ref: "#/components/schemas/Money"
+        targetMonthlySpend:
+          $ref: "#/components/schemas/Money"
+        actualMonthlyInvestments:
+          $ref: "#/components/schemas/Money"
+        savingsAccountMonthlyNet:
+          $ref: "#/components/schemas/Money"
+        savingsAccountMonthlyGrossDeposits:
+          $ref: "#/components/schemas/Money"
+        loanOverpaymentMonthly:
+          $ref: "#/components/schemas/Money"
+        firePortfolioMonthlyContribution:
+          $ref: "#/components/schemas/Money"
+        targetInvestableSurplus:
+          $ref: "#/components/schemas/Money"
+        unassignedSurplusMonthly:
+          $ref: "#/components/schemas/Money"
+        emergencyReserveTarget:
+          $ref: "#/components/schemas/Money"
+        spendOverrideUsed:
+          type: boolean
+        contributionOverrideUsed:
+          type: boolean
+        note:
+          type: string
+    FireWithdrawalPlan:
+      type: object
+      required: [monthlyTarget, annualTarget, liquidCapital, yearsCoveredByLiquidCapital, bridgeNeedToAge60, bridgeNeedToAge65, estimatedTaxReserve, sequence]
+      properties:
+        monthlyTarget:
+          $ref: "#/components/schemas/Money"
+        annualTarget:
+          $ref: "#/components/schemas/Money"
+        liquidCapital:
+          $ref: "#/components/schemas/Money"
+        yearsCoveredByLiquidCapital:
+          $ref: "#/components/schemas/Ratio"
+        bridgeNeedToAge60:
+          $ref: "#/components/schemas/Money"
+        bridgeNeedToAge65:
+          $ref: "#/components/schemas/Money"
+        estimatedTaxReserve:
+          $ref: "#/components/schemas/Money"
+        sequence:
+          type: string
+    FireDataQuality:
+      type: object
+      required: [sourceCount, positionCount, staleSourceCount, unknownAssetClassCount, unknownAssetClassValue, unknownWrapperCount, unknownWrapperValue, status, note]
+      properties:
+        newestReportDate:
+          type: string
+          format: date
+        sourceCount:
+          type: integer
+        positionCount:
+          type: integer
+        staleSourceCount:
+          type: integer
+        unknownAssetClassCount:
+          type: integer
+        unknownAssetClassValue:
+          $ref: "#/components/schemas/Money"
+        unknownWrapperCount:
+          type: integer
+        unknownWrapperValue:
+          $ref: "#/components/schemas/Money"
+        status:
+          type: string
+          enum: [ok, needsReview, missing]
+        note:
+          type: string
+    FireActionItem:
+      type: object
+      required: [priority, type, title, detail, amount]
+      properties:
+        priority:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        amount:
+          $ref: "#/components/schemas/Money"
+    FirePositionAnalysis:
+      type: object
+      required: [instrument, isin, portfolio, assetClass, instrumentType, fireRole, wrapper, account, currency, value, costBasis, unrealizedGain, returnPct, shareOfPortfolio, shareOfInvestments, riskLevel, reviewFocus, decision, decisionReason, action, perspective, riskDrivers, checklist]
+      properties:
+        instrument:
+          type: string
+        isin:
+          type: string
+        portfolio:
+          type: string
+        assetClass:
+          type: string
+        instrumentType:
+          type: string
+          description: Diagnostic security type inferred from MyFund group, name, wrapper and identifiers.
+        fireRole:
+          type: string
+          description: FIRE portfolio role such as growth core, stabilizer, bridge liquidity or satellite.
+        wrapper:
+          type: string
+        account:
+          type: string
+        currency:
+          type: string
+        priceDate:
+          type: string
+          format: date
+        value:
+          $ref: "#/components/schemas/Money"
+        costBasis:
+          $ref: "#/components/schemas/Money"
+        unrealizedGain:
+          $ref: "#/components/schemas/Money"
+        returnPct:
+          $ref: "#/components/schemas/Ratio"
+        shareOfPortfolio:
+          $ref: "#/components/schemas/Ratio"
+        shareOfInvestments:
+          $ref: "#/components/schemas/Ratio"
+        riskLevel:
+          type: string
+          enum: [high, medium, low, info]
+        reviewFocus:
+          type: string
+        decision:
+          type: string
+          description: Operational diagnostic next step, not investment advice.
+        decisionReason:
+          type: string
+          description: Main reasons behind the diagnostic decision.
+        action:
+          type: string
+          description: Backward-compatible alias of decision.
+        perspective:
+          type: string
+        riskDrivers:
+          type: array
+          items:
+            type: string
+        checklist:
+          type: array
+          items:
+            type: string
+    FireMilestone:
+      type: object
+      required: [age, label, description, requiredCapital]
+      properties:
+        age:
+          type: integer
+        label:
+          type: string
+        description:
+          type: string
+        requiredCapital:
+          $ref: "#/components/schemas/Money"
+    FireLegalRule:
+      type: object
+      required: [id, label, value, note, sourceUrl]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        value:
+          type: string
+        note:
+          type: string
+        sourceUrl:
+          type: string
+          format: uri
+    FireSource:
+      type: object
+      required: [fileName, portfolio, positions, value]
+      properties:
+        fileName:
+          type: string
+        portfolio:
+          type: string
+        asOf:
+          type: string
+          format: date
+        positions:
+          type: integer
+        value:
+          $ref: "#/components/schemas/Money"
+    FireSettings:
+      type: object
+      required: [reportsPath, currentAge, targetAge, safeWithdrawalRate, pessimisticRealReturn, expectedRealReturn, optimisticRealReturn, targetEquityShare, targetBondShare, targetCashShare, targetAlternativeShare, rebalanceBand]
+      properties:
+        reportsPath:
+          type: string
+        currentAge:
+          type: integer
+          minimum: 18
+          maximum: 90
+        targetAge:
+          type: integer
+          minimum: 18
+          maximum: 90
+        monthlySpendOverride:
+          description: Explicit monthly FIRE spending target. When omitted, the model does not guess a FIRE number from the household budget.
+          $ref: "#/components/schemas/Money"
+        monthlyContributionOverride:
+          description: Optional manual FIRE contribution override. When omitted, current contribution comes from household budget investments plus net savings-account movement.
+          $ref: "#/components/schemas/Money"
+        safeWithdrawalRate:
+          $ref: "#/components/schemas/Ratio"
+        pessimisticRealReturn:
+          $ref: "#/components/schemas/Ratio"
+        expectedRealReturn:
+          $ref: "#/components/schemas/Ratio"
+        optimisticRealReturn:
+          $ref: "#/components/schemas/Ratio"
+        targetEquityShare:
+          $ref: "#/components/schemas/Ratio"
+        targetBondShare:
+          $ref: "#/components/schemas/Ratio"
+        targetCashShare:
+          $ref: "#/components/schemas/Ratio"
+        targetAlternativeShare:
+          $ref: "#/components/schemas/Ratio"
+        rebalanceBand:
+          $ref: "#/components/schemas/Ratio"
     ProblemDetail:
       type: object
       properties:

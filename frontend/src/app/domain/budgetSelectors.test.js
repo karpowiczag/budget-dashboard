@@ -6,6 +6,7 @@ import {
   selectBuckets,
   selectCategoryLimitChart,
   selectCategoryExamples,
+  selectCostMatrix,
   selectCategoryShare,
   selectCategorySubcategories,
   selectCashflowSankey,
@@ -45,6 +46,7 @@ describe("buildDashboardViews", () => {
       "plan",
       "reports",
       "wealth",
+      "fire",
       "obligations",
       "transactions",
       "import",
@@ -54,6 +56,7 @@ describe("buildDashboardViews", () => {
       "Plan",
       "Raporty",
       "Majątek",
+      "FIRE",
       "Zobowiązania",
       "Transakcje",
       "Import",
@@ -168,6 +171,33 @@ describe("module view-model selectors", () => {
     })).toMatchObject({
       eyebrow: "Majątek",
       cards: [{ label: "Inwestycje", value: 500 }],
+    });
+
+    expect(selectModuleHeader({
+      view: "fire",
+      fireSummary: { spendTargetConfigured: true, currentPortfolioValue: 100000, fireNumber: 2000000, gapToFireNumber: 1900000, liquidBridgeGapToAge60: 1200000, safeWithdrawalRate: 0.035, targetAge: 50, positionCount: 12, budgetLink: { firePortfolioMonthlyContribution: 3000 } },
+    })).toMatchObject({
+      eyebrow: "FIRE tracking",
+      cards: [
+        { label: "Kapitał teraz", value: 100000 },
+        { label: "Cel FIRE", value: 2000000 },
+        { label: "Brakuje", value: 1900000 },
+        { label: "Wpłata z budżetu", value: 3000 },
+        { label: "Luka 50-60", value: 1200000 },
+      ],
+    });
+
+    expect(selectModuleHeader({
+      view: "fire",
+      fireSummary: { spendTargetConfigured: false, currentPortfolioValue: 100000, safeWithdrawalRate: 0.035, targetAge: 50, positionCount: 12, budgetLink: { firePortfolioMonthlyContribution: 3000 } },
+    })).toMatchObject({
+      cards: [
+        { label: "Kapitał teraz", value: 100000 },
+        { label: "Cel FIRE", value: "Ustaw cel", textValue: true },
+        { label: "Brakuje", value: "Ustaw cel", textValue: true },
+        { label: "Wpłata z budżetu", value: 3000 },
+        { label: "Luka 50-60", value: "Ustaw cel", textValue: true },
+      ],
     });
   });
 });
@@ -670,6 +700,20 @@ describe("advanced analytical selectors", () => {
       { merchant: "IKEA", filter: { query: "IKEA" } },
     ]);
 
+    const matrix = selectCostMatrix({
+      year: 2026,
+      rows: [
+        { monthKey: "2026-01", category: "Jedzenie", subcategory: "Restauracje", spend: 120, count: 2 },
+        { monthKey: "2026-02", category: "Jedzenie", subcategory: "Ogólne", spend: 80, count: 1 },
+        { monthKey: "2026-01", category: "Mieszkanie", subcategory: "", spend: 1000, count: 1 },
+      ],
+    });
+    expect(matrix.months).toHaveLength(12);
+    expect(matrix.grandTotal).toBe(1200);
+    expect(matrix.rows.map((row) => `${row.level}:${row.label}`)).toEqual(["0:Mieszkanie", "0:Jedzenie", "1:Restauracje"]);
+    expect(matrix.rows.find((row) => row.label === "Jedzenie").months["2026-02"]).toBe(80);
+    expect(matrix.rows.find((row) => row.label === "Restauracje").filter).toEqual({ category: "Jedzenie", subcategory: "Restauracje" });
+
     expect(selectMerchantFunnel([{ merchant: "IKEA", sum: 500, count: 1 }])).toEqual([
       { merchant: "IKEA", sum: 500, count: 1, filter: { query: "IKEA" } },
     ]);
@@ -739,7 +783,7 @@ describe("selectImportHealth", () => {
         { label: "Lata w bazie", value: 2 },
         { label: "Transakcje w bazie", value: 150 },
         { label: "Do sprawdzenia", value: 2, amount: 300 },
-        { label: "Usunięte duplikaty", value: 3 },
+        { label: "Pominięte/duplikaty", value: 3 },
       ],
     });
   });

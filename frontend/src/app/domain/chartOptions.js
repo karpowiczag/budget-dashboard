@@ -280,6 +280,78 @@ export function buildMonthlyCashflowComboOption(data = []) {
   };
 }
 
+export function buildFireProjectionOption(scenarios = [], target = 0, currentAge = 36, targetAge = 50, currentValue = 0) {
+  const ages = Array.from({ length: Math.max(1, targetAge - currentAge + 1) }, (_, index) => currentAge + index);
+  return {
+    grid: baseGrid({ right: 28 }),
+    legend: { bottom: 0, textStyle: { color: TEXT } },
+    tooltip: tooltip((params) => {
+      const age = params?.[0]?.axisValue ?? "";
+      return [
+        `<strong>Wiek ${escapeHtml(age)}</strong>`,
+        ...params.map((item) => `${marker(item.color)}${escapeHtml(item.seriesName)}: ${moneyDec(item.value)}`),
+      ].join("<br/>");
+    }),
+    xAxis: categoryAxis(ages),
+    yAxis: valueAxis(),
+    series: [
+      ...scenarios.map((scenario, index) => ({
+        data: ages.map((age) => ({
+          scenario: scenario.id,
+          age,
+          value: interpolate(Number(currentValue || 0), Number(scenario.projectedAtFire || 0), ages, age),
+        })),
+        lineStyle: { color: [COLORS.amber, COLORS.blue, COLORS.green][index] || COLORS.slate, width: 2 },
+        name: scenario.label,
+        showSymbol: false,
+        type: "line",
+      })),
+      {
+        data: ages.map((age) => ({ age, value: Number(target || 0) })),
+        lineStyle: { color: COLORS.red, type: "dashed", width: 2 },
+        name: "Cel FIRE",
+        showSymbol: false,
+        type: "line",
+      },
+    ],
+  };
+}
+
+export function buildFireAllocationOption(rows = []) {
+  return {
+    legend: { bottom: 0, textStyle: { color: TEXT } },
+    series: [
+      {
+        data: rows.map((row) => ({
+          name: row.assetClass,
+          value: Number(row.value || 0),
+          ...row,
+        })),
+        emphasis: { itemStyle: { shadowBlur: 8, shadowColor: "rgba(15, 23, 42, 0.18)" } },
+        label: { formatter: "{b}: {d}%" },
+        radius: ["42%", "72%"],
+        type: "pie",
+      },
+    ],
+    tooltip: itemTooltip((item) => {
+      const row = item?.data || {};
+      return [
+        `<strong>${escapeHtml(row.assetClass || row.name)}</strong>`,
+        `Wartość: ${moneyDec(row.value)}`,
+        `Udział: ${percent(row.share)}`,
+        `Cel: ${percent(row.targetShare)}`,
+      ].join("<br/>");
+    }),
+  };
+}
+
+function interpolate(currentValue, projectedAtFire, ages, age) {
+  const start = Math.max(0, currentValue);
+  const index = Math.max(0, ages.indexOf(age));
+  const denominator = Math.max(1, ages.length - 1);
+  return start + (projectedAtFire - start) * (index / denominator);
+}
+
 export function buildCashflowSankeyOption(model = { links: [], nodes: [] }) {
   const links = model.links || [];
   const nodes = model.nodes || [];
