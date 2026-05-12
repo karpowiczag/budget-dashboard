@@ -94,11 +94,13 @@ class OpenApiContractTest {
         assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "hierarchyTop", "HierarchySpend");
         assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "financialFlows", "FinancialFlow");
         assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "monthlyCategoryTrends", "MonthlyCategoryTrend");
+        assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "monthlyHierarchyTrends", "MonthlyHierarchyTrend");
         assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "monthlyBucketTrends", "MonthlyBucketTrend");
         assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "monthlyMerchantTrends", "MonthlyMerchantTrend");
         assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "fixednessBreakdown", "FixednessBreakdown");
         assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "confidenceBreakdown", "ConfidenceBreakdown");
         assertArrayItemRef(openApi.getComponents().getSchemas().get("AnalyticsResponse"), "amountBands", "AmountBand");
+        assertArrayItemRef(openApi.getComponents().getSchemas().get("FireSummary"), "positionAnalyses", "FirePositionAnalysis");
         assertThat(openApi.getComponents().getSchemas()).containsKeys("BudgetSettings", "CategoryLimitSetting", "FireSettings");
     }
 

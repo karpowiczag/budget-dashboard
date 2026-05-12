@@ -51,7 +51,8 @@ class PostgresBudgetPersistenceIntegrationTest {
         var second = importFixture();
 
         assertThat(first.transactions()).isEqualTo(17);
-        assertThat(second.transactions()).isEqualTo(17);
+        assertThat(second.transactions()).isZero();
+        assertThat(second.duplicatesRemoved()).isEqualTo(17);
         assertThat(count("budget_transactions", 2026)).isEqualTo(17);
         assertThat(count("report_monthly_summaries", 2026)).isEqualTo(12);
         assertThat(count("report_category_summaries", 2026)).isGreaterThan(5);

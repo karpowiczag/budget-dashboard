@@ -31,6 +31,8 @@ public class FireQueryService {
     private final FirePortfolioReader portfolioReader;
     private final BudgetReportStore budgetStore;
     private final FireSettingsService settingsService;
+    private final FireInstrumentClassifier instrumentClassifier = new FireInstrumentClassifier();
+    private final FirePositionAnalyzer positionAnalyzer = new FirePositionAnalyzer(instrumentClassifier);
     private final FireRiskAnalyzer riskAnalyzer = new FireRiskAnalyzer();
 
     public FireQueryService(FirePortfolioReader portfolioReader, BudgetReportStore budgetStore, FireSettingsService settingsService) {
@@ -72,6 +74,7 @@ public class FireQueryService {
         var investmentPortfolioValue = sum(investmentPositions, FirePortfolioPosition::valuePln);
         var allocation = allocation(settings, investmentPositions, investmentPortfolioValue);
         var wrappers = wrappers(positions, currentValue);
+        var portfolios = portfolios(positions, currentValue);
         var rebalancing = rebalancing(settings, allocation, investmentPortfolioValue);
         var bridgeTo60 = bridgeCapital(settings, annualSpendTarget, 60);
         var bridgeTo65 = bridgeCapital(settings, annualSpendTarget, 65);
@@ -110,6 +113,7 @@ public class FireQueryService {
                 liquidBridgeGapTo60
         ));
         var actionItems = actionItems(baseScenario, contributionPlan, liquidBridgeGapTo60, dataQuality, rebalancing, budgetLink, spendTargetConfigured);
+        var positionAnalyses = positionAnalyzer.analyze(settings, positions, currentValue, investmentPortfolioValue, rebalancing);
 
         return new FireSummary(
                 snapshot.asOf(),
@@ -149,9 +153,11 @@ public class FireQueryService {
                 scenarios,
                 allocation,
                 wrappers,
+                portfolios,
                 rebalancing,
                 risks,
                 actionItems,
+                positionAnalyses,
                 spendTargetConfigured ? milestones(settings, annualSpendTarget, fireNumber, bridgeTo60, bridgeTo65) : List.of(),
                 legalRules(),
                 sources(positions)
@@ -299,7 +305,7 @@ public class FireQueryService {
     private List<FireSummary.FireAllocation> allocation(FireSettings settings, List<FirePortfolioPosition> positions, BigDecimal total) {
         var grouped = new LinkedHashMap<String, BigDecimal>();
         for (var position : positions) {
-            grouped.merge(position.assetClass(), position.valuePln(), BigDecimal::add);
+            grouped.merge(instrumentClassifier.classify(position).assetClass(), position.valuePln(), BigDecimal::add);
         }
         var targets = targetAllocation(settings);
         return grouped.entrySet().stream()
@@ -313,7 +319,9 @@ public class FireQueryService {
                             share,
                             target,
                             drift,
-                            drift.abs().compareTo(settings.rebalanceBand()) > 0 ? "Poza pasmem" : "OK"
+                            "Mieszane".equals(entry.getKey())
+                                    ? "Wymaga look-through"
+                                    : drift.abs().compareTo(settings.rebalanceBand()) > 0 ? "Poza pasmem" : "OK"
                     );
                 })
                 .sorted(Comparator.comparing(FireSummary.FireAllocation::value).reversed())
@@ -326,6 +334,7 @@ public class FireQueryService {
         targets.put("Obligacje", settings.targetBondShare());
         targets.put("Gotówka", settings.targetCashShare());
         targets.put("Alternatywne", settings.targetAlternativeShare());
+        targets.put("Mieszane", BigDecimal.ZERO);
         targets.put("Inne", BigDecimal.ZERO);
         return targets;
     }
@@ -350,9 +359,87 @@ public class FireQueryService {
                 .toList();
     }
 
+    private List<FireSummary.FirePortfolioBreakdown> portfolios(List<FirePortfolioPosition> positions, BigDecimal total) {
+        var grouped = new LinkedHashMap<String, List<FirePortfolioPosition>>();
+        for (var position : positions) {
+            grouped.computeIfAbsent(portfolioLabel(position), ignored -> new ArrayList<>()).add(position);
+        }
+        return grouped.entrySet().stream()
+                .map(entry -> {
+                    var rows = entry.getValue();
+                    var value = money(sum(rows, FirePortfolioPosition::valuePln));
+                    var emergency = money(sum(rows.stream()
+                            .filter(position -> WRAPPER_EMERGENCY.equals(position.wrapper()))
+                            .toList(), FirePortfolioPosition::valuePln));
+                    var retirement = money(sum(rows.stream()
+                            .filter(position -> WRAPPER_RETIREMENT.equals(position.wrapper()))
+                            .toList(), FirePortfolioPosition::valuePln));
+                    var taxable = money(sum(rows.stream()
+                            .filter(position -> WRAPPER_TAXABLE.equals(position.wrapper()))
+                            .toList(), FirePortfolioPosition::valuePln));
+                    var investment = money(value.subtract(emergency).max(BigDecimal.ZERO));
+                    var role = portfolioRole(value, emergency, retirement, taxable);
+                    return new FireSummary.FirePortfolioBreakdown(
+                            entry.getKey(),
+                            value,
+                            share(value, total),
+                            investment,
+                            emergency,
+                            retirement,
+                            taxable,
+                            rows.size(),
+                            role,
+                            portfolioNote(role)
+                    );
+                })
+                .sorted(Comparator.comparing(FireSummary.FirePortfolioBreakdown::value).reversed())
+                .toList();
+    }
+
+    private String portfolioLabel(FirePortfolioPosition position) {
+        var value = position.portfolio() == null ? "" : position.portfolio().trim();
+        return value.isBlank() ? "Nieznany portfel" : value;
+    }
+
+    private String portfolioRole(BigDecimal total, BigDecimal emergency, BigDecimal retirement, BigDecimal taxable) {
+        if (total.signum() == 0) {
+            return "Brak wartości";
+        }
+        if (share(emergency, total).compareTo(new BigDecimal("0.80")) >= 0) {
+            return "Poduszka";
+        }
+        if (share(retirement, total).compareTo(new BigDecimal("0.80")) >= 0) {
+            return "Emerytalny";
+        }
+        if (share(taxable, total).compareTo(new BigDecimal("0.80")) >= 0) {
+            return "Płynny inwestycyjny";
+        }
+        return "Mieszany";
+    }
+
+    private String portfolioNote(String role) {
+        return switch (role) {
+            case "Poduszka" -> "Nie traktuj jako ryzykowny portfel FIRE; chroni płynność i awarie.";
+            case "Emerytalny" -> "Dobre miejsce na długi horyzont, ale nie finansuje automatycznie pomostu 50-60/65.";
+            case "Płynny inwestycyjny" -> "Może finansować pomost, ale sprzedaż z zyskiem może być podatkowo wrażliwa.";
+            default -> "Sprawdź segmenty w środku, bo portfel miesza płynność, podatki albo różne cele.";
+        };
+    }
+
     private List<FireSummary.FireRebalanceAction> rebalancing(FireSettings settings, List<FireSummary.FireAllocation> allocation, BigDecimal total) {
         return allocation.stream()
                 .map(row -> {
+                    if ("Mieszane".equals(row.assetClass())) {
+                        return new FireSummary.FireRebalanceAction(
+                                row.assetClass(),
+                                row.share(),
+                                row.targetShare(),
+                                row.drift(),
+                                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                                "Rozbij look-through na akcje/obligacje przed decyzją",
+                                row.share().signum() > 0 ? "Wysoki" : "Normalny"
+                        );
+                    }
                     var amountToTarget = row.targetShare().subtract(row.share()).multiply(total);
                     var action = amountToTarget.compareTo(BigDecimal.ZERO) > 0
                             ? "Doważyć nowymi wpłatami"
@@ -466,7 +553,7 @@ public class FireQueryService {
                 .filter(source -> source.asOf() == null || source.asOf().isBefore(staleThreshold))
                 .count();
         var unknownAssets = positions.stream()
-                .filter(position -> position.assetClass().equals("Inne"))
+                .filter(position -> instrumentClassifier.classify(position).unknown())
                 .toList();
         var unknownWrappers = positions.stream()
                 .filter(position -> position.wrapper().equals("Inne"))
@@ -576,7 +663,9 @@ public class FireQueryService {
                 new FireSummary.FireLegalRule("ike-limit", "Limit IKE 2026", "28 260 zł / osoba", "Wypłata z zachowaniem zwolnienia podatkowego zasadniczo po 60 r.ż. albo 55 r.ż. przy uprawnieniach emerytalnych.", "https://www.knf.gov.pl/?articleId=81021&p_id=18"),
                 new FireSummary.FireLegalRule("ikze-limit", "Limit IKZE 2026", "11 304 zł / osoba", "Dla JDG limit 16 956 zł; kwalifikowana wypłata po 65 r.ż. i 5 latach wpłat, zryczałtowany podatek 10%.", "https://www.knf.gov.pl/?articleId=81022&p_id=18"),
                 new FireSummary.FireLegalRule("zus-age", "Powszechny wiek emerytalny", "60 K / 65 M", "FIRE w wieku 50 lat wymaga osobnego kapitału pomostowego przed świadczeniami ustawowymi.", "https://www.zus.pl/swiadczenia/emerytury/emerytura-dla-osob-urodzonych-po-31-grudnia-1948/emerytura-w-wieku-powszechnym"),
-                new FireSummary.FireLegalRule("rebalance", "Rebalancing", "pasmo 5 p.p.", "Domyślnie doważanie nowymi wpłatami; sprzedaż w rachunkach opodatkowanych tylko przy istotnym odchyleniu.", "https://www.sec.gov/investor/pubs/assetallocation.htm")
+                new FireSummary.FireLegalRule("rebalance", "Rebalancing", "pasmo 5 p.p.", "Domyślnie doważanie nowymi wpłatami; sprzedaż w rachunkach opodatkowanych tylko przy istotnym odchyleniu.", "https://www.sec.gov/investor/pubs/assetallocation.htm"),
+                new FireSummary.FireLegalRule("kid-cost-risk", "KID, koszty i ryzyko funduszy", "SRI / koszty / benchmark", "Dla funduszy i ETF sprawdzaj dokument KID, koszty, wskaźnik ryzyka i historyczne stopy zwrotu; sama nazwa waloru nie wystarcza do decyzji.", "https://wybieramfundusze.knf.gov.pl/"),
+                new FireSummary.FireLegalRule("diversification", "Dywersyfikacja", "nie jedna inwestycja", "Model flaguje koncentrację, bo KNF zaleca rozpraszanie środków między różne produkty i unikanie zależności od jednej inwestycji.", "https://www.knf.gov.pl/dla_konsumenta/kampanie_informacyjne/inwestuj_swiadomie")
         );
     }
 
@@ -638,4 +727,5 @@ public class FireQueryService {
                 .filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
+
 }

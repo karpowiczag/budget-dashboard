@@ -835,7 +835,7 @@ components:
           $ref: "#/components/schemas/Transaction"
     AnalyticsResponse:
       type: object
-      required: [year, scope, spend, income, transactionCount, areaTop, groupTop, categoryTop, subcategoryTop, hierarchyTop, financialFlows, merchants, oneoffs, monthlyCategoryTrends, monthlyBucketTrends, monthlyMerchantTrends, fixednessBreakdown, confidenceBreakdown, amountBands]
+      required: [year, scope, spend, income, transactionCount, areaTop, groupTop, categoryTop, subcategoryTop, hierarchyTop, financialFlows, merchants, oneoffs, monthlyCategoryTrends, monthlyHierarchyTrends, monthlyBucketTrends, monthlyMerchantTrends, fixednessBreakdown, confidenceBreakdown, amountBands]
       properties:
         year:
           type: integer
@@ -883,6 +883,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MonthlyCategoryTrend"
+        monthlyHierarchyTrends:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyHierarchyTrend"
         monthlyBucketTrends:
           type: array
           items:
@@ -991,6 +995,23 @@ components:
           type: string
         category:
           type: string
+        spend:
+          $ref: "#/components/schemas/Money"
+        count:
+          type: integer
+    MonthlyHierarchyTrend:
+      type: object
+      required: [month, monthKey, category, subcategory, spend, count]
+      properties:
+        month:
+          type: string
+        monthKey:
+          type: string
+        category:
+          type: string
+        subcategory:
+          type: string
+          description: Empty when the source subcategory is generic.
         spend:
           $ref: "#/components/schemas/Money"
         count:
@@ -1169,9 +1190,11 @@ components:
             type: integer
         transactions:
           type: integer
+          description: Number of newly imported transactions for CSV upload, or rebuilt transactions for local rebuild.
         duplicatesRemoved:
           type: integer
           minimum: 0
+          description: Rows skipped because they were already imported, or duplicates removed during rebuild.
         income:
           $ref: "#/components/schemas/Money"
         spend:
@@ -1238,7 +1261,7 @@ components:
           description: Optional manual high-level budget bucket override for category-scope settings.
     FireSummary:
       type: object
-      required: [reportsLoaded, reportsPath, sourceCount, positionCount, currentAge, targetAge, yearsToFire, currentPortfolioValue, costBasis, unrealizedGain, emergencyFundValue, retirementLockedValue, liquidFireCapital, bridgeableLiquidCapital, emergencyReserveTarget, annualSpendTarget, monthlySpendTarget, spendTargetConfigured, safeWithdrawalRate, fireNumber, gapToFireNumber, bridgeCapitalToAge60, bridgeCapitalToAge65, liquidBridgeGapToAge60, liquidBridgeGapToAge65, taxableCapitalValue, taxableUnrealizedGain, estimatedCapitalGainsTax, currentMonthlyWealthContribution, budgetLink, contributionPlan, withdrawalPlan, dataQuality, scenarios, allocation, wrappers, rebalancing, risks, actionItems, milestones, legalRules, sources]
+      required: [reportsLoaded, reportsPath, sourceCount, positionCount, currentAge, targetAge, yearsToFire, currentPortfolioValue, costBasis, unrealizedGain, emergencyFundValue, retirementLockedValue, liquidFireCapital, bridgeableLiquidCapital, emergencyReserveTarget, annualSpendTarget, monthlySpendTarget, spendTargetConfigured, safeWithdrawalRate, fireNumber, gapToFireNumber, bridgeCapitalToAge60, bridgeCapitalToAge65, liquidBridgeGapToAge60, liquidBridgeGapToAge65, taxableCapitalValue, taxableUnrealizedGain, estimatedCapitalGainsTax, currentMonthlyWealthContribution, budgetLink, contributionPlan, withdrawalPlan, dataQuality, scenarios, allocation, wrappers, portfolios, rebalancing, risks, actionItems, positionAnalyses, milestones, legalRules, sources]
       properties:
         asOf:
           type: string
@@ -1323,6 +1346,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FireWrapper"
+        portfolios:
+          type: array
+          items:
+            $ref: "#/components/schemas/FirePortfolioBreakdown"
         rebalancing:
           type: array
           items:
@@ -1335,6 +1362,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FireActionItem"
+        positionAnalyses:
+          type: array
+          items:
+            $ref: "#/components/schemas/FirePositionAnalysis"
         milestones:
           type: array
           items:
@@ -1396,6 +1427,30 @@ components:
         positions:
           type: integer
         liquidity:
+          type: string
+    FirePortfolioBreakdown:
+      type: object
+      required: [portfolio, value, share, investmentValue, emergencyValue, retirementLockedValue, taxableValue, positions, role, note]
+      properties:
+        portfolio:
+          type: string
+        value:
+          $ref: "#/components/schemas/Money"
+        share:
+          $ref: "#/components/schemas/Ratio"
+        investmentValue:
+          $ref: "#/components/schemas/Money"
+        emergencyValue:
+          $ref: "#/components/schemas/Money"
+        retirementLockedValue:
+          $ref: "#/components/schemas/Money"
+        taxableValue:
+          $ref: "#/components/schemas/Money"
+        positions:
+          type: integer
+        role:
+          type: string
+        note:
           type: string
     FireRebalanceAction:
       type: object
@@ -1556,6 +1611,69 @@ components:
           type: string
         amount:
           $ref: "#/components/schemas/Money"
+    FirePositionAnalysis:
+      type: object
+      required: [instrument, isin, portfolio, assetClass, instrumentType, fireRole, wrapper, account, currency, value, costBasis, unrealizedGain, returnPct, shareOfPortfolio, shareOfInvestments, riskLevel, reviewFocus, decision, decisionReason, action, perspective, riskDrivers, checklist]
+      properties:
+        instrument:
+          type: string
+        isin:
+          type: string
+        portfolio:
+          type: string
+        assetClass:
+          type: string
+        instrumentType:
+          type: string
+          description: Diagnostic security type inferred from MyFund group, name, wrapper and identifiers.
+        fireRole:
+          type: string
+          description: FIRE portfolio role such as growth core, stabilizer, bridge liquidity or satellite.
+        wrapper:
+          type: string
+        account:
+          type: string
+        currency:
+          type: string
+        priceDate:
+          type: string
+          format: date
+        value:
+          $ref: "#/components/schemas/Money"
+        costBasis:
+          $ref: "#/components/schemas/Money"
+        unrealizedGain:
+          $ref: "#/components/schemas/Money"
+        returnPct:
+          $ref: "#/components/schemas/Ratio"
+        shareOfPortfolio:
+          $ref: "#/components/schemas/Ratio"
+        shareOfInvestments:
+          $ref: "#/components/schemas/Ratio"
+        riskLevel:
+          type: string
+          enum: [high, medium, low, info]
+        reviewFocus:
+          type: string
+        decision:
+          type: string
+          description: Operational diagnostic next step, not investment advice.
+        decisionReason:
+          type: string
+          description: Main reasons behind the diagnostic decision.
+        action:
+          type: string
+          description: Backward-compatible alias of decision.
+        perspective:
+          type: string
+        riskDrivers:
+          type: array
+          items:
+            type: string
+        checklist:
+          type: array
+          items:
+            type: string
     FireMilestone:
       type: object
       required: [age, label, description, requiredCapital]

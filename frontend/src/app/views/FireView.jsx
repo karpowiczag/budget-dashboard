@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FireAllocationChart } from "../components/charts/FireAllocationChart.jsx";
 import { FireProjectionChart } from "../components/charts/FireProjectionChart.jsx";
 import { ReportDataTable } from "../components/tables/ReportDataTable.jsx";
@@ -15,7 +15,7 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
 
   if (!summary.reportsLoaded) {
     return (
-      <section className="viewStack">
+      <section className="viewStack fireView">
         <Panel title="FIRE tracking">
           <div className="dataQualityBanner warn">
             <strong>Brak raportów inwestycyjnych</strong>
@@ -26,87 +26,67 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
     );
   }
 
-  const baseScenario = summary.scenarios?.find((scenario) => scenario.id === "base") || summary.scenarios?.[0];
   const budget = summary.budgetLink || {};
+  const risks = summary.risks || [];
   const hasSpendTarget = summary.spendTargetConfigured === true;
-  const setupTarget = "Ustaw cel";
   const saveDraft = () => {
     if (draft) onSaveSettings?.(draft);
   };
+
   return (
-    <section className="viewStack">
+    <section className="viewStack fireView">
       <Panel
-        title="Plan FIRE"
+        title="Decyzja FIRE"
         action={
           <button className="primaryButton" disabled={!draft || saving} onClick={saveDraft} type="button">
             {saving ? "Zapisuję..." : "Zapisz FIRE"}
           </button>
         }
       >
-        <div className="dataQualityBanner neutral">
-          <strong>Model planistyczny</strong>
-          <span>To projekcja w realnych złotych na podstawie celu FIRE, raportów MyFund i tempa inwestowania z budżetu. Nie jest poradą inwestycyjną ani podatkową.</span>
-        </div>
-        <div className="metricGrid four">
-          <Metric label="Kapitał dziś" value={money(summary.currentPortfolioValue)} detail={`${summary.positionCount} pozycji`} />
-          <SpendTargetCard
+        <div className="fireDecisionGrid">
+          <SpendTargetEditor
             draft={draft}
             hasSpendTarget={hasSpendTarget}
+            monthlySpendTarget={summary.monthlySpendTarget}
+            fireNumber={summary.fireNumber}
             saving={saving}
-            value={hasSpendTarget ? money(summary.fireNumber) : setupTarget}
             onChange={(value) => update(draft, setDraft, "monthlySpendOverride", value)}
             onSave={saveDraft}
           />
-          <Metric label="Brakuje" value={hasSpendTarget ? money(summary.gapToFireNumber) : setupTarget} detail={hasSpendTarget ? `do wieku ${summary.targetAge}` : "nie liczę bez celu"} warn={hasSpendTarget && Number(summary.gapToFireNumber) > 0} />
-          <Metric label="Wymagane / mies." value={hasSpendTarget ? money(baseScenario?.requiredMonthlyContribution) : setupTarget} detail={hasSpendTarget ? "scenariusz bazowy" : "najpierw cel wydatków"} />
+          <DecisionSummary actionItems={summary.actionItems || []} risks={risks} hasSpendTarget={hasSpendTarget} />
+          <ContributionSummary budget={budget} contributionPlan={summary.contributionPlan} currentMonthlyWealthContribution={summary.currentMonthlyWealthContribution} />
         </div>
         {settingsStatus && <div className={`inlineStatus ${settingsStatus.type}`}>{settingsStatus.message}</div>}
       </Panel>
 
-      <Panel title="Budżet domowy -> FIRE">
-        <div className="dataQualityBanner neutral">
-          <strong>{budget.linked ? `Źródło: budżet ${budget.budgetYear}` : "Brak połączenia z budżetem"}</strong>
-          <span>{budget.note || "Odbuduj budżet domowy, żeby FIRE używał realnych przepływów."}</span>
+      <Panel title="Ryzyka inwestycyjne" action={<RiskCounter risks={risks} />}>
+        <div className="dataQualityBanner neutral compactBanner">
+          <strong>Aktualny portfel MyFund</strong>
+          <span>Najpierw ryzyka, potem prognoza. Ocena obejmuje alokację, koncentrację, płynność, walutę, pomost i podatek.</span>
         </div>
-        <div className="metricGrid four">
-          <Metric label="Cel wydatków FIRE" value={hasSpendTarget ? money(summary.monthlySpendTarget) : setupTarget} detail={hasSpendTarget ? "z ustawień FIRE" : "nie zgaduję tej liczby"} />
-          <Metric label="Wpłata FIRE" value={money(budget.firePortfolioMonthlyContribution || summary.currentMonthlyWealthContribution)} detail={budget.contributionOverrideUsed ? "override" : "z budżetu: inwestycje + oszcz. netto"} />
-          <Metric label="Nadpłata kredytu" value={money(budget.loanOverpaymentMonthly)} detail="osobno od portfela FIRE" />
-          <Metric label="Poduszka zostaje" value={money(summary.emergencyReserveTarget || budget.emergencyReserveTarget)} detail="nie liczę jej do pomostu" />
-        </div>
-        <div className="metricGrid four">
-          <Metric label="Wydatki teraz" value={money(budget.currentMonthlyLivingSpend)} detail={`${budget.activeMonths || 0} mies. danych`} />
-          <Metric label="Okres budżetu" value={`${budget.activeMonths || 0} mies.`} detail={budget.budgetYear ? `rok ${budget.budgetYear}` : "brak danych"} />
-          <Metric label="Inwestycje" value={money(budget.actualMonthlyInvestments)} detail="średnio / mies." />
-          <Metric label="Konto oszcz. netto" value={money(budget.savingsAccountMonthlyNet)} detail={`brutto ${money(budget.savingsAccountMonthlyGrossDeposits)}`} />
-        </div>
-      </Panel>
-
-      <Panel title="Ryzyka inwestycyjne">
-        <div className="dataQualityBanner neutral">
-          <strong>Ocena z aktualnych pozycji MyFund</strong>
-          <span>Ryzyka wynikają z alokacji, płynności segmentów, koncentracji pozycji, podatku i jakości danych. To kontrola planu, nie rekomendacja kupna lub sprzedaży instrumentów.</span>
-        </div>
-        <RiskCards risks={summary.risks || []} />
-        <ReportDataTable
-          emptyMessage="Brak istotnych ryzyk dla aktualnych danych."
-          exportName="fire-risks"
-          rows={summary.risks || []}
-          columns={[
-            { key: "level", header: "Poziom", render: (row) => <RiskLevel level={row.level} /> },
-            { key: "area", header: "Obszar" },
-            { key: "title", header: "Ryzyko" },
-            { key: "metric", header: "Metryka" },
-            { key: "value", header: "Wartość", className: "num" },
-            { key: "threshold", header: "Próg", className: "num" },
-            { key: "detail", header: "Dlaczego" },
-            { key: "recommendation", header: "Co zrobić" },
-          ]}
-        />
+        <RiskCards risks={risks} />
+        <details className="fireDisclosure">
+          <summary>Pełna tabela ryzyk</summary>
+          <ReportDataTable
+            className="smallRows fireRiskTable"
+            emptyMessage="Brak istotnych ryzyk dla aktualnych danych."
+            exportName="fire-risks"
+            rows={risks}
+            columns={[
+              { key: "level", header: "Poziom", render: (row) => <RiskLevel level={row.level} /> },
+              { key: "area", header: "Obszar" },
+              { key: "title", header: "Ryzyko" },
+              { key: "metric", header: "Metryka" },
+              { key: "value", header: "Wartość", className: "num" },
+              { key: "threshold", header: "Próg", className: "num" },
+              { key: "recommendation", header: "Co zrobić" },
+            ]}
+          />
+        </details>
       </Panel>
 
       <section className="gridTwo">
-        <Panel title="Prognoza do wieku 50">
+        <Panel title="Prognoza i luka do celu">
           <FireProjectionChart
             currentAge={summary.currentAge}
             currentValue={summary.currentPortfolioValue}
@@ -114,57 +94,70 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
             target={summary.fireNumber}
             targetAge={summary.targetAge}
           />
+          <ScenarioStrip scenarios={summary.scenarios || []} />
         </Panel>
-        <Panel title="Alokacja portfela inwestycyjnego">
-          <FireAllocationChart data={summary.allocation || []} />
-        </Panel>
-      </section>
-
-      <section className="gridTwo">
-        <Panel title="Akcje do wykonania">
-          <ReportDataTable
-            exportName="fire-actions"
-            rows={summary.actionItems || []}
-            columns={[
-              { key: "priority", header: "Priorytet" },
-              { key: "title", header: "Decyzja" },
-              { key: "amount", header: "Kwota", className: "num", render: (row) => money(row.amount) },
-              { key: "detail", header: "Dlaczego" },
-            ]}
-          />
-        </Panel>
-        <Panel title="Plan wpłat">
-          <div className="planCards compactCards">
-            <Metric label="Obecnie" value={money(summary.contributionPlan?.currentMonthly)} detail="miesięcznie" />
-            <Metric label="Wymagane" value={money(summary.contributionPlan?.requiredMonthlyBase)} detail="scenariusz bazowy" />
-            <Metric label="Brakuje / mies." value={money(summary.contributionPlan?.additionalMonthlyNeeded)} detail="do celu 50" warn={Number(summary.contributionPlan?.additionalMonthlyNeeded || 0) > 0} />
-            <Metric label="Limit IKE+IKZE" value={money(summary.contributionPlan?.monthlyRetirementWrapperCapacity)} detail="2 osoby / mies." />
-          </div>
-          <p className="mutedText">{summary.contributionPlan?.recommendation}</p>
-        </Panel>
-      </section>
-
-      <section className="gridTwo">
-        <Panel title="Pomost i dostępność kapitału">
-          <div className="planCards compactCards">
-            <Metric label="Luka 50-60" value={money(summary.liquidBridgeGapToAge60)} detail="płynny kapitał" warn={Number(summary.liquidBridgeGapToAge60 || 0) > 0} />
-            <Metric label="Luka 50-65" value={money(summary.liquidBridgeGapToAge65)} detail="konserwatywnie" warn={Number(summary.liquidBridgeGapToAge65 || 0) > 0} />
+        <Panel title="Pomost 50-60/65">
+          <div className="fireMiniMetrics">
+            <Metric label="Luka 50-60" value={hasSpendTarget ? money(summary.liquidBridgeGapToAge60) : "Ustaw cel"} detail="płynny kapitał" warn={hasSpendTarget && Number(summary.liquidBridgeGapToAge60 || 0) > 0} />
+            <Metric label="Luka 50-65" value={hasSpendTarget ? money(summary.liquidBridgeGapToAge65) : "Ustaw cel"} detail="konserwatywnie" warn={hasSpendTarget && Number(summary.liquidBridgeGapToAge65 || 0) > 0} />
             <Metric label="Kapitał pomostowy" value={money(summary.bridgeableLiquidCapital)} detail="po zostawieniu poduszki" />
             <Metric label="Rezerwa podatku" value={money(summary.withdrawalPlan?.estimatedTaxReserve)} detail="Belka od zysków opod." />
           </div>
           <p className="mutedText">{summary.withdrawalPlan?.sequence}</p>
+          <details className="fireDisclosure">
+            <summary>Kamienie milowe pomostu</summary>
+            <ReportDataTable
+              exportName="fire-milestones"
+              rows={summary.milestones || []}
+              columns={[
+                { key: "age", header: "Wiek", className: "num", render: (row) => row.age || "-" },
+                { key: "label", header: "Kamień milowy" },
+                { key: "requiredCapital", header: "Kapitał", className: "num", render: (row) => money(row.requiredCapital) },
+                { key: "description", header: "Sens" },
+              ]}
+            />
+          </details>
+        </Panel>
+      </section>
+
+      <section className="gridTwo">
+        <Panel title="Alokacja portfela">
+          <FireAllocationChart data={summary.allocation || []} />
+          <details className="fireDisclosure">
+            <summary>Szczegóły rebalancingu</summary>
+            <ReportDataTable
+              exportName="fire-rebalancing"
+              rows={summary.rebalancing || []}
+              columns={[
+                { key: "assetClass", header: "Klasa" },
+                { key: "currentShare", header: "Teraz", className: "num", render: (row) => percent(row.currentShare) },
+                { key: "targetShare", header: "Cel", className: "num", render: (row) => percent(row.targetShare) },
+                { key: "drift", header: "Odchylenie", className: "num", render: (row) => percent(row.drift) },
+                { key: "amountToTarget", header: "Kwota do celu", className: "num", render: (row) => money(row.amountToTarget) },
+                { key: "action", header: "Akcja" },
+              ]}
+            />
+          </details>
+        </Panel>
+        <Panel title="Portfele MyFund">
           <ReportDataTable
-            exportName="fire-milestones"
-            rows={summary.milestones || []}
+            exportName="fire-portfele"
+            rows={summary.portfolios || []}
             columns={[
-              { key: "age", header: "Wiek", className: "num", render: (row) => row.age || "-" },
-              { key: "label", header: "Kamień milowy" },
-              { key: "requiredCapital", header: "Kapitał", className: "num", render: (row) => money(row.requiredCapital) },
-              { key: "description", header: "Sens" },
+              { key: "portfolio", header: "Portfel" },
+              { key: "role", header: "Rola" },
+              { key: "value", header: "Wartość", className: "num", render: (row) => money(row.value) },
+              { key: "share", header: "Udział", className: "num", render: (row) => percent(row.share) },
+              { key: "investmentValue", header: "Inwest.", className: "num", render: (row) => money(row.investmentValue) },
+              { key: "retirementLockedValue", header: "Emeryt.", className: "num", render: (row) => money(row.retirementLockedValue) },
+              { key: "note", header: "Wniosek" },
             ]}
           />
         </Panel>
-        <Panel title="Opakowania i płynność">
+      </section>
+
+      <section className="gridTwo">
+        <Panel title="Płynność i opakowania">
           <ReportDataTable
             exportName="fire-wrappers"
             rows={summary.wrappers || []}
@@ -176,67 +169,560 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
             ]}
           />
         </Panel>
-      </section>
-
-      <Panel title="Ustawienia produkcyjne">
-        <FireSettingsForm draft={draft} onChange={setDraft} />
-      </Panel>
-
-      <Panel title="Rebalancing">
-        <ReportDataTable
-          exportName="fire-rebalancing"
-          rows={summary.rebalancing || []}
-          columns={[
-            { key: "assetClass", header: "Klasa" },
-            { key: "currentShare", header: "Teraz", className: "num", render: (row) => percent(row.currentShare) },
-            { key: "targetShare", header: "Cel", className: "num", render: (row) => percent(row.targetShare) },
-            { key: "drift", header: "Odchylenie", className: "num", render: (row) => percent(row.drift) },
-            { key: "amountToTarget", header: "Kwota do celu", className: "num", render: (row) => money(row.amountToTarget) },
-            { key: "action", header: "Akcja" },
-            { key: "priority", header: "Priorytet" },
-          ]}
-        />
-      </Panel>
-
-      <section className="gridTwo">
-        <Panel title="Polskie reguły w modelu">
-          <ReportDataTable
-            exportName="fire-reguly"
-            rows={summary.legalRules || []}
-            columns={[
-              { key: "label", header: "Reguła" },
-              { key: "value", header: "Wartość" },
-              { key: "note", header: "Komentarz" },
-            ]}
-          />
-        </Panel>
-        <Panel title="Jakość danych FIRE">
-          <div className="planCards compactCards">
-            <Metric label="Status" value={summary.dataQuality?.status || "brak"} detail={summary.dataQuality?.newestReportDate || "bez daty"} />
-            <Metric label="Stare źródła" value={summary.dataQuality?.staleSourceCount || 0} detail=">45 dni" warn={Number(summary.dataQuality?.staleSourceCount || 0) > 0} />
-            <Metric label="Nieznane aktywa" value={summary.dataQuality?.unknownAssetClassCount || 0} detail={money(summary.dataQuality?.unknownAssetClassValue)} warn={Number(summary.dataQuality?.unknownAssetClassCount || 0) > 0} />
-            <Metric label="Nieznane segmenty" value={summary.dataQuality?.unknownWrapperCount || 0} detail={money(summary.dataQuality?.unknownWrapperValue)} warn={Number(summary.dataQuality?.unknownWrapperCount || 0) > 0} />
-          </div>
-          <p className="mutedText">{summary.dataQuality?.note}</p>
+        <Panel title="Dane MyFund">
+          <DataQualitySummary dataQuality={summary.dataQuality} />
+          <details className="fireDisclosure">
+            <summary>Źródła MyFund</summary>
+            <ReportDataTable
+              exportName="fire-zrodla"
+              rows={summary.sources || []}
+              columns={[
+                { key: "portfolio", header: "Portfel" },
+                { key: "asOf", header: "Data" },
+                { key: "positions", header: "Pozycje", className: "num" },
+                { key: "value", header: "Wartość", className: "num", render: (row) => money(row.value) },
+              ]}
+            />
+          </details>
         </Panel>
       </section>
 
+      <Panel title="Analiza walorów">
+        <PositionAnalysisWorkspace portfolios={summary.portfolios || []} rows={summary.positionAnalyses || []} />
+      </Panel>
+
       <section className="gridTwo">
-        <Panel title="Źródła MyFund">
-          <ReportDataTable
-            exportName="fire-zrodla"
-            rows={summary.sources || []}
-            columns={[
-              { key: "portfolio", header: "Portfel" },
-              { key: "asOf", header: "Data" },
-              { key: "positions", header: "Pozycje", className: "num" },
-              { key: "value", header: "Wartość", className: "num", render: (row) => money(row.value) },
-            ]}
-          />
+        <Panel title="Dane i reguły">
+          <details className="fireDisclosure">
+            <summary>Polskie reguły modelu</summary>
+            <ReportDataTable
+              exportName="fire-reguly"
+              rows={summary.legalRules || []}
+              columns={[
+                { key: "label", header: "Reguła" },
+                { key: "value", header: "Wartość" },
+                { key: "note", header: "Komentarz" },
+              ]}
+            />
+          </details>
+        </Panel>
+        <Panel
+          title="Ustawienia modelu"
+          action={
+            <button className="secondaryButton compact" disabled={!draft || saving} onClick={saveDraft} type="button">
+              {saving ? "Zapisuję..." : "Zapisz"}
+            </button>
+          }
+        >
+          <FireSettingsForm draft={draft} onChange={setDraft} />
         </Panel>
       </section>
     </section>
   );
+}
+
+function PositionAnalysisWorkspace({ portfolios, rows }) {
+  const [activePortfolio, setActivePortfolio] = useState("all");
+  const [activeFocus, setActiveFocus] = useState("all");
+  const model = useMemo(() => buildPositionAnalysisModel(rows, portfolios), [rows, portfolios]);
+  const selectedRows = useMemo(
+    () => rows.filter((row) => matchesPortfolio(row, activePortfolio) && matchesFocus(row, activeFocus)),
+    [rows, activePortfolio, activeFocus],
+  );
+  const selectedModel = useMemo(() => buildPositionAnalysisModel(selectedRows, portfolios), [selectedRows, portfolios]);
+
+  useEffect(() => {
+    if (activePortfolio !== "all" && !model.groups.some((group) => group.name === activePortfolio)) {
+      setActivePortfolio("all");
+    }
+  }, [activePortfolio, model.groups]);
+
+  const activePortfolioLabel = activePortfolio === "all" ? "Wszystkie portfele" : activePortfolio;
+
+  return (
+    <div className="positionAnalysisWorkspace">
+      <div className="dataQualityBanner neutral compactBanner">
+        <strong>Przegląd pozycji z MyFund</strong>
+        <span>Najpierw wybierz portfel i typ decyzji, potem schodź do waloru. To diagnostyka portfelowa, nie rekomendacja kupna ani sprzedaży.</span>
+      </div>
+
+      <div className="positionAnalysisKpis">
+        <Metric label="Zakres" value={selectedModel.positionCount} detail={`${activePortfolioLabel} · ${focusLabel(activeFocus)}`} />
+        <Metric label="Wartość" value={money(selectedModel.totalValue)} detail={`${selectedModel.portfolioCount || 0} portfele`} />
+        <Metric label="Wysokie ryzyko" value={selectedModel.highRiskCount} detail="pierwsze do kontroli" warn={selectedModel.highRiskCount > 0} />
+        <Metric label="Look-through" value={selectedModel.lookThroughCount} detail="produkty mieszane" warn={selectedModel.lookThroughCount > 0} />
+      </div>
+
+      <PortfolioSelector activePortfolio={activePortfolio} model={model} onChange={setActivePortfolio} />
+      <ScopeSummary activePortfolio={activePortfolioLabel} activeFocus={activeFocus} model={selectedModel} />
+
+      <div className="positionAnalysisGrid">
+        <aside className="positionPriorityPanel">
+          <h3>Filtry analizy</h3>
+          <p>Filtry są lokalne dla analizy walorów. Nie zmieniają alokacji ani prognozy FIRE.</p>
+          <FocusFilter activeFocus={activeFocus} model={model} onChange={setActiveFocus} />
+          <h3 className="priorityHeading">Priorytety decyzji</h3>
+          <p>Najpierw ryzyko i wartość. To lista tematów do ręcznej kontroli przed rebalancingiem.</p>
+          <div className="priorityPositionList">
+            {selectedModel.priorities.length ? selectedModel.priorities.map((row) => <PriorityPosition key={positionKey(row)} row={row} />) : <div className="emptyState compact">Brak pilnych pozycji w tym zakresie.</div>}
+          </div>
+        </aside>
+
+        <div className="portfolioPositionGroups">
+          {selectedModel.groups.length ? selectedModel.groups.map((group) => <PortfolioPositionGroup group={group} key={group.name} />) : <div className="emptyState compact">Brak pozycji dla wybranego filtra.</div>}
+        </div>
+      </div>
+
+      <details className="fireDisclosure">
+        <summary>Tabela techniczna aktualnego zakresu i eksport CSV</summary>
+        <PositionAnalysisTable rows={selectedRows} />
+      </details>
+    </div>
+  );
+}
+
+function PortfolioSelector({ activePortfolio, model, onChange }) {
+  const options = [
+    {
+      name: "all",
+      label: "Wszystkie",
+      role: "pełny portfel",
+      value: model.totalValue,
+      positions: model.positionCount,
+      riskLevel: model.riskLevel,
+    },
+    ...model.groups.map((group) => ({
+      name: group.name,
+      label: group.name,
+      role: group.role,
+      value: group.value,
+      positions: group.positions.length,
+      riskLevel: group.riskLevel,
+    })),
+  ];
+  return (
+    <div className="portfolioScopeRail" aria-label="Wybór portfela MyFund">
+      {options.map((option) => (
+        <button
+          aria-pressed={activePortfolio === option.name}
+          className={`portfolioScopeTile ${activePortfolio === option.name ? "active" : ""} ${option.riskLevel || "info"}`}
+          key={option.name}
+          onClick={() => onChange(option.name)}
+          type="button"
+        >
+          <span>{option.label}</span>
+          <strong>{money(option.value)}</strong>
+          <small>{option.role} · {option.positions} walorów</small>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ScopeSummary({ activeFocus, activePortfolio, model }) {
+  return (
+    <div className="positionScopeSummary">
+      <div>
+        <span>Wybrany zakres</span>
+        <strong>{activePortfolio}</strong>
+        <small>{focusLabel(activeFocus)} · {model.positionCount} walorów · {money(model.totalValue)}</small>
+      </div>
+      <AssetMixBar items={model.assetMix} />
+    </div>
+  );
+}
+
+function AssetMixBar({ items }) {
+  if (!items.length) {
+    return <div className="emptyState compact">Brak danych alokacji dla zakresu.</div>;
+  }
+  return (
+    <div className="assetMixSummary">
+      <div className="assetMixBar" aria-label="Struktura klas aktywów">
+        {items.map((item) => (
+          <span
+            className={`assetSegment ${assetClassToken(item.assetClass)}`}
+            key={item.assetClass}
+            style={{ width: `${Math.max(item.share * 100, 2)}%` }}
+            title={`${item.assetClass}: ${percent(item.share)}`}
+          />
+        ))}
+      </div>
+      <div className="assetMixLegend">
+        {items.map((item) => (
+          <span key={item.assetClass}>
+            <i className={assetClassToken(item.assetClass)} /> {item.assetClass} <strong>{percent(item.share)}</strong>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FocusFilter({ activeFocus, model, onChange }) {
+  const options = [
+    { id: "all", label: "Wszystkie", count: model.positionCount },
+    { id: "attention", label: "Do decyzji", count: model.attentionCount },
+    { id: "high", label: "Wysokie", count: model.highRiskCount },
+    { id: "lookThrough", label: "Look-through", count: model.lookThroughCount },
+    { id: "taxable", label: "Opodatkowane", count: model.taxableCount },
+  ];
+  return (
+    <div className="focusFilterStack">
+      {options.map((option) => (
+        <button className={activeFocus === option.id ? "active" : ""} key={option.id} onClick={() => onChange(option.id)} type="button">
+          <span>{option.label}</span>
+          <strong>{option.count}</strong>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PriorityPosition({ row }) {
+  return (
+    <article className={`priorityPosition ${row.riskLevel || "info"}`}>
+      <div>
+        <RiskLevel level={row.riskLevel} />
+        <strong>{row.instrument}</strong>
+        <small>{[row.portfolio, row.assetClass, money(row.value)].filter(Boolean).join(" · ")}</small>
+      </div>
+      <p>{row.decision || row.action || row.reviewFocus}</p>
+    </article>
+  );
+}
+
+function PortfolioPositionGroup({ group }) {
+  return (
+    <details className="portfolioPositionGroup" open>
+      <summary>
+        <div>
+          <strong>{group.name}</strong>
+          <span>{group.role} · {group.positions.length} walorów · {money(group.value)}</span>
+        </div>
+        <RiskLevel level={group.riskLevel} />
+      </summary>
+      {group.note && <p className="portfolioGroupNote">{group.note}</p>}
+      <div className="portfolioAssetMix">
+        {group.assetMix.map((item) => (
+          <span key={item.assetClass}>
+            {item.assetClass} <strong>{percent(item.share)}</strong>
+          </span>
+        ))}
+      </div>
+      <div className="positionCardGrid">
+        {group.positions.map((row) => <PositionAnalysisCard key={positionKey(row)} row={row} />)}
+      </div>
+    </details>
+  );
+}
+
+function PositionAnalysisCard({ row }) {
+  return (
+    <article className={`positionAnalysisCard ${row.riskLevel || "info"}`}>
+      <header>
+        <div>
+          <strong>{row.instrument}</strong>
+          <small>{[row.isin || row.account || "brak ISIN", row.currency].filter(Boolean).join(" · ")}</small>
+        </div>
+        <RiskLevel level={row.riskLevel} />
+      </header>
+      <div className="positionCardMetrics">
+        <div className="positionMetric">
+          <span>Wartość</span>
+          <strong>{money(row.value)}</strong>
+          <small>{percent(row.shareOfInvestments)} portfela inwest.</small>
+        </div>
+        <div className={`positionMetric ${Number(row.returnPct || 0) < 0 ? "warn" : ""}`}>
+          <span>Zwrot</span>
+          <strong>{percent(row.returnPct)}</strong>
+          <small>{row.priceDate || "brak daty"}</small>
+        </div>
+      </div>
+      <div className="fireRoleChips">
+        <span>{row.assetClass || "Klasa do ustalenia"}</span>
+        <span>{row.instrumentType || "Typ do ustalenia"}</span>
+        <span>{row.fireRole || "Rola do ustalenia"}</span>
+        <span>{row.wrapper || "Segment do ustalenia"}</span>
+      </div>
+      <div className="positionDecisionBlock">
+        <span>{row.reviewFocus || "Decyzja"}</span>
+        <strong>{row.decision || row.action || "Sprawdź ręcznie"}</strong>
+        {row.decisionReason && <p>{row.decisionReason}</p>}
+      </div>
+      {!!(row.riskDrivers || []).length && (
+        <div className="riskDriverChips">
+          {(row.riskDrivers || []).map((item) => <span key={item}>{item}</span>)}
+        </div>
+      )}
+      <details className="inlineDisclosure">
+        <summary>Perspektywa i checklista</summary>
+        <p>{row.perspective}</p>
+        <ul className="checklistList">
+          {(row.checklist || []).map((item) => <li key={item}>{item}</li>)}
+        </ul>
+      </details>
+    </article>
+  );
+}
+
+function PositionAnalysisTable({ rows }) {
+  return (
+    <ReportDataTable
+      className="smallRows firePositionTable"
+      emptyMessage="Brak pozycji do analizy. Dodaj raporty MyFund portfelSklad."
+      exportName="fire-analiza-walorow"
+      rows={rows}
+      columns={[
+        {
+          key: "instrument",
+          header: "Walor",
+          render: (row) => (
+            <div className="firePositionName">
+              <strong>{row.instrument}</strong>
+              <small>{[row.portfolio, row.isin || row.account || "brak ISIN"].filter(Boolean).join(" · ")}</small>
+            </div>
+          ),
+          csvValue: (row) => row.instrument,
+        },
+        {
+          key: "assetClass",
+          header: "Klasyfikacja FIRE",
+          render: (row) => (
+            <div className="analysisText">
+              <strong>{row.assetClass}</strong>
+              <small>{row.instrumentType || "Typ do ustalenia"}</small>
+              <div className="fireRoleChips">
+                <span>{row.fireRole || "Rola do ustalenia"}</span>
+                <span>{row.wrapper}</span>
+              </div>
+            </div>
+          ),
+          csvValue: (row) => [row.assetClass, row.instrumentType, row.fireRole, row.wrapper].filter(Boolean).join(" | "),
+        },
+        {
+          key: "value",
+          header: "Metryki",
+          render: (row) => (
+            <div className="analysisText compact">
+              <strong>{money(row.value)}</strong>
+              <small>{percent(row.shareOfInvestments)} portfela inwest. · zwrot {percent(row.returnPct)}</small>
+            </div>
+          ),
+          csvValue: (row) => row.value,
+        },
+        {
+          key: "action",
+          header: "Decyzja, ryzyka i checklista",
+          render: (row) => (
+            <details className="inlineDisclosure">
+              <summary><RiskLevel level={row.riskLevel} /> {row.reviewFocus}: {row.decision || row.action}</summary>
+              {row.decisionReason && <p className="decisionReason">{row.decisionReason}</p>}
+              {!!(row.riskDrivers || []).length && (
+                <div className="riskDriverChips">
+                  {(row.riskDrivers || []).map((item) => <span key={item}>{item}</span>)}
+                </div>
+              )}
+              <p>{row.perspective}</p>
+              <ul className="checklistList">
+                {(row.checklist || []).map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </details>
+          ),
+          csvValue: (row) => [row.reviewFocus, row.decision || row.action, row.decisionReason, row.perspective, ...(row.riskDrivers || []), ...(row.checklist || [])].filter(Boolean).join(" | "),
+        },
+      ]}
+    />
+  );
+}
+
+function buildPositionAnalysisModel(rows = [], portfolios = []) {
+  const portfolioByName = new Map(portfolios.map((portfolio) => [portfolio.portfolio, portfolio]));
+  const sortedRows = [...rows].sort(comparePositions);
+  const groupsByName = new Map();
+  let totalValue = 0;
+  sortedRows.forEach((row) => {
+    const name = row.portfolio || "Nieprzypisane";
+    totalValue += Number(row.value || 0);
+    const group = groupsByName.get(name) || {
+      name,
+      positions: [],
+      value: 0,
+      role: portfolioByName.get(name)?.role || "Nieprzypisany",
+      note: portfolioByName.get(name)?.note || "",
+      riskLevel: "info",
+    };
+    group.positions.push(row);
+    group.value += Number(row.value || 0);
+    group.riskLevel = maxRisk(group.riskLevel, row.riskLevel);
+    groupsByName.set(name, group);
+  });
+  const groups = Array.from(groupsByName.values())
+    .map((group) => ({ ...group, assetMix: buildAssetMix(group.positions, group.value) }))
+    .sort((a, b) => b.value - a.value);
+  const highRiskCount = rows.filter((row) => row.riskLevel === "high").length;
+  const lookThroughCount = rows.filter((row) => isLookThrough(row)).length;
+  const taxableCount = rows.filter((row) => isTaxable(row)).length;
+  const priorityRows = sortedRows.filter(isPriorityPosition);
+  return {
+    groups,
+    totalValue,
+    assetMix: buildAssetMix(rows, totalValue),
+    riskLevel: groups.reduce((level, group) => maxRisk(level, group.riskLevel), "info"),
+    portfolioCount: groups.length,
+    positionCount: rows.length,
+    highRiskCount,
+    lookThroughCount,
+    taxableCount,
+    attentionCount: priorityRows.length,
+    priorities: priorityRows.slice(0, 6),
+  };
+}
+
+function buildAssetMix(rows, totalValue) {
+  const byClass = new Map();
+  rows.forEach((row) => {
+    const assetClass = row.assetClass || "Inne";
+    byClass.set(assetClass, (byClass.get(assetClass) || 0) + Number(row.value || 0));
+  });
+  return Array.from(byClass.entries())
+    .map(([assetClass, value]) => ({ assetClass, value, share: totalValue ? value / totalValue : 0 }))
+    .sort((a, b) => b.value - a.value);
+}
+
+function comparePositions(a, b) {
+  const riskDiff = riskRank(b.riskLevel) - riskRank(a.riskLevel);
+  if (riskDiff) return riskDiff;
+  return Number(b.value || 0) - Number(a.value || 0);
+}
+
+function riskRank(level) {
+  return { high: 3, medium: 2, low: 1, info: 0 }[level] || 0;
+}
+
+function maxRisk(a, b) {
+  return riskRank(a) >= riskRank(b) ? a : b || a;
+}
+
+function isLookThrough(row) {
+  const text = [row.assetClass, row.instrumentType, row.fireRole, row.decision, row.action, row.decisionReason].filter(Boolean).join(" ").toLowerCase();
+  return text.includes("look-through") || text.includes("mieszane") || text.includes("mieszany");
+}
+
+function isTaxable(row) {
+  return String(row.wrapper || "").toLowerCase().includes("opodatk");
+}
+
+function isPriorityPosition(row) {
+  return row.riskLevel === "high" || isLookThrough(row) || String(row.decision || row.action || "").toLowerCase().includes("nie ");
+}
+
+function matchesPortfolio(row, activePortfolio) {
+  return activePortfolio === "all" || (row.portfolio || "Nieprzypisane") === activePortfolio;
+}
+
+function matchesFocus(row, activeFocus) {
+  if (activeFocus === "attention") return isPriorityPosition(row);
+  if (activeFocus === "high") return row.riskLevel === "high";
+  if (activeFocus === "lookThrough") return isLookThrough(row);
+  if (activeFocus === "taxable") return isTaxable(row);
+  return true;
+}
+
+function focusLabel(activeFocus) {
+  return {
+    all: "wszystkie walory",
+    attention: "do decyzji",
+    high: "wysokie ryzyko",
+    lookThrough: "look-through",
+    taxable: "opodatkowane",
+  }[activeFocus] || activeFocus;
+}
+
+function assetClassToken(assetClass = "") {
+  const normalized = assetClass.toLowerCase();
+  if (normalized.includes("akcj")) return "equity";
+  if (normalized.includes("oblig")) return "bond";
+  if (normalized.includes("got")) return "cash";
+  if (normalized.includes("altern")) return "alternative";
+  if (normalized.includes("miesz")) return "mixed";
+  return "other";
+}
+
+function positionKey(row) {
+  return [row.portfolio, row.instrument, row.isin, row.account].filter(Boolean).join("|");
+}
+
+function SpendTargetEditor({ draft, fireNumber, hasSpendTarget, monthlySpendTarget, onChange, onSave, saving }) {
+  const rawValue = draft?.monthlySpendOverride ?? "";
+  const numericValue = Number(rawValue || 0);
+  const canSave = !!draft && numericValue > 0 && !saving;
+  return (
+    <article className={`fireTargetEditor ${!hasSpendTarget ? "warn" : ""}`}>
+      <span>Cel wydatków FIRE / mies.</span>
+      <strong>{hasSpendTarget ? money(monthlySpendTarget) : "Ustaw cel"}</strong>
+      <small>{hasSpendTarget ? `FIRE number: ${money(fireNumber)}` : "Nie liczę celu z obecnego budżetu."}</small>
+      <div className="inlineEdit">
+        <label>
+          <span>Docelowe wydatki miesięczne</span>
+          <input
+            aria-label="Cel wydatków FIRE miesięcznie"
+            disabled={!draft || saving}
+            min="0"
+            onChange={(event) => onChange(event.target.value === "" ? null : Number(event.target.value))}
+            placeholder="np. 10000"
+            step="100"
+            type="number"
+            value={rawValue}
+          />
+        </label>
+        <button className="secondaryButton compact" disabled={!canSave} onClick={onSave} type="button">
+          {saving ? "Zapisuję..." : "Zapisz cel"}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function DecisionSummary({ actionItems, hasSpendTarget, risks }) {
+  const primaryRisk = risks.find((risk) => risk.level === "high") || risks[0];
+  const primaryAction = actionItems[0];
+  const title = primaryRisk?.title || primaryAction?.title || "Utrzymaj automatyzację";
+  const metric = primaryRisk ? `${primaryRisk.metric}: ${primaryRisk.value}` : primaryAction?.amount ? money(primaryAction.amount) : hasSpendTarget ? "plan aktywny" : "brak celu";
+  const detail = primaryRisk?.recommendation || primaryAction?.detail || "Najważniejsze są regularne wpłaty, kontrola kosztów życia i rebalancing nowymi środkami.";
+  return (
+    <article className={`fireDecisionCard ${primaryRisk?.level || "info"}`}>
+      <span>Najważniejsza decyzja</span>
+      <strong>{title}</strong>
+      <small>{metric}</small>
+      <p>{detail}</p>
+    </article>
+  );
+}
+
+function ContributionSummary({ budget, contributionPlan, currentMonthlyWealthContribution }) {
+  return (
+    <article className="fireContributionCard">
+      <div>
+        <span>Budżet zasila FIRE</span>
+        <strong>{money(budget.firePortfolioMonthlyContribution || currentMonthlyWealthContribution)}</strong>
+        <small>inwestycje + konto oszczędnościowe netto</small>
+      </div>
+      <div className="fireContributionMetrics">
+        <Metric label="Wymagane" value={money(contributionPlan?.requiredMonthlyBase)} detail="scenariusz bazowy" />
+        <Metric label="Brakuje / mies." value={money(contributionPlan?.additionalMonthlyNeeded)} detail="do celu 50" warn={Number(contributionPlan?.additionalMonthlyNeeded || 0) > 0} />
+        <Metric label="Nadpłata kredytu" value={money(budget.loanOverpaymentMonthly)} detail="osobno od portfela FIRE" />
+        <Metric label="Konto oszcz. netto" value={money(budget.savingsAccountMonthlyNet)} detail={`brutto ${money(budget.savingsAccountMonthlyGrossDeposits)}`} />
+      </div>
+      <p>{contributionPlan?.recommendation}</p>
+    </article>
+  );
+}
+
+function RiskCounter({ risks }) {
+  const high = risks.filter((risk) => risk.level === "high").length;
+  const medium = risks.filter((risk) => risk.level === "medium").length;
+  return <span className={`riskCounter ${high ? "high" : medium ? "medium" : "low"}`}>{high} wysokie · {medium} średnie</span>;
 }
 
 function RiskCards({ risks }) {
@@ -269,33 +755,31 @@ function RiskLevel({ level }) {
   return <span className={`riskBadge ${level || "info"}`}>{label}</span>;
 }
 
-function SpendTargetCard({ draft, hasSpendTarget, onChange, onSave, saving, value }) {
-  const rawValue = draft?.monthlySpendOverride ?? "";
-  const numericValue = Number(rawValue || 0);
-  const canSave = !!draft && numericValue > 0 && !saving;
+function ScenarioStrip({ scenarios }) {
+  if (!scenarios.length) {
+    return <p className="mutedText">Ustaw cel wydatków FIRE, żeby pokazać scenariusze dojścia do wieku 50.</p>;
+  }
   return (
-    <div className={`metricCard editableMetric ${!hasSpendTarget ? "warn" : ""}`}>
-      <span>Cel FIRE</span>
-      <strong>{value}</strong>
-      <small>{hasSpendTarget ? "na podstawie docelowych wydatków" : "wpisz miesięczne wydatki FIRE"}</small>
-      <div className="inlineEdit">
-        <label>
-          <span>Cel wydatków FIRE miesięcznie</span>
-          <input
-            aria-label="Cel wydatków FIRE miesięcznie"
-            disabled={!draft || saving}
-            min="0"
-            onChange={(event) => onChange(event.target.value === "" ? null : Number(event.target.value))}
-            placeholder="np. 10000"
-            step="100"
-            type="number"
-            value={rawValue}
-          />
-        </label>
-        <button className="secondaryButton compact" disabled={!canSave} onClick={onSave} type="button">
-          {saving ? "Zapisuję..." : "Zapisz cel"}
-        </button>
-      </div>
+    <div className="scenarioStrip">
+      {scenarios.map((scenario) => (
+        <div key={scenario.id}>
+          <span>{scenario.label}</span>
+          <strong>{money(scenario.projectedAtFire)}</strong>
+          <small>{scenario.onTrack ? "domyka cel" : `luka ${money(scenario.gapAtFire)}`}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DataQualitySummary({ dataQuality }) {
+  return (
+    <div className="fireMiniMetrics">
+      <Metric label="Status danych" value={dataQuality?.status || "brak"} detail={dataQuality?.newestReportDate || "bez daty"} />
+      <Metric label="Stare źródła" value={dataQuality?.staleSourceCount || 0} detail=">45 dni" warn={Number(dataQuality?.staleSourceCount || 0) > 0} />
+      <Metric label="Nieznane aktywa" value={dataQuality?.unknownAssetClassCount || 0} detail={money(dataQuality?.unknownAssetClassValue)} warn={Number(dataQuality?.unknownAssetClassCount || 0) > 0} />
+      <Metric label="Nieznane segmenty" value={dataQuality?.unknownWrapperCount || 0} detail={money(dataQuality?.unknownWrapperValue)} warn={Number(dataQuality?.unknownWrapperCount || 0) > 0} />
+      <p className="mutedText fullWidth">{dataQuality?.note}</p>
     </div>
   );
 }

@@ -55,7 +55,25 @@ class FireQueryServiceTest {
         assertThat(summary.allocation()).extracting(FireSummary.FireAllocation::assetClass).contains("Akcje", "Obligacje");
         assertThat(summary.allocation()).extracting(FireSummary.FireAllocation::assetClass).doesNotContain("Gotówka");
         assertThat(summary.wrappers()).extracting(FireSummary.FireWrapper::wrapper).contains("Poduszka bezpieczeństwa");
+        assertThat(summary.portfolios()).extracting(FireSummary.FirePortfolioBreakdown::portfolio).contains("Test");
+        assertThat(summary.portfolios()).singleElement().satisfies(portfolio -> {
+            assertThat(portfolio.value()).isEqualByComparingTo("200000.00");
+            assertThat(portfolio.role()).isEqualTo("Mieszany");
+        });
         assertThat(summary.risks()).extracting(FireSummary.FireRisk::id).contains("singlePositionConcentration");
+        assertThat(summary.positionAnalyses()).hasSize(3);
+        assertThat(summary.positionAnalyses()).extracting(FireSummary.FirePositionAnalysis::instrument)
+                .contains("Akcje instrument", "Gotówka instrument", "Obligacje instrument");
+        assertThat(summary.positionAnalyses().stream()
+                .filter(row -> row.instrument().equals("Akcje instrument"))
+                .findFirst()
+                .orElseThrow()
+                .decision()).contains("Nie zwiększaj ekspozycji");
+        assertThat(summary.positionAnalyses().stream()
+                .filter(row -> row.instrument().equals("Gotówka instrument"))
+                .findFirst()
+                .orElseThrow()
+                .perspective()).contains("Płynność");
         assertThat(summary.legalRules()).extracting(FireSummary.FireLegalRule::id).contains("ike-limit", "ikze-limit", "zus-age");
     }
 
@@ -112,7 +130,7 @@ class FireQueryServiceTest {
         when(portfolioReader.read(settings.reportsPath())).thenReturn(new FirePortfolioSnapshot(
                 LocalDate.parse("2026-05-08"),
                 List.of(
-                        position("Akcje", "Rachunek opodatkowany", "180000"),
+                        position("Inne", "Rachunek opodatkowany", "180000", "iShares Core MSCI World UCITS ETF", "ETF-y zagraniczne", "EUR"),
                         position("Obligacje", "Rachunek opodatkowany", "20000")
                 ),
                 List.of("fake.csv")
@@ -128,6 +146,120 @@ class FireQueryServiceTest {
                 .findFirst()
                 .orElseThrow()
                 .level()).isEqualTo("high");
+        assertThat(summary.positionAnalyses().stream()
+                .filter(row -> row.assetClass().equals("Akcje"))
+                .findFirst()
+                .orElseThrow()
+                .riskLevel()).isEqualTo("high");
+        assertThat(summary.positionAnalyses().stream()
+                .filter(row -> row.assetClass().equals("Akcje"))
+                .findFirst()
+                .orElseThrow()
+                .checklist()).anyMatch(item -> item.contains("KID"));
+        assertThat(summary.positionAnalyses().stream()
+                .filter(row -> row.assetClass().equals("Akcje"))
+                .findFirst()
+                .orElseThrow()
+                .instrumentType()).isEqualTo("ETF akcyjny szerokiego rynku");
+    }
+
+    @Test
+    void normalizesMyFundInstrumentTaxonomyIntoFireRoles() throws Exception {
+        var settings = settingsWithSpend("10000.00");
+        when(portfolioReader.read(settings.reportsPath())).thenReturn(new FirePortfolioSnapshot(
+                LocalDate.parse("2026-05-08"),
+                List.of(
+                        position("Inne", "Emerytalne długoterminowe", "50000", "Global UCITS ETF", "ETF-y zagraniczne", "EUR"),
+                        position("Inne", "Emerytalne długoterminowe", "30000", "Vanguard LifeStrategy 80% Equity UCITS ETF", "ETF-y zagraniczne", "EUR"),
+                        position("Inne", "Rachunek opodatkowany", "10000", "Gold ETC", "ETC zagraniczne", "USD"),
+                        position("Inne", "Poduszka bezpieczeństwa", "20000", "Konto oszczędnościowe", "Konta oszczędnościowe", "PLN")
+                ),
+                List.of("fake.csv")
+        ));
+        when(budgetStore.findYears()).thenReturn(List.of());
+
+        var summary = new FireQueryService(portfolioReader, budgetStore, new FireSettingsService(settings, new MemoryStore())).summary();
+
+        assertThat(summary.allocation()).extracting(FireSummary.FireAllocation::assetClass)
+                .contains("Akcje", "Alternatywne", "Mieszane")
+                .doesNotContain("Inne");
+        assertThat(summary.positionAnalyses()).filteredOn(row -> row.instrument().equals("Global UCITS ETF"))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.assetClass()).isEqualTo("Akcje");
+                    assertThat(row.instrumentType()).isEqualTo("ETF akcyjny szerokiego rynku");
+                    assertThat(row.fireRole()).isEqualTo("Kapitał po 60/65");
+                    assertThat(row.decision()).contains("po 60/65");
+                    assertThat(row.riskDrivers()).anyMatch(driver -> driver.contains("Ograniczona dostępność"));
+                });
+        assertThat(summary.positionAnalyses()).filteredOn(row -> row.instrument().equals("Vanguard LifeStrategy 80% Equity UCITS ETF"))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.assetClass()).isEqualTo("Mieszane");
+                    assertThat(row.instrumentType()).isEqualTo("ETF mieszany 80/20");
+                    assertThat(row.reviewFocus()).isEqualTo("Look-through");
+                    assertThat(row.decision()).contains("look-through");
+                    assertThat(row.riskDrivers()).anyMatch(driver -> driver.contains("Produkt mieszany"));
+                });
+        assertThat(summary.risks()).extracting(FireSummary.FireRisk::id).contains("mixedFundLookThrough");
+        assertThat(summary.rebalancing()).filteredOn(row -> row.assetClass().equals("Mieszane"))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.action()).contains("look-through");
+                    assertThat(row.amountToTarget()).isEqualByComparingTo("0.00");
+                });
+        assertThat(summary.positionAnalyses()).filteredOn(row -> row.instrument().equals("Gold ETC"))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.assetClass()).isEqualTo("Alternatywne");
+                    assertThat(row.instrumentType()).isEqualTo("ETC/surowiec");
+                    assertThat(row.fireRole()).isEqualTo("Satelita dywersyfikacyjny");
+                });
+        assertThat(summary.positionAnalyses()).filteredOn(row -> row.instrument().equals("Konto oszczędnościowe"))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.assetClass()).isEqualTo("Gotówka");
+                    assertThat(row.riskLevel()).isEqualTo("low");
+                    assertThat(row.decision()).contains("poduszki");
+                });
+        assertThat(summary.dataQuality().unknownAssetClassCount()).isZero();
+    }
+
+    @Test
+    void keepsSeparateMyFundPortfoliosVisibleInFireSummary() throws Exception {
+        var settings = settingsWithSpend("10000.00");
+        when(portfolioReader.read(settings.reportsPath())).thenReturn(new FirePortfolioSnapshot(
+                LocalDate.parse("2026-05-08"),
+                List.of(
+                        position("Akcje", "Emerytalne długoterminowe", "60000", "ETF emerytalny", "ETF-y zagraniczne", "EUR", "Emerytura Aleksander"),
+                        position("Akcje", "Rachunek opodatkowany", "30000", "ETF płynny", "ETF-y zagraniczne", "USD", "Giełda"),
+                        position("Gotówka", "Poduszka bezpieczeństwa", "20000", "Konto oszczędnościowe", "Konta oszczędnościowe", "PLN", "Poduszka")
+                ),
+                List.of("fake.csv")
+        ));
+        when(budgetStore.findYears()).thenReturn(List.of());
+
+        var summary = new FireQueryService(portfolioReader, budgetStore, new FireSettingsService(settings, new MemoryStore())).summary();
+
+        assertThat(summary.portfolios()).extracting(FireSummary.FirePortfolioBreakdown::portfolio)
+                .containsExactly("Emerytura Aleksander", "Giełda", "Poduszka");
+        assertThat(summary.portfolios()).filteredOn(portfolio -> portfolio.portfolio().equals("Emerytura Aleksander"))
+                .singleElement()
+                .satisfies(portfolio -> {
+                    assertThat(portfolio.role()).isEqualTo("Emerytalny");
+                    assertThat(portfolio.retirementLockedValue()).isEqualByComparingTo("60000.00");
+                    assertThat(portfolio.investmentValue()).isEqualByComparingTo("60000.00");
+                });
+        assertThat(summary.portfolios()).filteredOn(portfolio -> portfolio.portfolio().equals("Poduszka"))
+                .singleElement()
+                .satisfies(portfolio -> {
+                    assertThat(portfolio.role()).isEqualTo("Poduszka");
+                    assertThat(portfolio.emergencyValue()).isEqualByComparingTo("20000.00");
+                    assertThat(portfolio.investmentValue()).isEqualByComparingTo("0.00");
+                });
+        assertThat(summary.positionAnalyses()).filteredOn(row -> row.instrument().equals("ETF płynny"))
+                .singleElement()
+                .satisfies(row -> assertThat(row.portfolio()).isEqualTo("Giełda"));
     }
 
     @Test
@@ -164,15 +296,23 @@ class FireQueryServiceTest {
     }
 
     private FirePortfolioPosition position(String assetClass, String wrapper, String value) {
+        return position(assetClass, wrapper, value, assetClass + " instrument", assetClass, "PLN");
+    }
+
+    private FirePortfolioPosition position(String assetClass, String wrapper, String value, String instrument, String group, String currency) {
+        return position(assetClass, wrapper, value, instrument, group, currency, "Test");
+    }
+
+    private FirePortfolioPosition position(String assetClass, String wrapper, String value, String instrument, String group, String currency, String portfolio) {
         return new FirePortfolioPosition(
                 "fake.csv",
-                "Test",
+                portfolio,
                 wrapper,
                 assetClass,
-                assetClass + " instrument",
-                assetClass,
+                instrument,
+                group,
                 "Test account",
-                "PLN",
+                currency,
                 "",
                 LocalDate.parse("2026-05-08"),
                 BigDecimal.ONE,

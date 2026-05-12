@@ -610,6 +610,11 @@ export function selectReportsSections({
     categoryShare: selectCategoryShare(scoped?.categoryTop || [], scoped?.spend || 0),
     categoryPareto: selectCategoryPareto(scoped?.categoryTop || []),
     categoryTrends: selectMonthlyDimensionTrends(trendStats?.monthlyCategoryTrends || [], "category", { type: "category" }),
+    costMatrix: selectCostMatrix({
+      categoryRows: trendStats?.monthlyCategoryTrends || [],
+      rows: trendStats?.monthlyHierarchyTrends || [],
+      year,
+    }),
     fixednessChart: selectFixednessChart(fixednessSource),
     hierarchySunburst: selectHierarchySunburst(scoped?.hierarchyTop || []),
     merchantFunnel: selectMerchantFunnel(scoped?.merchants || []),
@@ -981,6 +986,52 @@ export function selectMonthlyDimensionTrends(rows, dimensionKey, filterDescripto
     }));
 }
 
+export function selectCostMatrix({ categoryRows = [], rows = [], year } = {}) {
+  const sourceRows = rows.length
+    ? rows
+    : categoryRows.map((row) => ({ ...row, subcategory: "" }));
+  const months = matrixMonths(sourceRows, year);
+  const monthSet = new Set(months.map((month) => month.key));
+  const categories = new Map();
+
+  sourceRows.forEach((row) => {
+    const spend = Number(row.spend || 0);
+    if (!row.monthKey || !monthSet.has(row.monthKey) || spend <= 0 || !row.category) return;
+    const category = ensureMatrixRow(categories, row.category, 0, { category: row.category }, months);
+    addMatrixSpend(category, row.monthKey, spend, Number(row.count || 0));
+    if (!row.subcategory || GENERIC_SUBCATEGORY_LABELS.has(row.subcategory)) return;
+    const child = ensureMatrixRow(category.childrenMap, row.subcategory, 1, { category: row.category, subcategory: row.subcategory }, months);
+    addMatrixSpend(child, row.monthKey, spend, Number(row.count || 0));
+  });
+
+  const resultRows = Array.from(categories.values())
+    .filter((row) => row.total > 0)
+    .sort(compareMatrixRows)
+    .flatMap((category) => [
+      finalizeMatrixRow(category, months),
+      ...Array.from(category.childrenMap.values())
+        .filter((child) => child.total > 0)
+        .sort(compareMatrixRows)
+        .map((child) => finalizeMatrixRow(child, months, category.label)),
+    ]);
+  const totalsByMonth = months.map((month) => ({
+    ...month,
+    spend: resultRows
+      .filter((row) => row.level === 0)
+      .reduce((sum, row) => sum + Number(row.months[month.key] || 0), 0),
+  }));
+  const grandTotal = totalsByMonth.reduce((sum, row) => sum + row.spend, 0);
+  const maxCell = Math.max(1, ...resultRows.flatMap((row) => Object.values(row.months).map(Number)));
+
+  return {
+    grandTotal,
+    maxCell,
+    months,
+    rows: resultRows,
+    totalsByMonth,
+  };
+}
+
 export function selectMerchantFunnel(merchants) {
   return (merchants || [])
     .slice(0, 10)
@@ -1090,7 +1141,7 @@ export function selectImportHealth({ data, importRuns, years }) {
       { label: "Lata w bazie", value: yearRows.length, detail: yearRows.map((row) => row.year).join(", ") || "brak", number: true },
       { label: "Transakcje w bazie", value: totalTransactions, detail: data?.year ? `aktywny rok: ${data.year}` : "po importach", number: true },
       { label: "Do sprawdzenia", value: Number(data?.kpis?.toCheck || 0), amount: Number(data?.kpis?.toCheckAmount || 0), detail: "aktywny rok", number: true },
-      { label: "Usunięte duplikaty", value: duplicatesRemoved, detail: latestRun ? "ostatni import/rebuild" : "brak historii", number: true },
+      { label: "Pominięte/duplikaty", value: duplicatesRemoved, detail: latestRun ? "ostatni import/rebuild" : "brak historii", number: true },
     ],
   };
 }
@@ -1226,11 +1277,67 @@ export function emptyAnalytics() {
     merchants: [],
     oneoffs: [],
     monthlyCategoryTrends: [],
+    monthlyHierarchyTrends: [],
     monthlyBucketTrends: [],
     monthlyMerchantTrends: [],
     fixednessBreakdown: [],
     confidenceBreakdown: [],
     amountBands: [],
+  };
+}
+
+const MONTH_LABELS = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień"];
+
+function matrixMonths(rows, year) {
+  const numericYear = Number(year);
+  if (numericYear) {
+    return MONTH_LABELS.map((label, index) => ({
+      key: `${numericYear}-${String(index + 1).padStart(2, "0")}`,
+      label,
+    }));
+  }
+  return unique((rows || []).map((row) => row.monthKey))
+    .map((key) => ({
+      key,
+      label: /^\d{4}-\d{2}$/.test(key) ? MONTH_LABELS[Number(key.slice(5, 7)) - 1] || key : key,
+    }));
+}
+
+function ensureMatrixRow(rows, label, level, filter, months) {
+  if (!rows.has(label)) {
+    rows.set(label, {
+      childrenMap: new Map(),
+      count: 0,
+      filter,
+      label,
+      level,
+      months: Object.fromEntries(months.map((month) => [month.key, 0])),
+      total: 0,
+    });
+  }
+  return rows.get(label);
+}
+
+function addMatrixSpend(row, monthKey, spend, count) {
+  row.months[monthKey] = Number(row.months[monthKey] || 0) + spend;
+  row.total += spend;
+  row.count += count;
+}
+
+function compareMatrixRows(left, right) {
+  return Number(right.total || 0) - Number(left.total || 0)
+    || String(left.label).localeCompare(String(right.label), "pl");
+}
+
+function finalizeMatrixRow(row, months, parent = "") {
+  return {
+    count: row.count,
+    filter: row.filter,
+    label: row.label,
+    level: row.level,
+    months: Object.fromEntries(months.map((month) => [month.key, Number(row.months[month.key] || 0)])),
+    parent,
+    total: row.total,
   };
 }
 

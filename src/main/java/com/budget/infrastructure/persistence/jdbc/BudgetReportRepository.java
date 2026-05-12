@@ -258,6 +258,7 @@ public class BudgetReportRepository implements BudgetReportStore {
                 aggregate(rows, TransactionRecord::merchant, AnalyticsReport.MerchantSpend::new),
                 oneoffs,
                 monthlyCategoryTrends(rows),
+                monthlyHierarchyTrends(rows),
                 monthlyBucketTrends(rows),
                 monthlyMerchantTrends(rows),
                 fixednessBreakdown(rows),
@@ -1191,6 +1192,27 @@ public class BudgetReportRepository implements BudgetReportStore {
                 .toList();
     }
 
+    private List<AnalyticsReport.MonthlyHierarchyTrend> monthlyHierarchyTrends(List<TransactionRecord> rows) {
+        var totals = new LinkedHashMap<String, MonthlyHierarchyAggregate>();
+        for (var row : rows) {
+            if (row.spend().signum() <= 0) {
+                continue;
+            }
+            var category = normalizedLabel(row.correctedCategory());
+            var subcategory = visibleSubcategory(row.subcategory());
+            var key = row.month() + "\u001F" + category + "\u001F" + subcategory;
+            var agg = totals.computeIfAbsent(key, ignored -> new MonthlyHierarchyAggregate(row.month(), category, subcategory));
+            agg.spend = agg.spend.add(row.spend());
+            agg.count++;
+        }
+        return totals.values().stream()
+                .map(agg -> new AnalyticsReport.MonthlyHierarchyTrend(monthLabel(agg.monthKey), agg.monthKey, agg.category, agg.subcategory, agg.spend, agg.count))
+                .sorted(Comparator.comparing(AnalyticsReport.MonthlyHierarchyTrend::monthKey)
+                        .thenComparing(AnalyticsReport.MonthlyHierarchyTrend::category)
+                        .thenComparing(AnalyticsReport.MonthlyHierarchyTrend::subcategory))
+                .toList();
+    }
+
     private List<AnalyticsReport.MonthlyBucketTrend> monthlyBucketTrends(List<TransactionRecord> rows) {
         var totals = new LinkedHashMap<String, MonthlyDimensionAggregate>();
         for (var row : rows) {
@@ -1312,6 +1334,10 @@ public class BudgetReportRepository implements BudgetReportStore {
         return value == null || value.isBlank() ? "Inne" : value;
     }
 
+    private String visibleSubcategory(String value) {
+        return value == null || value.isBlank() || "Ogólne".equals(value) ? "" : value;
+    }
+
     private String monthLabel(String monthKey) {
         return monthKey == null || monthKey.length() != 7 ? monthKey : monthKey.substring(5, 7) + "." + monthKey.substring(0, 4);
     }
@@ -1392,6 +1418,20 @@ public class BudgetReportRepository implements BudgetReportStore {
         private MonthlyDimensionAggregate(String monthKey, String dimension) {
             this.monthKey = monthKey;
             this.dimension = dimension;
+        }
+    }
+
+    private static final class MonthlyHierarchyAggregate {
+        private final String monthKey;
+        private final String category;
+        private final String subcategory;
+        private BigDecimal spend = BigDecimal.ZERO;
+        private int count;
+
+        private MonthlyHierarchyAggregate(String monthKey, String category, String subcategory) {
+            this.monthKey = monthKey;
+            this.category = category;
+            this.subcategory = subcategory;
         }
     }
 

@@ -68,6 +68,22 @@ final class FireRiskAnalyzer {
 
     private void addAllocationRisks(Context context, List<FireSummary.FireRisk> risks) {
         context.allocation().stream()
+                .filter(row -> row.assetClass().equals("Mieszane"))
+                .findFirst()
+                .filter(row -> row.share().signum() > 0)
+                .ifPresent(row -> risks.add(risk(
+                        "mixedFundLookThrough",
+                        "medium",
+                        "Alokacja",
+                        "Produkty mieszane wymagają look-through",
+                        "Mieszane",
+                        percentLabel(row.share()),
+                        "split akcji/obligacji",
+                        "Część portfela jest w produktach mieszanych, więc model nie powinien udawać, że to czyste akcje albo obligacje.",
+                        "Dla takich walorów zapisz przybliżony split, np. 80/20, i dopiero wtedy oceniaj docelową alokację oraz rebalancing."
+                )));
+
+        context.allocation().stream()
                 .filter(row -> row.assetClass().equals("Akcje"))
                 .findFirst()
                 .ifPresent(row -> {
@@ -89,6 +105,7 @@ final class FireRiskAnalyzer {
                 });
 
         context.rebalancing().stream()
+                .filter(row -> !row.assetClass().equals("Mieszane"))
                 .filter(row -> row.priority().equals("Wysoki"))
                 .max(Comparator.comparing(row -> row.drift().abs()))
                 .ifPresent(row -> risks.add(risk(

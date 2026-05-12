@@ -31,8 +31,35 @@ describe("FireView", () => {
           scenarios: [{ id: "base", label: "Bazowy", requiredMonthlyContribution: 12000, projectedAtFire: 1800000 }],
           allocation: [{ assetClass: "Akcje", value: 160000, share: 0.8, targetShare: 0.8 }],
           wrappers: [{ wrapper: "Rachunek opodatkowany", value: 100000, share: 0.5, positions: 2, liquidity: "płynne" }],
+          portfolios: [{ portfolio: "Giełda", value: 100000, share: 0.5, investmentValue: 100000, emergencyValue: 0, retirementLockedValue: 0, taxableValue: 100000, positions: 2, role: "Płynny inwestycyjny", note: "Może finansować pomost." }],
           rebalancing: [{ assetClass: "Akcje", currentShare: 0.8, targetShare: 0.8, drift: 0, amountToTarget: 0, action: "Bez zmian", priority: "Normalny" }],
           risks: [{ id: "equityConcentration", level: "medium", area: "Alokacja", title: "Portfel jest mocno akcyjny", metric: "Akcje", value: "80,0%", threshold: "85,0%", detail: "Akcje są powyżej celu.", recommendation: "Doważ obligacje." }],
+          positionAnalyses: [{
+            instrument: "Global Equity ETF",
+            isin: "IE00FAKEETF1",
+            portfolio: "Giełda",
+            assetClass: "Akcje",
+            instrumentType: "ETF akcyjny szerokiego rynku",
+            fireRole: "Rdzeń wzrostowy FIRE",
+            wrapper: "Rachunek opodatkowany",
+            account: "Makler",
+            currency: "USD",
+            priceDate: "2026-05-08",
+            value: 160000,
+            costBasis: 120000,
+            unrealizedGain: 40000,
+            returnPct: 0.3333,
+            shareOfPortfolio: 0.8,
+            shareOfInvestments: 0.8,
+            riskLevel: "high",
+            reviewFocus: "Koncentracja",
+            decision: "Nie zwiększaj ekspozycji. Nowe wpłaty kieruj w niedoważone klasy albo płynny pomost.",
+            decisionReason: "Rdzeń wzrostowy FIRE · udział 80,0% portfela inwestycyjnego",
+            action: "Nie dokupuj automatycznie; rozcieńczaj koncentrację nowymi wpłatami.",
+            perspective: "Silnik wzrostu FIRE: wysoka zmienność.",
+            riskDrivers: ["Koncentracja pozycji powyżej 25% portfela inwestycyjnego", "Waluta instrumentu: USD"],
+            checklist: ["Sprawdź KID/PRIIP, TER/opłaty, walutę i replikację.", "Sprawdź, czy walor nie dubluje ekspozycji z innymi ETF/funduszami."],
+          }],
           milestones: [{ age: 50, label: "FIRE target", description: "Cel", requiredCapital: 4800000 }],
           legalRules: [{ id: "ike-limit", label: "Limit IKE 2026", value: "28 260 zł / osoba", note: "Reguła", sourceUrl: "https://example.com" }],
           sources: [{ portfolio: "Test", asOf: "2026-05-08", positions: 4, value: 200000 }],
@@ -40,13 +67,30 @@ describe("FireView", () => {
       />
     );
 
-    expect(screen.getByText("Model planistyczny")).toBeInTheDocument();
-    expect(screen.getByText("Kapitał dziś")).toBeInTheDocument();
-    expect(screen.getByText("Cel FIRE")).toBeInTheDocument();
+    expect(screen.getByText("Decyzja FIRE")).toBeInTheDocument();
+    expect(screen.getByText("Cel wydatków FIRE / mies.")).toBeInTheDocument();
+    expect(screen.getByText("Budżet zasila FIRE")).toBeInTheDocument();
     expect(screen.getByText("Ryzyka inwestycyjne")).toBeInTheDocument();
+    expect(screen.getByText("Pełna tabela ryzyk")).toBeInTheDocument();
     expect(screen.getAllByText("Portfel jest mocno akcyjny").length).toBeGreaterThan(0);
-    expect(screen.getByText("Rebalancing")).toBeInTheDocument();
-    expect(screen.getByText("Polskie reguły w modelu")).toBeInTheDocument();
+    expect(screen.getByText("Prognoza i luka do celu")).toBeInTheDocument();
+    expect(screen.getByText("Alokacja portfela")).toBeInTheDocument();
+    expect(screen.getByText("Portfele MyFund")).toBeInTheDocument();
+    expect(screen.getAllByText("Giełda").length).toBeGreaterThan(0);
+    expect(screen.getByText("Płynny inwestycyjny")).toBeInTheDocument();
+    expect(screen.getByText("Szczegóły rebalancingu")).toBeInTheDocument();
+    expect(screen.getByText("Analiza walorów")).toBeInTheDocument();
+    expect(screen.getByText("Wybrany zakres")).toBeInTheDocument();
+    expect(screen.getByText("Wszystkie portfele")).toBeInTheDocument();
+    expect(screen.getByText("Filtry analizy")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Do decyzji/i })).toBeInTheDocument();
+    expect(screen.getAllByText("Global Equity ETF").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("ETF akcyjny szerokiego rynku").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Rdzeń wzrostowy FIRE").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Koncentracja pozycji powyżej 25% portfela inwestycyjnego").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Sprawdź KID/PRIIP, TER/opłaty, walutę i replikację.").length).toBeGreaterThan(0);
+    expect(screen.getByText("Dane i reguły")).toBeInTheDocument();
+    expect(screen.getByText("Polskie reguły modelu")).toBeInTheDocument();
     expect(screen.getByTestId("fire-projection-chart")).toBeInTheDocument();
     expect(screen.getByTestId("fire-allocation-chart")).toBeInTheDocument();
   });
@@ -80,7 +124,7 @@ describe("FireView", () => {
     );
 
     expect(screen.getAllByText("Ustaw cel").length).toBeGreaterThan(0);
-    expect(screen.getByText("nie zgaduję tej liczby")).toBeInTheDocument();
+    expect(screen.getByText("Nie liczę celu z obecnego budżetu.")).toBeInTheDocument();
     expect(screen.getByRole("spinbutton", { name: "Cel wydatków FIRE miesięcznie" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Zapisz cel" })).toBeDisabled();
     expect(screen.queryByText("Target budżetu")).not.toBeInTheDocument();
@@ -167,7 +211,7 @@ describe("FireView", () => {
 
     expect(screen.getAllByText("Wysokie").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Duża koncentracja pojedynczej pozycji").length).toBeGreaterThan(0);
-    expect(screen.getByText("Rozcieńczaj koncentrację nowymi wpłatami.")).toBeInTheDocument();
+    expect(screen.getAllByText("Rozcieńczaj koncentrację nowymi wpłatami.").length).toBeGreaterThan(0);
   });
 
   it("explains where local MyFund reports are expected when data is missing", () => {

@@ -89,6 +89,10 @@ class BudgetReportRepositoryTest {
                 .filteredOn(row -> "2099-01".equals(row.monthKey()))
                 .extracting(row -> row.category())
                 .contains("Żywność i chemia");
+        assertThat(analytics.monthlyHierarchyTrends())
+                .filteredOn(row -> "2099-01".equals(row.monthKey()))
+                .extracting(row -> row.category())
+                .contains("Żywność i chemia");
         assertThat(analytics.monthlyBucketTrends())
                 .filteredOn(row -> "2099-01".equals(row.monthKey()))
                 .extracting(row -> row.bucket())

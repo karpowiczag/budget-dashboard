@@ -271,6 +271,7 @@ public final class BudgetApiDtos {
             List<AnalyticsMerchantSpendResponse> merchants,
             List<TransactionResponse> oneoffs,
             List<MonthlyCategoryTrendResponse> monthlyCategoryTrends,
+            List<MonthlyHierarchyTrendResponse> monthlyHierarchyTrends,
             List<MonthlyBucketTrendResponse> monthlyBucketTrends,
             List<MonthlyMerchantTrendResponse> monthlyMerchantTrends,
             List<FixednessBreakdownResponse> fixednessBreakdown,
@@ -301,6 +302,9 @@ public final class BudgetApiDtos {
     }
 
     public record MonthlyCategoryTrendResponse(String month, String monthKey, String category, BigDecimal spend, int count) {
+    }
+
+    public record MonthlyHierarchyTrendResponse(String month, String monthKey, String category, String subcategory, BigDecimal spend, int count) {
     }
 
     public record MonthlyBucketTrendResponse(String month, String monthKey, String bucket, BigDecimal spend, int count) {
@@ -437,9 +441,11 @@ public final class BudgetApiDtos {
             List<FireScenarioResponse> scenarios,
             List<FireAllocationResponse> allocation,
             List<FireWrapperResponse> wrappers,
+            List<FirePortfolioBreakdownResponse> portfolios,
             List<FireRebalanceActionResponse> rebalancing,
             List<FireRiskResponse> risks,
             List<FireActionItemResponse> actionItems,
+            List<FirePositionAnalysisResponse> positionAnalyses,
             List<FireMilestoneResponse> milestones,
             List<FireLegalRuleResponse> legalRules,
             List<FireSourceResponse> sources
@@ -474,6 +480,20 @@ public final class BudgetApiDtos {
             BigDecimal share,
             int positions,
             String liquidity
+    ) {
+    }
+
+    public record FirePortfolioBreakdownResponse(
+            String portfolio,
+            BigDecimal value,
+            BigDecimal share,
+            BigDecimal investmentValue,
+            BigDecimal emergencyValue,
+            BigDecimal retirementLockedValue,
+            BigDecimal taxableValue,
+            int positions,
+            String role,
+            String note
     ) {
     }
 
@@ -565,6 +585,34 @@ public final class BudgetApiDtos {
             String title,
             String detail,
             BigDecimal amount
+    ) {
+    }
+
+    public record FirePositionAnalysisResponse(
+            String instrument,
+            String isin,
+            String portfolio,
+            String assetClass,
+            String instrumentType,
+            String fireRole,
+            String wrapper,
+            String account,
+            String currency,
+            LocalDate priceDate,
+            BigDecimal value,
+            BigDecimal costBasis,
+            BigDecimal unrealizedGain,
+            BigDecimal returnPct,
+            BigDecimal shareOfPortfolio,
+            BigDecimal shareOfInvestments,
+            String riskLevel,
+            String reviewFocus,
+            String decision,
+            String decisionReason,
+            String action,
+            String perspective,
+            List<String> riskDrivers,
+            List<String> checklist
     ) {
     }
 

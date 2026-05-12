@@ -42,9 +42,11 @@ public record FireSummary(
         List<FireScenario> scenarios,
         List<FireAllocation> allocation,
         List<FireWrapper> wrappers,
+        List<FirePortfolioBreakdown> portfolios,
         List<FireRebalanceAction> rebalancing,
         List<FireRisk> risks,
         List<FireActionItem> actionItems,
+        List<FirePositionAnalysis> positionAnalyses,
         List<FireMilestone> milestones,
         List<FireLegalRule> legalRules,
         List<FireSource> sources
@@ -57,9 +59,11 @@ public record FireSummary(
         scenarios = scenarios == null ? List.of() : List.copyOf(scenarios);
         allocation = allocation == null ? List.of() : List.copyOf(allocation);
         wrappers = wrappers == null ? List.of() : List.copyOf(wrappers);
+        portfolios = portfolios == null ? List.of() : List.copyOf(portfolios);
         rebalancing = rebalancing == null ? List.of() : List.copyOf(rebalancing);
         risks = risks == null ? List.of() : List.copyOf(risks);
         actionItems = actionItems == null ? List.of() : List.copyOf(actionItems);
+        positionAnalyses = positionAnalyses == null ? List.of() : List.copyOf(positionAnalyses);
         milestones = milestones == null ? List.of() : List.copyOf(milestones);
         legalRules = legalRules == null ? List.of() : List.copyOf(legalRules);
         sources = sources == null ? List.of() : List.copyOf(sources);
@@ -93,6 +97,20 @@ public record FireSummary(
             BigDecimal share,
             int positions,
             String liquidity
+    ) {
+    }
+
+    public record FirePortfolioBreakdown(
+            String portfolio,
+            BigDecimal value,
+            BigDecimal share,
+            BigDecimal investmentValue,
+            BigDecimal emergencyValue,
+            BigDecimal retirementLockedValue,
+            BigDecimal taxableValue,
+            int positions,
+            String role,
+            String note
     ) {
     }
 
@@ -215,6 +233,38 @@ public record FireSummary(
             String detail,
             BigDecimal amount
     ) {
+    }
+
+    public record FirePositionAnalysis(
+            String instrument,
+            String isin,
+            String portfolio,
+            String assetClass,
+            String instrumentType,
+            String fireRole,
+            String wrapper,
+            String account,
+            String currency,
+            LocalDate priceDate,
+            BigDecimal value,
+            BigDecimal costBasis,
+            BigDecimal unrealizedGain,
+            BigDecimal returnPct,
+            BigDecimal shareOfPortfolio,
+            BigDecimal shareOfInvestments,
+            String riskLevel,
+            String reviewFocus,
+            String decision,
+            String decisionReason,
+            String action,
+            String perspective,
+            List<String> riskDrivers,
+            List<String> checklist
+    ) {
+        public FirePositionAnalysis {
+            riskDrivers = riskDrivers == null ? List.of() : List.copyOf(riskDrivers);
+            checklist = checklist == null ? List.of() : List.copyOf(checklist);
+        }
     }
 
     public record FireMilestone(
