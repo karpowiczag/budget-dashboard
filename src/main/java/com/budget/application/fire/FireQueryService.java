@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -308,18 +309,26 @@ public class FireQueryService {
             grouped.merge(instrumentClassifier.classify(position).assetClass(), position.valuePln(), BigDecimal::add);
         }
         var targets = targetAllocation(settings);
-        return grouped.entrySet().stream()
-                .map(entry -> {
-                    var share = share(entry.getValue(), total);
-                    var target = targets.getOrDefault(entry.getKey(), BigDecimal.ZERO);
+        var assetClasses = new LinkedHashSet<String>();
+        assetClasses.addAll(grouped.keySet());
+        targets.forEach((assetClass, targetShare) -> {
+            if (targetShare.signum() > 0) {
+                assetClasses.add(assetClass);
+            }
+        });
+        return assetClasses.stream()
+                .map(assetClass -> {
+                    var value = grouped.getOrDefault(assetClass, BigDecimal.ZERO);
+                    var share = share(value, total);
+                    var target = targets.getOrDefault(assetClass, BigDecimal.ZERO);
                     var drift = share.subtract(target);
                     return new FireSummary.FireAllocation(
-                            entry.getKey(),
-                            money(entry.getValue()),
+                            assetClass,
+                            money(value),
                             share,
                             target,
                             drift,
-                            "Mieszane".equals(entry.getKey())
+                            "Mieszane".equals(assetClass)
                                     ? "Wymaga look-through"
                                     : drift.abs().compareTo(settings.rebalanceBand()) > 0 ? "Poza pasmem" : "OK"
                     );

@@ -12,7 +12,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -122,7 +121,7 @@ public class BudgetImportService {
                         prepared.duplicatesRemoved(),
                         existing == null ? BigDecimal.ZERO : existing.income(),
                         existing == null ? BigDecimal.ZERO : existing.spend(),
-                        "CSV checked; no new transactions after latest imported transaction"
+                        "CSV checked; no new transactions"
                 );
             }
             var analysis = importBudgetInputInTransaction(prepared.input());
@@ -176,29 +175,14 @@ public class BudgetImportService {
             );
         }
 
-        var latestExistingDate = existing.stream()
-                .map(BankTransaction::date)
-                .max(LocalDate::compareTo)
-                .orElseThrow();
-        var existingLatestDayCounts = fingerprintCounts(existing.stream()
-                .filter(transaction -> latestExistingDate.equals(transaction.date()))
-                .toList());
-        var seenLatestDayCounts = new LinkedHashMap<TransactionFingerprint, Integer>();
+        var existingCounts = fingerprintCounts(existing);
+        var seenUploadCounts = new LinkedHashMap<TransactionFingerprint, Integer>();
         var incremental = new ArrayList<BankTransaction>();
         var skippedExisting = 0;
         for (var transaction : upload.transactions()) {
-            var dateComparison = transaction.date().compareTo(latestExistingDate);
-            if (dateComparison < 0) {
-                skippedExisting++;
-                continue;
-            }
-            if (dateComparison > 0) {
-                incremental.add(transaction);
-                continue;
-            }
             var fingerprint = fingerprint(transaction);
-            var seen = seenLatestDayCounts.merge(fingerprint, 1, Integer::sum);
-            if (seen <= existingLatestDayCounts.getOrDefault(fingerprint, 0)) {
+            var seen = seenUploadCounts.merge(fingerprint, 1, Integer::sum);
+            if (seen <= existingCounts.getOrDefault(fingerprint, 0)) {
                 skippedExisting++;
             } else {
                 incremental.add(transaction);
@@ -214,11 +198,16 @@ public class BudgetImportService {
             );
         }
 
-        var merged = mergeTransactionSources(List.of(existing, newRows.transactions()));
-        var unexpectedOverlap = Math.max(0, existing.size() + newRows.transactions().size() - merged.transactions().size());
+        var merged = new ArrayList<BankTransaction>();
+        merged.addAll(existing);
+        merged.addAll(newRows.transactions());
+        merged.sort(Comparator.comparing(BankTransaction::date)
+                .thenComparing(BankTransaction::account)
+                .thenComparing(BankTransaction::description)
+                .thenComparing(BankTransaction::amount));
         return new PreparedInput(
-                new BudgetInput(upload.year(), upload.fileName(), merged.transactions()),
-                skippedExisting + newRows.duplicatesRemoved() + unexpectedOverlap,
+                new BudgetInput(upload.year(), upload.fileName(), merged),
+                skippedExisting + newRows.duplicatesRemoved(),
                 newRows.transactions().size()
         );
     }

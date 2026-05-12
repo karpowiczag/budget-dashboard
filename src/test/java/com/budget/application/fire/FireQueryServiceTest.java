@@ -52,8 +52,20 @@ class FireQueryServiceTest {
         assertThat(summary.withdrawalPlan().estimatedTaxReserve()).isEqualByComparingTo("0.00");
         assertThat(summary.dataQuality().status()).isEqualTo("ok");
         assertThat(summary.scenarios()).hasSize(3);
-        assertThat(summary.allocation()).extracting(FireSummary.FireAllocation::assetClass).contains("Akcje", "Obligacje");
-        assertThat(summary.allocation()).extracting(FireSummary.FireAllocation::assetClass).doesNotContain("Gotówka");
+        assertThat(summary.allocation()).extracting(FireSummary.FireAllocation::assetClass).contains("Akcje", "Obligacje", "Gotówka", "Alternatywne");
+        assertThat(summary.allocation()).filteredOn(row -> row.assetClass().equals("Gotówka"))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.value()).isEqualByComparingTo("0.00");
+                    assertThat(row.targetShare()).isEqualByComparingTo("0.05");
+                    assertThat(row.status()).isEqualTo("OK");
+                });
+        assertThat(summary.rebalancing()).filteredOn(row -> row.assetClass().equals("Gotówka"))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.amountToTarget()).isEqualByComparingTo("8500.00");
+                    assertThat(row.action()).isEqualTo("Doważyć nowymi wpłatami");
+                });
         assertThat(summary.wrappers()).extracting(FireSummary.FireWrapper::wrapper).contains("Poduszka bezpieczeństwa");
         assertThat(summary.portfolios()).extracting(FireSummary.FirePortfolioBreakdown::portfolio).contains("Test");
         assertThat(summary.portfolios()).singleElement().satisfies(portfolio -> {
