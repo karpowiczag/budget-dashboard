@@ -56,11 +56,11 @@ public class MyFundPortfolioCsvReader implements FirePortfolioReader {
         var text = readText(file);
         var rows = new ArrayList<FirePortfolioPosition>();
         try (var reader = new BufferedReader(new StringReader(text))) {
-            var headerLine = reader.readLine();
+            var headerLine = stripBom(reader.readLine());
             if (headerLine == null || !headerLine.startsWith("Walor")) {
                 return List.of();
             }
-            var headers = parseLine(stripBom(headerLine));
+            var headers = parseLine(headerLine);
             var line = "";
             while ((line = reader.readLine()) != null) {
                 if (line.isBlank()) {

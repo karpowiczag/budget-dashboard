@@ -3,6 +3,7 @@ package com.budget.infrastructure.csv;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,20 @@ class MyFundPortfolioCsvReaderTest {
                 .map(position -> position.valuePln())
                 .reduce(BigDecimal.ZERO, BigDecimal::add))
                 .isEqualByComparingTo("2750.00");
+    }
+
+    @Test
+    void readsMyFundPortfolioCompositionWithUtf8Bom() throws Exception {
+        var source = Path.of("src/test/resources/fixtures/myfund/fake-portfelSklad.csv");
+        var target = tempDir.resolve("myfund.pl_Gielda_portfelSklad_2026-05-08.csv");
+        Files.writeString(target, "\uFEFF" + Files.readString(source, StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+
+        var snapshot = reader.read(tempDir);
+
+        assertThat(snapshot.positions()).hasSize(3);
+        assertThat(snapshot.positions())
+                .extracting("portfolio")
+                .containsOnly("Giełda");
     }
 
     @Test
