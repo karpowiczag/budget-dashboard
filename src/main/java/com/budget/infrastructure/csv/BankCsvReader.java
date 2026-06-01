@@ -112,7 +112,13 @@ public class BankCsvReader implements BankTransactionReader {
         if (raw == null || raw.isBlank()) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
-        var normalized = raw.replace("PLN", "").replace(" ", "").replace(",", ".").trim();
+        // Polish bank exports group thousands with a non-breaking space (U+00A0) or
+        // narrow NBSP (U+202F), which \s does not match; strip every Unicode space
+        // separator so amounts like "18 000,00 PLN" parse instead of aborting the import.
+        var normalized = raw.replace("PLN", "").replaceAll("[\\p{Z}\\s]", "").replace(",", ".");
+        if (normalized.isBlank()) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
         return new BigDecimal(normalized).setScale(2, RoundingMode.HALF_UP);
     }
 }

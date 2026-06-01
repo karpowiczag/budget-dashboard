@@ -11,6 +11,8 @@ import { TransactionDrilldownModal } from "./components/tables/TransactionDrilld
 import { StateScreen } from "./components/ui/StateScreen.jsx";
 import { useBudgetData } from "./hooks/useBudgetData.js";
 import { useDashboardModel } from "./hooks/useDashboardModel.js";
+import { applyTheme, getInitialTheme } from "./theme.js";
+import { Moon, Sun } from "lucide-react";
 import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel } from "./domain/budgetSelectors.js";
 import { ImportView } from "./views/ImportView.jsx";
 import { FireView } from "./views/FireView.jsx";
@@ -36,6 +38,7 @@ export default function App() {
     importStatus,
     budgetSettings,
     settingsStatus,
+    settingsSaving,
     handleUpload,
     handleRebuild,
     saveBudgetSettings,
@@ -48,6 +51,7 @@ export default function App() {
   const [settingsDraft, setSettingsDraft] = useState(null);
   const [fireSettingsStatus, setFireSettingsStatus] = useState(null);
   const [view, setView] = useState("control");
+  const [theme, setTheme] = useState(getInitialTheme);
   const [localTimes, setLocalTimes] = useState({
     control: { scope: "month", month: "", day: "", drillFilter: null },
     reports: { scope: "year", month: "", day: "", drillFilter: null },
@@ -196,16 +200,32 @@ export default function App() {
 
   if (status === "empty") {
     return (
-      <main>
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Budżet domowy</p>
-            <h1>Import danych</h1>
-            <span>Dodaj pierwszy eksport bankowy CSV, żeby zbudować dashboard.</span>
-          </div>
-        </header>
+      <AppShell
+        sidebar={
+          <aside className="sidebarNav">
+            <div className="sidebarBrand">
+              <p className="eyebrow">Budżet domowy</p>
+              <span className="brandYear">Start</span>
+              <span>Zaimportuj dane, aby odblokować moduły.</span>
+            </div>
+            <div className="sidebarYears">
+              <button type="button" className="themeToggle" onClick={toggleTheme} aria-pressed={theme === "dark"}>
+                {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+                <span>{theme === "dark" ? "Jasny motyw" : "Ciemny motyw"}</span>
+              </button>
+            </div>
+          </aside>
+        }
+      >
+        <ModuleHeader
+          header={{
+            eyebrow: "Budżet domowy",
+            title: "Import danych",
+            subtitle: "Dodaj pierwszy eksport bankowy CSV, żeby zbudować dashboard.",
+          }}
+        />
         <ImportView onUpload={handleUpload} uploading={uploading} importStatus={importStatus} />
-      </main>
+      </AppShell>
     );
   }
 
@@ -227,6 +247,12 @@ export default function App() {
       ...current,
       [key]: { ...current[key], drillFilter: null },
     }));
+  }
+
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    applyTheme(next);
+    setTheme(next);
   }
 
   function openTransactionInspector(config) {
@@ -375,8 +401,10 @@ export default function App() {
           year={year}
           years={years}
           views={model.views}
+          theme={theme}
           onViewChange={setView}
           onYearChange={setYear}
+          onToggleTheme={toggleTheme}
         />
       }
     >
@@ -411,6 +439,7 @@ export default function App() {
           savingsWaterfall={model.savingsWaterfall}
           settings={settingsDraft || budgetSettings}
           settingsStatus={settingsStatus}
+          saving={settingsSaving}
           bucketOptions={BUDGET_BUCKET_OPTIONS}
           onSaveSettings={handleSaveSettings}
           onSettingChange={handleSettingChange}
@@ -439,6 +468,7 @@ export default function App() {
         <FireView
           fireSettings={fireSettingsQuery.data}
           fireSummary={fireQuery.data || model.fireSummary}
+          loading={fireQuery.isPending && !fireQuery.data && !model.fireSummary}
           saving={fireSettingsMutation.isPending}
           settingsStatus={fireSettingsStatus}
           onSaveSettings={handleSaveFireSettings}

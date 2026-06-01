@@ -41,6 +41,11 @@ export function TimeScopeControl({
 
       {showCalendar && (
         <div className="globalCalendar localCalendar">
+          <div className="calendarLegend" aria-label="Skala dziennych wydatków">
+            <span><i className="cool" /> &lt; 300 zł</span>
+            <span><i className="warm" /> 300–1000 zł</span>
+            <span><i className="hot" /> &gt; 1000 zł</span>
+          </div>
           <div className="calendarWeekdays">
             {["Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Nd"].map((day) => (
               <span key={day}>{day}</span>

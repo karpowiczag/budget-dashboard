@@ -1,9 +1,18 @@
 import { CHART_COLORS } from "./charts.js";
 import { moneyDec, percent } from "./formatters.js";
 
-const AXIS_LINE = "#cbd5e1";
-const GRID_LINE = "#e5e7eb";
-const TEXT = "#475569";
+// Resolve a design token at build time so charts follow the active light/dark
+// theme. Falls back to the original literal when no document/var is available
+// (e.g. SSR or the jsdom test environment), keeping behaviour identical there.
+function cssVar(name, fallback) {
+  if (typeof document === "undefined") return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name);
+  return value && value.trim() ? value.trim() : fallback;
+}
+
+const chartAxis = () => cssVar("--border-strong", "#cbd5e1");
+const chartGrid = () => cssVar("--border-subtle", "#e5e7eb");
+const chartText = () => cssVar("--text-2", "#475569");
 
 const COLORS = {
   amber: "#b45309",
@@ -38,8 +47,8 @@ export function baseGrid(extra = {}) {
 
 export function categoryAxis(data, extra = {}) {
   return {
-    axisLabel: { color: TEXT, fontSize: 12 },
-    axisLine: { lineStyle: { color: AXIS_LINE } },
+    axisLabel: { color: chartText(), fontSize: 12 },
+    axisLine: { lineStyle: { color: chartAxis() } },
     axisTick: { show: false },
     data,
     type: "category",
@@ -49,9 +58,9 @@ export function categoryAxis(data, extra = {}) {
 
 export function valueAxis(extra = {}) {
   return {
-    axisLabel: { color: TEXT, formatter: moneyAxis, fontSize: 12 },
-    axisLine: { lineStyle: { color: AXIS_LINE } },
-    splitLine: { lineStyle: { color: GRID_LINE } },
+    axisLabel: { color: chartText(), formatter: moneyAxis, fontSize: 12 },
+    axisLine: { lineStyle: { color: chartAxis() } },
+    splitLine: { lineStyle: { color: chartGrid() } },
     type: "value",
     ...extra,
   };
@@ -123,13 +132,13 @@ export function buildDailyCalendarHeatmapOption(data = []) {
     calendar: {
       cellSize: ["auto", 34],
       dayLabel: {
-        color: TEXT,
+        color: chartText(),
         firstDay: 1,
         nameMap: ["Nd", "Pn", "Wt", "Śr", "Cz", "Pt", "Sb"],
       },
       itemStyle: { borderColor: "#ffffff", borderWidth: 2 },
       left: 28,
-      monthLabel: { color: TEXT, fontSize: 12 },
+      monthLabel: { color: chartText(), fontSize: 12 },
       orient: "horizontal",
       range,
       right: 28,
@@ -153,7 +162,7 @@ export function buildDailyCalendarHeatmapOption(data = []) {
       max,
       min: 0,
       orient: "horizontal",
-      textStyle: { color: TEXT },
+      textStyle: { color: chartText() },
     },
     series: [
       {
@@ -179,7 +188,7 @@ export function buildCategoryLimitProjectionOption(data = []) {
     }),
     xAxis: valueAxis(),
     yAxis: categoryAxis(rows.map((row) => row.category), {
-      axisLabel: { color: TEXT, fontSize: 12, overflow: "truncate", width: 126 },
+      axisLabel: { color: chartText(), fontSize: 12, overflow: "truncate", width: 126 },
     }),
     series: [
       {
@@ -205,7 +214,7 @@ export function buildLimitGaugeOption(data = []) {
   return {
     series: [
       {
-        axisLabel: { color: TEXT, formatter: (value) => percent(Number(value) / 100) },
+        axisLabel: { color: chartText(), formatter: (value) => percent(Number(value) / 100) },
         axisLine: {
           lineStyle: {
             color: [
@@ -217,7 +226,7 @@ export function buildLimitGaugeOption(data = []) {
           },
         },
         detail: {
-          color: "#172033",
+          color: chartText(),
           formatter: () => `${Math.round(usage * 100)}%`,
           fontSize: 26,
           fontWeight: 800,
@@ -228,7 +237,7 @@ export function buildLimitGaugeOption(data = []) {
         progress: { show: false },
         radius: "88%",
         splitLine: { distance: -14, length: 14 },
-        title: { color: TEXT, fontSize: 12, offsetCenter: [0, "60%"] },
+        title: { color: chartText(), fontSize: 12, offsetCenter: [0, "60%"] },
         type: "gauge",
         data: [{ ...worst, name: worst?.category || "Brak ryzyka", value: Math.min(150, Math.round(usage * 100)) }],
       },
@@ -243,7 +252,7 @@ export function buildLimitGaugeOption(data = []) {
 export function buildMonthlyCashflowComboOption(data = []) {
   return {
     grid: baseGrid({ right: 44 }),
-    legend: { bottom: 0, textStyle: { color: TEXT } },
+    legend: { bottom: 0, textStyle: { color: chartText() } },
     tooltip: tooltip((params) => {
       const label = params?.[0]?.data?.month ?? params?.[0]?.axisValue ?? "";
       return [
@@ -258,8 +267,8 @@ export function buildMonthlyCashflowComboOption(data = []) {
     yAxis: [
       valueAxis(),
       {
-        axisLabel: { color: TEXT, formatter: (value) => percent(value), fontSize: 12 },
-        axisLine: { lineStyle: { color: AXIS_LINE } },
+        axisLabel: { color: chartText(), formatter: (value) => percent(value), fontSize: 12 },
+        axisLine: { lineStyle: { color: chartAxis() } },
         splitLine: { show: false },
         type: "value",
       },
@@ -284,7 +293,7 @@ export function buildFireProjectionOption(scenarios = [], target = 0, currentAge
   const ages = Array.from({ length: Math.max(1, targetAge - currentAge + 1) }, (_, index) => currentAge + index);
   return {
     grid: baseGrid({ right: 28 }),
-    legend: { bottom: 0, textStyle: { color: TEXT } },
+    legend: { bottom: 0, textStyle: { color: chartText() } },
     tooltip: tooltip((params) => {
       const age = params?.[0]?.axisValue ?? "";
       return [
@@ -319,7 +328,7 @@ export function buildFireProjectionOption(scenarios = [], target = 0, currentAge
 
 export function buildFireAllocationOption(rows = []) {
   return {
-    legend: { bottom: 0, textStyle: { color: TEXT } },
+    legend: { bottom: 0, textStyle: { color: chartText() } },
     series: [
       {
         data: rows.map((row) => ({
@@ -363,7 +372,7 @@ export function buildCashflowSankeyOption(model = { links: [], nodes: [] }) {
         draggable: false,
         emphasis: { focus: "adjacency" },
         label: {
-          color: "#172033",
+          color: chartText(),
           fontSize: 12,
           fontWeight: 700,
           formatter: ({ data }) => data.shortName || data.name,
@@ -433,8 +442,8 @@ export function buildCategoryParetoOption(data = []) {
     yAxis: [
       valueAxis(),
       {
-        axisLabel: { color: TEXT, formatter: (value) => percent(value), fontSize: 12 },
-        axisLine: { lineStyle: { color: AXIS_LINE } },
+        axisLabel: { color: chartText(), formatter: (value) => percent(value), fontSize: 12 },
+        axisLine: { lineStyle: { color: chartAxis() } },
         max: 1,
         min: 0,
         splitLine: { show: false },
@@ -573,7 +582,7 @@ export function buildMerchantShareDonutOption(data = []) {
 
 export function buildFixednessBreakdownOption(data = []) {
   return {
-    legend: { bottom: 0, textStyle: { color: TEXT } },
+    legend: { bottom: 0, textStyle: { color: chartText() } },
     series: [
       {
         avoidLabelOverlap: true,
@@ -652,7 +661,7 @@ export function buildSavingsRadarOption(data = []) {
       indicator: data.map((row) => ({ name: row.label, max: Math.ceil(max * 1.15) })),
       radius: "66%",
       splitArea: { areaStyle: { color: ["#f8fafc", "#ffffff"] } },
-      splitLine: { lineStyle: { color: GRID_LINE } },
+      splitLine: { lineStyle: { color: chartGrid() } },
     },
     series: [
       {
@@ -691,7 +700,7 @@ export function buildMerchantFunnelOption(data = []) {
         })),
         gap: 3,
         label: {
-          color: "#172033",
+          color: chartText(),
           formatter: ({ data }) => `${truncate(data.merchant, 22)}\n${moneyAxis(data.value)}`,
           fontSize: 12,
         },
@@ -723,12 +732,12 @@ export function buildRecurringTimelineOption(data = []) {
       ].join("<br/>");
     }),
     xAxis: {
-      ...valueAxis({ max: 31, min: 1 }),
-      axisLabel: { color: TEXT, fontSize: 12 },
-      name: "Dzień",
+      ...valueAxis({ max: 31, min: 1, interval: 5 }),
+      axisLabel: { color: chartText(), fontSize: 12, showMaxLabel: false },
+      name: "Dzień miesiąca",
       nameGap: 28,
       nameLocation: "middle",
-      splitLine: { lineStyle: { color: GRID_LINE } },
+      splitLine: { lineStyle: { color: chartGrid() } },
     },
     yAxis: valueAxis({ name: "Kwota", nameGap: 34, nameLocation: "middle" }),
     series: [
@@ -755,7 +764,7 @@ export function buildSpendBarOption({ color = COLORS.green, data = [], dataKey }
 
 export function buildConfidenceOption(data = []) {
   return {
-    legend: { bottom: 0, textStyle: { color: TEXT } },
+    legend: { bottom: 0, textStyle: { color: chartText() } },
     series: [
       {
         data: data.map((row, index) => ({
@@ -791,7 +800,7 @@ function buildShareDonutOption({ data, labelKey, name, tooltipFormatter, valueKe
   return {
     legend: {
       bottom: 0,
-      textStyle: { color: TEXT },
+      textStyle: { color: chartText() },
       type: "scroll",
     },
     series: [
@@ -832,7 +841,7 @@ function buildHorizontalBarOption({ color, data, labelKey, name, valueKey }) {
     }),
     xAxis: valueAxis(),
     yAxis: categoryAxis(data.map((row) => row[labelKey]), {
-      axisLabel: { color: TEXT, fontSize: 12, overflow: "truncate", width: 136 },
+      axisLabel: { color: chartText(), fontSize: 12, overflow: "truncate", width: 136 },
     }),
     series: [
       {
@@ -855,7 +864,7 @@ function buildMonthlyDimensionTrendOption({ data, dimensionKey, name }) {
     legend: {
       formatter: (name) => truncate(name, 28),
       top: 0,
-      textStyle: { color: TEXT },
+      textStyle: { color: chartText() },
       type: "scroll",
     },
     tooltip: tooltip((params) => {
@@ -868,7 +877,7 @@ function buildMonthlyDimensionTrendOption({ data, dimensionKey, name }) {
       ].join("<br/>");
     }),
     xAxis: categoryAxis(months, {
-      axisLabel: { color: TEXT, formatter: (value) => labelsByMonth.get(value) || value, fontSize: 12 },
+      axisLabel: { color: chartText(), formatter: (value) => labelsByMonth.get(value) || value, fontSize: 12 },
     }),
     yAxis: valueAxis(),
     series: dimensions.map((dimension, index) => ({
@@ -896,7 +905,7 @@ function buildSimpleBarOption({ color, data, labelKey, name, valueKey, yAxisForm
       return `${escapeHtml(row[labelKey])}: ${escapeHtml(row[valueKey] ?? item.value)}`;
     }),
     xAxis: categoryAxis(data.map((row) => row[labelKey])),
-    yAxis: valueAxis({ axisLabel: { color: TEXT, formatter: yAxisFormatter, fontSize: 12 } }),
+    yAxis: valueAxis({ axisLabel: { color: chartText(), formatter: yAxisFormatter, fontSize: 12 } }),
     series: [
       {
         data: data.map((row) => ({ ...row, value: Number(row[valueKey] || 0) })),

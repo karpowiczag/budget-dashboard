@@ -682,7 +682,7 @@ export function selectWealthDashboard({ financialFlows, monthly = [], reportsSec
   return {
     cards: [
       { label: "Inwestycje", value: flows.investmentTotal, detail: `${flows.investmentCount} transakcji`, filter: { category: "Inwestycje" }, tone: "good" },
-      { label: "Konto oszczędnościowe", value: flows.savingsAccountTotal, detail: `wpływy ${flows.savingsAccountInflows} · wydatki ${flows.savingsAccountOutflows}`, filter: { category: "Konto oszczędnościowe" }, tone: "good" },
+      { label: "Konto oszczędnościowe (netto)", value: flows.savingsAccountTotal, detail: `wpływy ${flows.savingsAccountInflows} · wydatki ${flows.savingsAccountOutflows}`, filter: { category: "Konto oszczędnościowe" }, tone: "good" },
       { label: "Nadpłaty kredytu", value: flows.loanOverpaymentTotal, detail: `${flows.loanOverpaymentCount} transakcji`, filter: { category: "Nadpłata kredytu" }, tone: "good" },
       { label: "Razem przepływy", value: flows.total, detail: "transakcyjnie, bez sald kont", filter: { flow: "financial" }, tone: "neutral" },
     ],
@@ -714,7 +714,7 @@ export function selectModuleHeader({
   visibleSpend,
   wealthDashboard,
 }) {
-  const controlRisks = (monthDashboard?.categoryStatus || []).filter((row) => Number(row.currentMonthSpend || row.current || 0) > Number(row.limit || 0)).length;
+  const controlRisks = (monthDashboard?.categoryStatus || []).filter((row) => Number(row.limit || 0) > 0 && Number(row.currentMonthSpend || row.current || 0) > Number(row.limit || 0)).length;
   const toCheckAmount = Number(data?.kpis?.toCheckAmount || 0);
   const headers = {
     control: {
@@ -744,10 +744,10 @@ export function selectModuleHeader({
       title: "Co się zmienia w czasie?",
       subtitle: "Eksploracja historii: cashflow, wydatki, dochód i jakość danych.",
       cards: [
+        // Scope context only. The spend/income/net numbers live in the
+        // interactive "Zakres raportu" panel below (with drill-down), so the
+        // header no longer duplicates them.
         { label: "Zakres", value: reportsSections?.activeTimeLabel || activeTimeLabel || "Cały rok", textValue: true, detail: "lokalny filtr raportu" },
-        { label: "Wydatki", value: Number(reportsSections?.scopedStats?.spend || 0), detail: `${Number(reportsSections?.scopedStats?.transactionCount || 0)} transakcji` },
-        { label: "Wpływy", value: Number(reportsSections?.scopedStats?.income || 0), detail: "rozpoznane dochody", tone: "good" },
-        { label: "Net flow", value: Number(reportsSections?.scopedStats?.income || 0) - Number(reportsSections?.scopedStats?.spend || 0), detail: "przed przepływami majątkowymi" },
       ],
     },
     wealth: {
@@ -992,28 +992,29 @@ export function selectCostMatrix({ categoryRows = [], rows = [], year } = {}) {
     : categoryRows.map((row) => ({ ...row, subcategory: "" }));
   const months = matrixMonths(sourceRows, year);
   const monthSet = new Set(months.map((month) => month.key));
-  const categories = new Map();
+  const roots = new Map();
 
   sourceRows.forEach((row) => {
     const spend = Number(row.spend || 0);
     if (!row.monthKey || !monthSet.has(row.monthKey) || spend <= 0 || !row.category) return;
-    const category = ensureMatrixRow(categories, row.category, 0, { category: row.category }, months);
+    const hasArea = Boolean(row.area);
+    const areaLabel = row.area || "";
+    const categoryLevel = hasArea ? 1 : 0;
+    const area = hasArea ? ensureMatrixRow(roots, areaLabel, 0, { area: areaLabel }, months, `area:${areaLabel}`) : null;
+    const categoryRowsMap = area?.childrenMap || roots;
+    if (hasArea) {
+      addMatrixSpend(area, row.monthKey, spend, Number(row.count || 0));
+    }
+    const categoryFilter = hasArea ? { area: areaLabel, category: row.category } : { category: row.category };
+    const category = ensureMatrixRow(categoryRowsMap, row.category, categoryLevel, categoryFilter, months, `category:${row.category}`);
     addMatrixSpend(category, row.monthKey, spend, Number(row.count || 0));
     if (!row.subcategory || GENERIC_SUBCATEGORY_LABELS.has(row.subcategory)) return;
-    const child = ensureMatrixRow(category.childrenMap, row.subcategory, 1, { category: row.category, subcategory: row.subcategory }, months);
+    const subcategoryFilter = hasArea ? { area: areaLabel, category: row.category, subcategory: row.subcategory } : { category: row.category, subcategory: row.subcategory };
+    const child = ensureMatrixRow(category.childrenMap, row.subcategory, categoryLevel + 1, subcategoryFilter, months, `subcategory:${row.subcategory}`);
     addMatrixSpend(child, row.monthKey, spend, Number(row.count || 0));
   });
 
-  const resultRows = Array.from(categories.values())
-    .filter((row) => row.total > 0)
-    .sort(compareMatrixRows)
-    .flatMap((category) => [
-      finalizeMatrixRow(category, months),
-      ...Array.from(category.childrenMap.values())
-        .filter((child) => child.total > 0)
-        .sort(compareMatrixRows)
-        .map((child) => finalizeMatrixRow(child, months, category.label)),
-    ]);
+  const resultRows = flattenMatrixRows(roots, months);
   const totalsByMonth = months.map((month) => ({
     ...month,
     spend: resultRows
@@ -1303,19 +1304,20 @@ function matrixMonths(rows, year) {
     }));
 }
 
-function ensureMatrixRow(rows, label, level, filter, months) {
-  if (!rows.has(label)) {
-    rows.set(label, {
+function ensureMatrixRow(rows, label, level, filter, months, key = label) {
+  if (!rows.has(key)) {
+    rows.set(key, {
       childrenMap: new Map(),
       count: 0,
       filter,
+      key,
       label,
       level,
       months: Object.fromEntries(months.map((month) => [month.key, 0])),
       total: 0,
     });
   }
-  return rows.get(label);
+  return rows.get(key);
 }
 
 function addMatrixSpend(row, monthKey, spend, count) {
@@ -1333,12 +1335,23 @@ function finalizeMatrixRow(row, months, parent = "") {
   return {
     count: row.count,
     filter: row.filter,
+    key: row.key,
     label: row.label,
     level: row.level,
     months: Object.fromEntries(months.map((month) => [month.key, Number(row.months[month.key] || 0)])),
     parent,
     total: row.total,
   };
+}
+
+function flattenMatrixRows(rows, months, parentPath = []) {
+  return Array.from(rows.values())
+    .filter((row) => row.total > 0)
+    .sort(compareMatrixRows)
+    .flatMap((row) => [
+      finalizeMatrixRow(row, months, parentPath.join(" / ")),
+      ...flattenMatrixRows(row.childrenMap, months, [...parentPath, row.label]),
+    ]);
 }
 
 function unique(values) {

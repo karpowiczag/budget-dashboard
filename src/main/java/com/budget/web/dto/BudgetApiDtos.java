@@ -304,7 +304,7 @@ public final class BudgetApiDtos {
     public record MonthlyCategoryTrendResponse(String month, String monthKey, String category, BigDecimal spend, int count) {
     }
 
-    public record MonthlyHierarchyTrendResponse(String month, String monthKey, String category, String subcategory, BigDecimal spend, int count) {
+    public record MonthlyHierarchyTrendResponse(String month, String monthKey, String area, String group, String category, String subcategory, BigDecimal spend, int count) {
     }
 
     public record MonthlyBucketTrendResponse(String month, String monthKey, String bucket, BigDecimal spend, int count) {

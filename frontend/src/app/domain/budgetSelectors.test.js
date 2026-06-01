@@ -140,7 +140,7 @@ describe("module view-model selectors", () => {
     })).toMatchObject({
       cards: [
         { label: "Inwestycje", value: 500, filter: { category: "Inwestycje" } },
-        { label: "Konto oszczędnościowe", value: 300, filter: { category: "Konto oszczędnościowe" } },
+        { label: "Konto oszczędnościowe (netto)", value: 300, filter: { category: "Konto oszczędnościowe" } },
         { label: "Nadpłaty kredytu", value: 700, filter: { category: "Nadpłata kredytu" } },
         { label: "Razem przepływy", value: 1500, detail: "transakcyjnie, bez sald kont" },
       ],
@@ -713,6 +713,24 @@ describe("advanced analytical selectors", () => {
     expect(matrix.rows.map((row) => `${row.level}:${row.label}`)).toEqual(["0:Mieszkanie", "0:Jedzenie", "1:Restauracje"]);
     expect(matrix.rows.find((row) => row.label === "Jedzenie").months["2026-02"]).toBe(80);
     expect(matrix.rows.find((row) => row.label === "Restauracje").filter).toEqual({ category: "Jedzenie", subcategory: "Restauracje" });
+
+    const groupedMatrix = selectCostMatrix({
+      year: 2026,
+      rows: [
+        { monthKey: "2026-01", area: "Styl życia", group: "Styl życia", category: "Jedzenie", subcategory: "Restauracje", spend: 120, count: 2 },
+        { monthKey: "2026-01", area: "Dom i mieszkanie", group: "Mieszkanie", category: "Czynsz", subcategory: "", spend: 1000, count: 1 },
+      ],
+    });
+    expect(groupedMatrix.rows.map((row) => `${row.level}:${row.label}`)).toEqual([
+      "0:Dom i mieszkanie",
+      "1:Czynsz",
+      "0:Styl życia",
+      "1:Jedzenie",
+      "2:Restauracje",
+    ]);
+    expect(groupedMatrix.rows.find((row) => row.label === "Styl życia").filter).toEqual({ area: "Styl życia" });
+    expect(groupedMatrix.rows.find((row) => row.label === "Restauracje").parent).toBe("Styl życia / Jedzenie");
+    expect(groupedMatrix.rows.find((row) => row.label === "Restauracje").filter).toEqual({ area: "Styl życia", category: "Jedzenie", subcategory: "Restauracje" });
 
     expect(selectMerchantFunnel([{ merchant: "IKEA", sum: 500, count: 1 }])).toEqual([
       { merchant: "IKEA", sum: 500, count: 1, filter: { query: "IKEA" } },

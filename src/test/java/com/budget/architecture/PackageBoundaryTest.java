@@ -74,8 +74,15 @@ class PackageBoundaryTest {
         if (!trimmed.startsWith("import ")) {
             return java.util.Optional.empty();
         }
+        // Normalize both "import x.y.Z;" and "import static x.y.Z.m;" to the qualified
+        // name so a forbidden static import cannot slip past the boundary check.
+        var qualifiedName = trimmed.substring("import ".length()).stripLeading();
+        if (qualifiedName.startsWith("static ")) {
+            qualifiedName = qualifiedName.substring("static ".length()).stripLeading();
+        }
+        var name = qualifiedName;
         return forbiddenPrefixes.stream()
-                .filter(prefix -> trimmed.startsWith("import " + prefix + "."))
+                .filter(prefix -> name.startsWith(prefix + "."))
                 .findFirst()
                 .map(prefix -> path + ":" + lineNumber + " imports forbidden package " + prefix);
     }

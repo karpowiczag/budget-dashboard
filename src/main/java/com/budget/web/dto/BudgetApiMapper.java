@@ -82,7 +82,7 @@ public class BudgetApiMapper {
                 map(report.merchants(), row -> new BudgetApiDtos.AnalyticsMerchantSpendResponse(row.merchant(), row.sum(), row.count())),
                 map(report.oneoffs(), this::toTransaction),
                 map(report.monthlyCategoryTrends(), row -> new BudgetApiDtos.MonthlyCategoryTrendResponse(row.month(), row.monthKey(), row.category(), row.spend(), row.count())),
-                map(report.monthlyHierarchyTrends(), row -> new BudgetApiDtos.MonthlyHierarchyTrendResponse(row.month(), row.monthKey(), row.category(), row.subcategory(), row.spend(), row.count())),
+                map(report.monthlyHierarchyTrends(), row -> new BudgetApiDtos.MonthlyHierarchyTrendResponse(row.month(), row.monthKey(), row.area(), row.group(), row.category(), row.subcategory(), row.spend(), row.count())),
                 map(report.monthlyBucketTrends(), row -> new BudgetApiDtos.MonthlyBucketTrendResponse(row.month(), row.monthKey(), row.bucket(), row.spend(), row.count())),
                 map(report.monthlyMerchantTrends(), row -> new BudgetApiDtos.MonthlyMerchantTrendResponse(row.month(), row.monthKey(), row.merchant(), row.spend(), row.count())),
                 map(report.fixednessBreakdown(), row -> new BudgetApiDtos.FixednessBreakdownResponse(row.fixedness(), row.spend(), row.count())),

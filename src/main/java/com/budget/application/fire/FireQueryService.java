@@ -264,9 +264,9 @@ public class FireQueryService {
     private FireSummary.FireScenario scenario(String id, String label, BigDecimal annualReturn, BigDecimal currentValue, BigDecimal fireNumber, BigDecimal currentMonthly, int yearsToFire) {
         var months = yearsToFire * 12;
         var monthlyReturn = annualReturn.divide(TWELVE, 12, RoundingMode.HALF_UP);
-        var projected = futureValue(currentValue, currentMonthly, monthlyReturn, months);
+        var projected = FireProjection.futureValue(currentValue, currentMonthly, monthlyReturn, months);
         var gap = fireNumber.subtract(projected).max(BigDecimal.ZERO);
-        var required = requiredMonthlyContribution(currentValue, fireNumber, monthlyReturn, months);
+        var required = FireProjection.requiredMonthlyContribution(currentValue, fireNumber, monthlyReturn, months);
         return new FireSummary.FireScenario(
                 id,
                 label,
@@ -277,30 +277,6 @@ public class FireQueryService {
                 money(currentMonthly),
                 gap.compareTo(BigDecimal.ZERO) == 0
         );
-    }
-
-    private BigDecimal futureValue(BigDecimal principal, BigDecimal monthlyContribution, BigDecimal monthlyReturn, int months) {
-        if (months <= 0) {
-            return principal;
-        }
-        var rate = monthlyReturn.doubleValue();
-        var factor = Math.pow(1 + rate, months);
-        var contributionFactor = rate == 0 ? months : (factor - 1) / rate;
-        return BigDecimal.valueOf(principal.doubleValue() * factor + monthlyContribution.doubleValue() * contributionFactor);
-    }
-
-    private BigDecimal requiredMonthlyContribution(BigDecimal principal, BigDecimal target, BigDecimal monthlyReturn, int months) {
-        if (months <= 0) {
-            return BigDecimal.ZERO;
-        }
-        var rate = monthlyReturn.doubleValue();
-        var factor = Math.pow(1 + rate, months);
-        var remaining = target.doubleValue() - principal.doubleValue() * factor;
-        if (remaining <= 0) {
-            return BigDecimal.ZERO;
-        }
-        var contributionFactor = rate == 0 ? months : (factor - 1) / rate;
-        return BigDecimal.valueOf(remaining / contributionFactor);
     }
 
     private List<FireSummary.FireAllocation> allocation(FireSettings settings, List<FirePortfolioPosition> positions, BigDecimal total) {

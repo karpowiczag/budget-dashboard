@@ -86,9 +86,9 @@ describe("MonthControlView", () => {
     expect(screen.getByText("Restauracje ponad plan")).toBeInTheDocument();
     expect(screen.getByText("Dzień 07")).toBeInTheDocument();
     expect(screen.getByTestId("burn-down-chart")).toBeInTheDocument();
-    expect(screen.getByTestId("daily-heatmap-chart")).toBeInTheDocument();
-    expect(screen.getByTestId("limit-projection-chart")).toBeInTheDocument();
     expect(screen.getByTestId("limit-gauge-chart")).toBeInTheDocument();
+    expect(screen.queryByTestId("daily-heatmap-chart")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("limit-projection-chart")).not.toBeInTheDocument();
     expect(screen.getByText("Status głównych limitów")).toBeInTheDocument();
     expect(screen.getByText(/Kategorie \(1\)/)).toBeInTheDocument();
     expect(screen.getByText("400 zł / 1000 zł")).toBeInTheDocument();

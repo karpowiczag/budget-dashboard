@@ -1,6 +1,4 @@
 import { BudgetBurnDownChart } from "../components/charts/BudgetBurnDownChart.jsx";
-import { CategoryLimitProjectionChart } from "../components/charts/CategoryLimitProjectionChart.jsx";
-import { DailyCalendarHeatmapChart } from "../components/charts/DailyCalendarHeatmapChart.jsx";
 import { LimitGaugeChart } from "../components/charts/LimitGaugeChart.jsx";
 import { Panel } from "../components/ui/Panel.jsx";
 import { money } from "../domain/formatters.js";
@@ -10,7 +8,6 @@ export function MonthControlView({ monthDashboard, savingsFocus, spendingPlanSec
   const categoryStatus = monthDashboard?.categoryStatus || [];
   const focus = monthDashboard?.savingsFocus || savingsFocus || {};
   const burnDown = monthDashboard?.burnDown || [];
-  const dailyHeatmap = monthDashboard?.dailyHeatmap || [];
   const limitChart = monthDashboard?.limitChart || [];
   const selectedDay = monthDashboard?.selectedDay;
 
@@ -83,21 +80,6 @@ export function MonthControlView({ monthDashboard, savingsFocus, spendingPlanSec
           <BudgetBurnDownChart
             data={burnDown}
             onSelect={(row) => onInspect?.({ title: `Transakcje: dzień ${String(row.day).padStart(2, "0")}`, filters: { date: row.date }, useTimeScope: false })}
-          />
-        </Panel>
-        <Panel title="Mapa dziennych wydatków">
-          <DailyCalendarHeatmapChart
-            data={dailyHeatmap}
-            onSelect={(row) => onInspect?.({ title: `Transakcje: ${row.date}`, filters: { date: row.date }, useTimeScope: false })}
-          />
-        </Panel>
-        <Panel title="Ryzyko limitów">
-          <CategoryLimitProjectionChart
-            data={limitChart}
-            onSelect={(entry) => {
-              const row = entry?.payload || entry;
-              onInspect?.({ title: `Transakcje: ${row.category}`, filters: row.filter || { category: row.category }, useTimeScope: true });
-            }}
           />
         </Panel>
         <Panel title="Największe przekroczenie limitu">

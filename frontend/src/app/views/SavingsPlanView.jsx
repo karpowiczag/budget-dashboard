@@ -30,6 +30,7 @@ export function SavingsPlanView({
   onLimitChange,
   onSaveSettings,
   onSettingChange,
+  saving = false,
 }) {
   const minMonths = Number(settings?.emergencyFundMinMonths || 3);
   const comfortMonths = Number(settings?.emergencyFundComfortMonths || 6);
@@ -39,8 +40,8 @@ export function SavingsPlanView({
     <Panel
       title={planTitle}
       action={
-        <button className="primaryButton" onClick={onSaveSettings} type="button">
-          Zapisz ustawienia
+        <button className="primaryButton" disabled={saving} onClick={onSaveSettings} type="button">
+          {saving ? "Zapisuję..." : "Zapisz ustawienia"}
         </button>
       }
     >

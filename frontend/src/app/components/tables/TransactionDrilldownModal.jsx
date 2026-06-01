@@ -1,5 +1,5 @@
 import { CalendarDays, Loader2, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { money } from "../../domain/formatters.js";
 import { TransactionsTable } from "./TransactionsTable.jsx";
 
@@ -12,14 +12,47 @@ export function TransactionDrilldownModal({
   onClose,
   onPageChange,
 }) {
+  const dialogRef = useRef(null);
+
   useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    const dialog = dialogRef.current;
+    const focusable = () => (dialog
+      ? Array.from(dialog.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+          .filter((element) => !element.disabled && element.getAttribute("aria-hidden") !== "true")
+      : []);
+
+    (focusable()[0] || dialog)?.focus();
+
     function handleKeyDown(event) {
       if (event.key === "Escape") {
         onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) {
+        event.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     }
+
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (previouslyFocused instanceof HTMLElement) {
+        previouslyFocused.focus();
+      }
+    };
   }, [onClose]);
 
   const items = page?.items || [];
@@ -33,10 +66,12 @@ export function TransactionDrilldownModal({
   return (
     <div className="modalBackdrop" role="presentation" onMouseDown={onClose}>
       <section
+        ref={dialogRef}
         aria-label={title}
         aria-modal="true"
         className="transactionModal"
         role="dialog"
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="modalHead">

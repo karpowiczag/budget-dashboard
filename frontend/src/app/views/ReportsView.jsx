@@ -111,7 +111,7 @@ export function ReportsView({ dataQualityChart, reportsSections, reportsWorkspac
               <CategoryParetoChart data={sections.categoryPareto || []} onSelect={(entry) => inspectEntry(entry, onInspect)} />
             </Panel>
           </section>
-          <Panel title="Koszty total - kategorie i podkategorie" action={<ScopeBadge type="year" value={sections.yearLabel} />}>
+          <Panel title="Koszty total - obszary, kategorie i podkategorie" action={<ScopeBadge type="year" value={sections.yearLabel} />}>
             <CategoryCostMatrixTable matrix={sections.costMatrix} onInspect={onInspect} />
           </Panel>
           <Panel title="Podkategorie (Top 14)" action={<ScopeBadge type="scope" value={sections.activeTimeLabel} />}>
@@ -270,7 +270,7 @@ function formatScopeDetail(detail) {
 
 function formatBenchmarkDetail(detail) {
   if (typeof detail !== "string") return detail || "";
-  for (const prefix of ["limit 50%: ", "punkt odniesienia 50%: ", "punkt 30%: ", "minimum 20%: "]) {
+  for (const prefix of ["limit 50%: ", "punkt odniesienia 50%: ", "punkt odniesienia 30%: ", "minimum 20%: "]) {
     if (detail.startsWith(prefix)) {
       return `${prefix}${money(Number(detail.slice(prefix.length)))}`;
     }

@@ -153,4 +153,22 @@ class BudgetReportRepositoryTest {
                 "PRZELEW EXPRESS ELIXIR PRZYCH. TEST EMPLOYER WYNAGRODZENIE"
         );
     }
+
+    @Test
+    void derivesSavingsAccountTurnoverKpisFromWealthTransferDeposits() {
+        var result = analysisService.analyze(new BudgetInput(2098, "savings.csv", List.of(
+                new BankTransaction(LocalDate.of(2098, 3, 1), "konto", "PRZELEW EXPRESS ELIXIR PRZYCH. TEST EMPLOYER WYNAGRODZENIE", "", 9_000),
+                new BankTransaction(LocalDate.of(2098, 3, 5), "konto", "PRZELEW NA KONTO OSZCZĘDNOŚCIOWE", "", -2_000),
+                new BankTransaction(LocalDate.of(2098, 3, 6), "konto", "BIEDRONKA ZAKUP", "Bez kategorii", -100)
+        )));
+        store.save(result);
+
+        var kpis = store.findDashboard(2098).kpis();
+        // No account name matches the '%oszcz%' LIKE heuristic, so the deposit is counted
+        // through the corrected_category='Konto oszczędnościowe' pending-deposit branch.
+        assertThat(kpis.savingsAccountGrossDeposits()).isEqualByComparingTo(BigDecimal.valueOf(2_000));
+        assertThat(kpis.savingsAccountInflows()).isEqualByComparingTo(BigDecimal.valueOf(2_000));
+        assertThat(kpis.savingsAccountNetChange()).isEqualByComparingTo(BigDecimal.valueOf(2_000));
+        assertThat(kpis.savingsAccountOutflows()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
 }

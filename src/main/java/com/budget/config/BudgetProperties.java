@@ -53,6 +53,10 @@ public record BudgetProperties(
     public record Security(boolean oauthEnabled, String allowedGoogleEmail) {
         public Security {
             if (allowedGoogleEmail == null) allowedGoogleEmail = "";
+            if (oauthEnabled && allowedGoogleEmail.isBlank()) {
+                throw new IllegalStateException(
+                        "app.security.allowed-google-email must be configured when app.security.oauth-enabled=true");
+            }
         }
     }
 

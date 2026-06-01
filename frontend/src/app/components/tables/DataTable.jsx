@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, Download } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
 import { downloadCsv } from "../../domain/exporters.js";
 
@@ -14,14 +14,14 @@ export function DataTable({
   sort,
 }) {
   const [sorting, setSorting] = useState([]);
-  const enhancedColumns = columns.map((column) => ({
+  const enhancedColumns = useMemo(() => columns.map((column) => ({
     enableSorting: column.enableSorting !== false,
     sortingFn: column.sortingFn || ((left, right, columnId) => compareValues(
       sortableValue(column, left.original, columnId),
       sortableValue(column, right.original, columnId),
     )),
     ...column,
-  }));
+  })), [columns]);
   const table = useReactTable({
     columns: enhancedColumns,
     data,

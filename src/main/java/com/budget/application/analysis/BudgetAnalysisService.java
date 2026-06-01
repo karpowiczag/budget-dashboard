@@ -1,5 +1,6 @@
 package com.budget.application.analysis;
 
+import com.budget.application.categorization.BudgetTaxonomy;
 import com.budget.application.categorization.CategoryClassifier;
 import com.budget.application.settings.BudgetSettings;
 import com.budget.application.settings.BudgetSettingsService;
@@ -36,7 +37,7 @@ public class BudgetAnalysisService {
     private static final String BUCKET_SAVINGS_ACCOUNT = "Konto oszczędnościowe";
     private static final String BUCKET_LOAN_OVERPAYMENT = "Nadpłata kredytu";
     private static final Set<String> OBLIGATORY_BUCKETS = Set.of(BUCKET_FIXED_OBLIGATORY, BUCKET_VARIABLE_OBLIGATORY);
-    private static final Set<String> REAL_SAVING_CATEGORIES = Set.of("Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu");
+    private static final Set<String> REAL_SAVING_CATEGORIES = BudgetTaxonomy.wealthCategoryLabels();
     private static final Set<String> DAILY_PACED_CATEGORIES = Set.of(
             "Żywność i chemia",
             "Jedzenie poza domem"

@@ -17,7 +17,7 @@ test("imports fake CSV and serves dashboard desktop workflow", async ({ page }) 
   await expect(page.getByRole("heading", { name: "Kontrola bieżącego miesiąca" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Spending plan miesiąca" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Co ciąć teraz" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Mapa dziennych wydatków" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tempo wydatków" })).toBeVisible();
 
   await page.getByRole("button", { name: "Raporty", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Co się zmienia w czasie?" })).toBeVisible();

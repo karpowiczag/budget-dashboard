@@ -104,7 +104,7 @@ describe("ReportsView", () => {
           merchantShare: [{ merchant: "BIEDRONKA", sum: 500, share: 1 }],
           merchantTrends: [{ month: "01.2026", monthKey: "2026-01", merchant: "BIEDRONKA", spend: 500 }],
           outlierTimeline: [],
-          benchmarkCards: [{ label: "Zachcianki", value: 100, detail: "punkt 30%: 300" }],
+          benchmarkCards: [{ label: "Zachcianki", value: 100, detail: "punkt odniesienia 30%: 300" }],
           scopeCards: [{ label: "Wydatki", value: 500, detail: "2 transakcje", filter: { flow: "spend" } }],
           scopedStats: {
             spend: 500,
@@ -137,11 +137,13 @@ describe("ReportsView", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Trends" }));
     expect(screen.getByText("Cashflow miesięczny")).toBeInTheDocument();
+    // The 30% benchmark detail must be currency-formatted, not rendered as a raw float.
+    expect(screen.getByText(/punkt odniesienia 30%:/)).toHaveTextContent(/zł/);
 
     await userEvent.click(screen.getByRole("button", { name: "Wydatki" }));
     expect(screen.getByTestId("category-share-chart")).toBeInTheDocument();
     expect(screen.getByTestId("pareto-chart")).toBeInTheDocument();
-    expect(screen.getByText("Koszty total - kategorie i podkategorie")).toBeInTheDocument();
+    expect(screen.getByText("Koszty total - obszary, kategorie i podkategorie")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /500\s*zł/ })).toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId("pareto-chart"));

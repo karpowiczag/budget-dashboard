@@ -34,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class BudgetReportRepository implements BudgetReportStore {
-    private static final java.util.Set<String> FINANCIAL_FLOW_CATEGORIES = java.util.Set.of("Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu");
+    private static final java.util.Set<String> FINANCIAL_FLOW_CATEGORIES = com.budget.application.categorization.BudgetTaxonomy.wealthCategoryLabels();
 
     private final ReportDataJdbcRepository reports;
     private final BudgetTransactionDataJdbcRepository transactions;
@@ -1198,16 +1198,20 @@ public class BudgetReportRepository implements BudgetReportStore {
             if (row.spend().signum() <= 0) {
                 continue;
             }
+            var area = normalizedLabel(row.area());
+            var group = normalizedLabel(row.group());
             var category = normalizedLabel(row.correctedCategory());
             var subcategory = visibleSubcategory(row.subcategory());
-            var key = row.month() + "\u001F" + category + "\u001F" + subcategory;
-            var agg = totals.computeIfAbsent(key, ignored -> new MonthlyHierarchyAggregate(row.month(), category, subcategory));
+            var key = row.month() + "\u001F" + area + "\u001F" + group + "\u001F" + category + "\u001F" + subcategory;
+            var agg = totals.computeIfAbsent(key, ignored -> new MonthlyHierarchyAggregate(row.month(), area, group, category, subcategory));
             agg.spend = agg.spend.add(row.spend());
             agg.count++;
         }
         return totals.values().stream()
-                .map(agg -> new AnalyticsReport.MonthlyHierarchyTrend(monthLabel(agg.monthKey), agg.monthKey, agg.category, agg.subcategory, agg.spend, agg.count))
+                .map(agg -> new AnalyticsReport.MonthlyHierarchyTrend(monthLabel(agg.monthKey), agg.monthKey, agg.area, agg.group, agg.category, agg.subcategory, agg.spend, agg.count))
                 .sorted(Comparator.comparing(AnalyticsReport.MonthlyHierarchyTrend::monthKey)
+                        .thenComparing(AnalyticsReport.MonthlyHierarchyTrend::area)
+                        .thenComparing(AnalyticsReport.MonthlyHierarchyTrend::group)
                         .thenComparing(AnalyticsReport.MonthlyHierarchyTrend::category)
                         .thenComparing(AnalyticsReport.MonthlyHierarchyTrend::subcategory))
                 .toList();
@@ -1423,13 +1427,17 @@ public class BudgetReportRepository implements BudgetReportStore {
 
     private static final class MonthlyHierarchyAggregate {
         private final String monthKey;
+        private final String area;
+        private final String group;
         private final String category;
         private final String subcategory;
         private BigDecimal spend = BigDecimal.ZERO;
         private int count;
 
-        private MonthlyHierarchyAggregate(String monthKey, String category, String subcategory) {
+        private MonthlyHierarchyAggregate(String monthKey, String area, String group, String category, String subcategory) {
             this.monthKey = monthKey;
+            this.area = area;
+            this.group = group;
             this.category = category;
             this.subcategory = subcategory;
         }

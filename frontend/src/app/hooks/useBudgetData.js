@@ -140,6 +140,7 @@ export function useBudgetData() {
     importStatus,
     budgetSettings,
     settingsStatus,
+    settingsSaving: settingsMutation.isPending,
     handleUpload,
     handleRebuild,
     saveBudgetSettings,
