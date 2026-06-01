@@ -37,6 +37,7 @@ export default function App() {
     importStatus,
     budgetSettings,
     settingsStatus,
+    settingsSaving,
     handleUpload,
     handleRebuild,
     saveBudgetSettings,
@@ -376,7 +377,6 @@ export default function App() {
 
   return (
     <AppShell
-      contentKey={theme}
       sidebar={
         <SidebarNav
           activeView={view}
@@ -422,6 +422,7 @@ export default function App() {
           savingsWaterfall={model.savingsWaterfall}
           settings={settingsDraft || budgetSettings}
           settingsStatus={settingsStatus}
+          saving={settingsSaving}
           bucketOptions={BUDGET_BUCKET_OPTIONS}
           onSaveSettings={handleSaveSettings}
           onSettingChange={handleSettingChange}
