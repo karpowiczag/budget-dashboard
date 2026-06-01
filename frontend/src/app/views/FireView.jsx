@@ -5,7 +5,7 @@ import { ReportDataTable } from "../components/tables/ReportDataTable.jsx";
 import { Panel } from "../components/ui/Panel.jsx";
 import { money, percent } from "../domain/formatters.js";
 
-export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = false, settingsStatus }) {
+export function FireView({ fireSettings, fireSummary, loading = false, onSaveSettings, saving = false, settingsStatus }) {
   const summary = fireSummary || {};
   const [draft, setDraft] = useState(fireSettings || null);
 
@@ -17,10 +17,14 @@ export function FireView({ fireSettings, fireSummary, onSaveSettings, saving = f
     return (
       <section className="viewStack fireView">
         <Panel title="FIRE tracking">
-          <div className="dataQualityBanner warn">
-            <strong>Brak raportów inwestycyjnych</strong>
-            <span>Włóż eksporty MyFund `portfelSklad` do `{summary.reportsPath || "fire/investments_reports"}` i odśwież aplikację.</span>
-          </div>
+          {loading ? (
+            <div className="emptyState">Ładuję dane FIRE...</div>
+          ) : (
+            <div className="dataQualityBanner warn">
+              <strong>Brak raportów inwestycyjnych</strong>
+              <span>Włóż eksporty MyFund `portfelSklad` do `{summary.reportsPath || "fire/investments_reports"}` i odśwież aplikację.</span>
+            </div>
+          )}
         </Panel>
       </section>
     );

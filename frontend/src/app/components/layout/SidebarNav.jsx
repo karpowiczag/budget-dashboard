@@ -4,8 +4,10 @@ import {
   ClipboardList,
   Database,
   Landmark,
+  Moon,
   ReceiptText,
   ShieldCheck,
+  Sun,
 } from "lucide-react";
 
 const ICONS = {
@@ -18,12 +20,12 @@ const ICONS = {
   import: Database,
 };
 
-export function SidebarNav({ activeView, data, onViewChange, onYearChange, views = [], year, years = [] }) {
+export function SidebarNav({ activeView, data, onViewChange, onYearChange, onToggleTheme, theme = "light", views = [], year, years = [] }) {
   return (
     <aside className="sidebarNav">
       <div className="sidebarBrand">
         <p className="eyebrow">Budżet domowy</p>
-        <h1>{data?.year || year}</h1>
+        <span className="brandYear">{data?.year || year}</span>
         <span>{data?.period || "Import CSV"}</span>
       </div>
 
@@ -59,6 +61,17 @@ export function SidebarNav({ activeView, data, onViewChange, onYearChange, views
             </button>
           ))}
         </div>
+        {onToggleTheme && (
+          <button
+            type="button"
+            className="themeToggle"
+            onClick={onToggleTheme}
+            aria-pressed={theme === "dark"}
+          >
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            <span>{theme === "dark" ? "Jasny motyw" : "Ciemny motyw"}</span>
+          </button>
+        )}
       </div>
     </aside>
   );

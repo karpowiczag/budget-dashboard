@@ -11,6 +11,7 @@ import { TransactionDrilldownModal } from "./components/tables/TransactionDrilld
 import { StateScreen } from "./components/ui/StateScreen.jsx";
 import { useBudgetData } from "./hooks/useBudgetData.js";
 import { useDashboardModel } from "./hooks/useDashboardModel.js";
+import { applyTheme, getInitialTheme } from "./theme.js";
 import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel } from "./domain/budgetSelectors.js";
 import { ImportView } from "./views/ImportView.jsx";
 import { FireView } from "./views/FireView.jsx";
@@ -48,6 +49,7 @@ export default function App() {
   const [settingsDraft, setSettingsDraft] = useState(null);
   const [fireSettingsStatus, setFireSettingsStatus] = useState(null);
   const [view, setView] = useState("control");
+  const [theme, setTheme] = useState(getInitialTheme);
   const [localTimes, setLocalTimes] = useState({
     control: { scope: "month", month: "", day: "", drillFilter: null },
     reports: { scope: "year", month: "", day: "", drillFilter: null },
@@ -229,6 +231,12 @@ export default function App() {
     }));
   }
 
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    applyTheme(next);
+    setTheme(next);
+  }
+
   function openTransactionInspector(config) {
     setTransactionInspector({
       title: config.title,
@@ -368,6 +376,7 @@ export default function App() {
 
   return (
     <AppShell
+      contentKey={theme}
       sidebar={
         <SidebarNav
           activeView={view}
@@ -375,8 +384,10 @@ export default function App() {
           year={year}
           years={years}
           views={model.views}
+          theme={theme}
           onViewChange={setView}
           onYearChange={setYear}
+          onToggleTheme={toggleTheme}
         />
       }
     >
@@ -439,6 +450,7 @@ export default function App() {
         <FireView
           fireSettings={fireSettingsQuery.data}
           fireSummary={fireQuery.data || model.fireSummary}
+          loading={fireQuery.isPending && !fireQuery.data && !model.fireSummary}
           saving={fireSettingsMutation.isPending}
           settingsStatus={fireSettingsStatus}
           onSaveSettings={handleSaveFireSettings}

@@ -1,10 +1,11 @@
-export function AppShell({ sidebar, children }) {
+export function AppShell({ sidebar, children, contentKey }) {
   return (
-    <main className="appShell">
+    <div className="appShell">
+      <a className="skipLink" href="#mainContent">Przejdź do treści</a>
       {sidebar}
-      <div className="appContent">
+      <main className="appContent" id="mainContent" tabIndex={-1} key={contentKey}>
         {children}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
