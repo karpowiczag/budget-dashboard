@@ -12,6 +12,7 @@ import { StateScreen } from "./components/ui/StateScreen.jsx";
 import { useBudgetData } from "./hooks/useBudgetData.js";
 import { useDashboardModel } from "./hooks/useDashboardModel.js";
 import { applyTheme, getInitialTheme } from "./theme.js";
+import { Moon, Sun } from "lucide-react";
 import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel } from "./domain/budgetSelectors.js";
 import { ImportView } from "./views/ImportView.jsx";
 import { FireView } from "./views/FireView.jsx";
@@ -199,16 +200,32 @@ export default function App() {
 
   if (status === "empty") {
     return (
-      <main>
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Budżet domowy</p>
-            <h1>Import danych</h1>
-            <span>Dodaj pierwszy eksport bankowy CSV, żeby zbudować dashboard.</span>
-          </div>
-        </header>
+      <AppShell
+        sidebar={
+          <aside className="sidebarNav">
+            <div className="sidebarBrand">
+              <p className="eyebrow">Budżet domowy</p>
+              <span className="brandYear">Start</span>
+              <span>Zaimportuj dane, aby odblokować moduły.</span>
+            </div>
+            <div className="sidebarYears">
+              <button type="button" className="themeToggle" onClick={toggleTheme} aria-pressed={theme === "dark"}>
+                {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+                <span>{theme === "dark" ? "Jasny motyw" : "Ciemny motyw"}</span>
+              </button>
+            </div>
+          </aside>
+        }
+      >
+        <ModuleHeader
+          header={{
+            eyebrow: "Budżet domowy",
+            title: "Import danych",
+            subtitle: "Dodaj pierwszy eksport bankowy CSV, żeby zbudować dashboard.",
+          }}
+        />
         <ImportView onUpload={handleUpload} uploading={uploading} importStatus={importStatus} />
-      </main>
+      </AppShell>
     );
   }
 

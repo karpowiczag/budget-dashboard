@@ -540,15 +540,6 @@ main {
   color: var(--danger-text);
 }
 
-.topbar {
-  align-items: center;
-  display: flex;
-  gap: 20px;
-  justify-content: space-between;
-  margin: 0 auto 14px;
-  max-width: 1720px;
-}
-
 .eyebrow {
   color: var(--accent);
   font-size: 12px;
@@ -562,12 +553,6 @@ h1 {
   letter-spacing: 0;
   line-height: 1.1;
   margin: 0;
-}
-
-.topbar span {
-  color: var(--text-muted);
-  display: inline-block;
-  margin-top: 6px;
 }
 
 .controls,

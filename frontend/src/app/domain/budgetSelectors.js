@@ -744,10 +744,10 @@ export function selectModuleHeader({
       title: "Co się zmienia w czasie?",
       subtitle: "Eksploracja historii: cashflow, wydatki, dochód i jakość danych.",
       cards: [
+        // Scope context only. The spend/income/net numbers live in the
+        // interactive "Zakres raportu" panel below (with drill-down), so the
+        // header no longer duplicates them.
         { label: "Zakres", value: reportsSections?.activeTimeLabel || activeTimeLabel || "Cały rok", textValue: true, detail: "lokalny filtr raportu" },
-        { label: "Wydatki", value: Number(reportsSections?.scopedStats?.spend || 0), detail: `${Number(reportsSections?.scopedStats?.transactionCount || 0)} transakcji` },
-        { label: "Wpływy", value: Number(reportsSections?.scopedStats?.income || 0), detail: "rozpoznane dochody", tone: "good" },
-        { label: "Net flow", value: Number(reportsSections?.scopedStats?.income || 0) - Number(reportsSections?.scopedStats?.spend || 0), detail: "przed przepływami majątkowymi" },
       ],
     },
     wealth: {
