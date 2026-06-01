@@ -581,7 +581,7 @@ describe("chart selectors", () => {
       },
     })).toMatchObject({
       cards: [
-        { label: "Do sprawdzenia", value: 2, amount: 300, filter: { reviewStatus: "needsReview" } },
+        { label: "Do sprawdzenia", value: 2, amount: 300, filter: { flow: "review" } },
         { label: "Do rozbicia", value: 2, filter: { reviewStatus: "needsSplit" } },
         { label: "Niska pewność", value: 1 },
         { label: "Korekty roku", value: 4, filter: null, useTimeScope: false },
