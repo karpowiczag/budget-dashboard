@@ -1120,7 +1120,7 @@ export function selectDataQualityChart({ kpis, scopedStats }) {
   const lowConfidence = confidence.find((row) => row.confidence === "Niska");
   return {
     cards: [
-      { label: "Do sprawdzenia", value: Number(kpis?.toCheck || 0), amount: toCheckAmount, filter: { reviewStatus: "needsReview" }, useTimeScope: false },
+      { label: "Do sprawdzenia", value: Number(kpis?.toCheck || 0), amount: toCheckAmount, filter: { flow: "review" }, useTimeScope: false },
       { label: "Do rozbicia", value: Number((scopedStats?.categoryTop || []).filter((row) => REVIEW_CATEGORIES.has(row.category)).reduce((sum, row) => sum + Number(row.count || 0), 0)), filter: { reviewStatus: "needsSplit" } },
       { label: "Niska pewność", value: Number(lowConfidence?.count || 0), filter: { confidence: "Niska" } },
       { label: "Korekty roku", value: Number(kpis?.corrections || 0), filter: null, useTimeScope: false },

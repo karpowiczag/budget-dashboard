@@ -31,6 +31,9 @@ public class FireSettingsService {
 
     private FireSettings mergeWithDefaults(FireSettings settings) {
         return new FireSettings(
+                // Intentionally environment-controlled: the server owns the MyFund
+                // reports path. Honouring a client-supplied path would let the API
+                // redirect server-side file reads (see keepsReportsPathEnvironmentControlled).
                 defaults.reportsPath(),
                 positiveOrDefault(settings.currentAge(), defaults.currentAge()),
                 positiveOrDefault(settings.targetAge(), defaults.targetAge()),
