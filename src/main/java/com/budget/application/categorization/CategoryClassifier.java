@@ -3,6 +3,7 @@ package com.budget.application.categorization;
 import com.budget.domain.category.CategoryMatch;
 import java.math.BigDecimal;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -15,6 +16,7 @@ public class CategoryClassifier {
         this(PersonalCategoryRules.empty());
     }
 
+    @Autowired
     public CategoryClassifier(PersonalCategoryRules personalRules) {
         this(new RegexCategoryRuleMatcher(personalRules), new SubcategoryClassifier());
     }

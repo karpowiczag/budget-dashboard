@@ -141,7 +141,7 @@ describe("ReportsView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Wydatki" }));
     expect(screen.getByTestId("category-share-chart")).toBeInTheDocument();
     expect(screen.getByTestId("pareto-chart")).toBeInTheDocument();
-    expect(screen.getByText("Koszty total - kategorie i podkategorie")).toBeInTheDocument();
+    expect(screen.getByText("Koszty total - obszary, kategorie i podkategorie")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /500\s*zł/ })).toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId("pareto-chart"));

@@ -2,7 +2,9 @@ package com.budget.application.categorization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.budget.domain.category.CategoryRule;
 import java.util.List;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class CategoryClassifierTest {
@@ -149,5 +151,47 @@ class CategoryClassifierTest {
             assertThat(classifier.fixedness(category)).isEqualTo("Stałe");
             assertThat(classifier.subcategory(category, title)).isEqualTo("Telefon");
         }
+    }
+
+    @Test
+    void appliesPersonalRulesBeforePublicFallbackRules() {
+        var personalClassifier = new CategoryClassifier(new PersonalCategoryRules(List.of(
+                new CategoryRule(Pattern.compile("PRIVATE OWN TRANSFER", Pattern.CASE_INSENSITIVE), "ownTransfers", "personal:PRIVATE OWN TRANSFER")
+        )));
+
+        var decision = personalClassifier.classifyDecision("Bez kategorii", "PRIVATE OWN TRANSFER", -500);
+
+        assertThat(decision.category()).isEqualTo("Przelewy własne");
+        assertThat(decision.pattern()).isEqualTo("personal:PRIVATE OWN TRANSFER");
+        assertThat(decision.reviewStatus()).isEqualTo("ok");
+    }
+
+    @Test
+    void classifiesResearchedPublicMerchantsFromMayImport() {
+        assertDecision("NORWAYS BEST AS ZAKUP PRZY UŻYCIU KARTY - INTERNET", "Podróże i wyjazdy", "Atrakcje w podróży");
+        assertDecision("TORPEKSPRESSEN ZAKUP PRZY UŻYCIU KARTY - INTERNET", "Podróże i wyjazdy", "Transport w podróży");
+        assertDecision("OEN TURISTSENTE ZAKUP PRZY UŻYCIU KARTY - INTERNET", "Podróże i wyjazdy", "Noclegi");
+        assertDecision("housebrand.com ZAKUP PRZY UŻYCIU KARTY - INTERNET", "Odzież i obuwie", "Ubrania");
+        assertDecision("DM DROGERIE MARKT K.2. ZAKUP PRZY UŻYCIU KARTY W KRAJU", "Uroda i kosmetyki", "Kosmetyki");
+        assertDecision("PATRYCJA PILECKA ., EL GORDITO . BLIK P2P-WYCHODZĄCY", "Jedzenie poza domem", "Restauracje");
+    }
+
+    @Test
+    void treatsForeignParkingAndRentalAsTravelInsteadOfLocalTransport() {
+        assertDecision("PARKOVISTE CENTRUM ZAKUP PRZY UŻYCIU KARTY - INTERNET", "Podróże i wyjazdy", "Parking w podróży");
+        assertDecision("SIXT RENT A CAR ZAKUP PRZY UŻYCIU KARTY - INTERNET", "Podróże i wyjazdy", "Wynajem auta/campera");
+
+        var local = classifier.classifyDecision("Bez kategorii", "PARKOMAT WROCLAW ZAKUP PRZY UŻYCIU KARTY W KRAJU", -20);
+
+        assertThat(local.category()).isEqualTo("Transport i parking");
+        assertThat(local.subcategory()).isEqualTo("Parking");
+    }
+
+    private void assertDecision(String title, String category, String subcategory) {
+        var decision = classifier.classifyDecision("Bez kategorii", title, -100);
+
+        assertThat(decision.category()).isEqualTo(category);
+        assertThat(decision.subcategory()).isEqualTo(subcategory);
+        assertThat(decision.reviewStatus()).isEqualTo("ok");
     }
 }

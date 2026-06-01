@@ -1001,11 +1001,15 @@ components:
           type: integer
     MonthlyHierarchyTrend:
       type: object
-      required: [month, monthKey, category, subcategory, spend, count]
+      required: [month, monthKey, area, group, category, subcategory, spend, count]
       properties:
         month:
           type: string
         monthKey:
+          type: string
+        area:
+          type: string
+        group:
           type: string
         category:
           type: string

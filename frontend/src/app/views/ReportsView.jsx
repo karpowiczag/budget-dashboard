@@ -111,7 +111,7 @@ export function ReportsView({ dataQualityChart, reportsSections, reportsWorkspac
               <CategoryParetoChart data={sections.categoryPareto || []} onSelect={(entry) => inspectEntry(entry, onInspect)} />
             </Panel>
           </section>
-          <Panel title="Koszty total - kategorie i podkategorie" action={<ScopeBadge type="year" value={sections.yearLabel} />}>
+          <Panel title="Koszty total - obszary, kategorie i podkategorie" action={<ScopeBadge type="year" value={sections.yearLabel} />}>
             <CategoryCostMatrixTable matrix={sections.costMatrix} onInspect={onInspect} />
           </Panel>
           <Panel title="Podkategorie (Top 14)" action={<ScopeBadge type="scope" value={sections.activeTimeLabel} />}>

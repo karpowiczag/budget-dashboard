@@ -3599,7 +3599,46 @@ td {
   color: #64748b;
   display: flex;
   font-size: 12px;
+  gap: 12px;
   justify-content: space-between;
+}
+
+.costMatrixLegend {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.costMatrixLegend span {
+  align-items: center;
+  display: inline-flex;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.costMatrixLegend i {
+  border: 1px solid rgb(15 23 42 / 0.12);
+  border-radius: 3px;
+  display: inline-block;
+  height: 10px;
+  width: 18px;
+}
+
+.costMatrixLegend .low {
+  background: #dcfce7;
+}
+
+.costMatrixLegend .medium {
+  background: #fef3c7;
+}
+
+.costMatrixLegend .high {
+  background: #fed7aa;
+}
+
+.costMatrixLegend .peak {
+  background: #fecaca;
 }
 
 .costMatrixScroller {
@@ -3650,15 +3689,63 @@ td {
   z-index: 1;
 }
 
-.categoryRow .costMatrixLabel {
+.matrixLevel0 .costMatrixLabel {
   color: #07112d;
   font-weight: 900;
 }
 
-.subcategoryRow .costMatrixLabel {
+.matrixLevel1 .costMatrixLabel {
+  background: #fbfdff;
+  color: #172033;
+  font-weight: 760;
+  padding-left: 18px;
+}
+
+.matrixLevel2 .costMatrixLabel {
   color: #334155;
   font-weight: 650;
-  padding-left: 22px;
+  padding-left: 34px;
+}
+
+.matrixLabelContent {
+  align-items: flex-start;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.matrixLabelText {
+  display: block;
+  min-width: 0;
+}
+
+.matrixToggle,
+.matrixToggleSpacer {
+  flex: 0 0 18px;
+  height: 18px;
+  margin-top: -1px;
+  width: 18px;
+}
+
+.matrixToggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: #475569;
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  padding: 0;
+}
+
+.matrixToggle:hover {
+  background: #e8f0fe;
+  color: #17324d;
+}
+
+.matrixToggleSpacer {
+  display: inline-block;
 }
 
 .costMatrixLabel span,
@@ -3678,7 +3765,7 @@ td {
 .matrixAmount {
   background: transparent;
   border: 0;
-  color: #07112d;
+  color: var(--matrix-cell-text, #07112d);
   cursor: pointer;
   font: inherit;
   font-variant-numeric: tabular-nums;

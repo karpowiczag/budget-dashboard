@@ -29,7 +29,7 @@ final class SubcategoryClassifier {
                     sub("delivery", "UBER EATS|BOLT FOOD|PYSZNE|GLOVO|WOLT", "Dostawy"),
                     sub("coffee", "CAFE|KAWA|STARBUCKS|COSTA|KAVY|BELLA BEAN", "Kawa i kawiarnie"),
                     sub("fastFood", "MCDONALD|KFC|POPEYES|BURGER|BURGUER|KEBAP|DONER|PIZZA", "Fast food"),
-                    sub("restaurants", "RESTAUR|SUSHI|RAMEN|THAI|KUCHNIA|PIEROGARNIA|BISTRO|KARCZMA", "Restauracje")
+                    sub("restaurants", "RESTAUR|SUSHI|RAMEN|THAI|KUCHNIA|PIEROGARNIA|BISTRO|KARCZMA|EL GORDITO", "Restauracje")
             );
             case "medicalPharmacy" -> List.of(
                     sub("pharmacy", "APTEKA|APOTHEKE|DOZ|FARMAC|SUPER-PHARM", "Apteka"),
@@ -37,20 +37,22 @@ final class SubcategoryClassifier {
                     sub("optician", "FIELMANN|OPTYCZNY|OKULAR", "Optyk")
             );
             case "beautyCosmetics" -> List.of(
-                    sub("cosmetics", "SEPHORA|DOUGLAS|NOTINO|ROSSMANN|HEBE|DM-DROGERIE", "Kosmetyki"),
+                    sub("cosmetics", "SEPHORA|DOUGLAS|NOTINO|ROSSMANN|HEBE|DM-DROGERIE|DM\\s+DROGERIE|DROGERIE MARKT", "Kosmetyki"),
                     sub("beautyServices", "FRISER|MIDNIGHT MEADO", "Usługi urody")
             );
             case "travel" -> List.of(
-                    sub("lodging", "BOOKING|BKG\\*HOTEL|AIRBNB|HOTEL|PENSJONAT|PARK INN|ARBIO|DOM ZU SALZBURG|VLTAVSKA POHADKA", "Noclegi"),
+                    sub("lodging", "BOOKING|BKG\\*HOTEL|AIRBNB|HOTEL|PENSJONAT|PARK INN|ARBIO|OEN TURISTSENT|ØEN TURISTSENT|DOM ZU SALZBURG|VLTAVSKA POHADKA", "Noclegi"),
                     sub("flights", "RYANAIR|WIZZAIR|LOT\\.COM|LOT ", "Loty"),
                     sub("rentalCar", "SIXT|ARCTIC CAMPERS", "Wynajem auta/campera"),
-                    sub("travelAttractions", "SCHOENBRUNN|ALPINCENTER|DALI|BAHN|LANOVA|BANYS", "Atrakcje w podróży")
+                    sub("travelParking", "PARKOVISTE|PARKUM|PARKPLATZ|KARLSPLATZGARAGE|AP RIERA SANT VICENC|AP EL GARRIGAL|AP SANTA CATERINA|PR CERNY MOST", "Parking w podróży"),
+                    sub("travelTransport", "TORPEKSPRESSEN|TORP-EKSPRESSEN|WIENER LINIEN|MPSA - A|VIGNETTE|EDALNICE|DALNICKA", "Transport w podróży"),
+                    sub("travelAttractions", "SCHOENBRUNN|ALPINCENTER|DALI|BAHN|LANOVA|BANYS|NORWAYS BEST|NORWAY'S BEST", "Atrakcje w podróży")
             );
             case "transportParking" -> List.of(
                     sub("taxi", "UBER|BOLT|FREE NOW", "Taxi/VTC"),
-                    sub("publicTransport", "ZTM|MPK|PKP|KOLEO|INTERCITY|FLIXBUS|INFOBUS|WIENER LINIEN", "Komunikacja i bilety"),
-                    sub("parking", "PARKING|PARKOVISTE|PARKOMAT|APCOA|PARKUM|GARAGE|GARAZE|SPP|KBU", "Parking"),
-                    sub("roads", "AUTOSTRADA|VIGNETTE|EDALNICE|DALNICKA", "Drogi i winiety")
+                    sub("publicTransport", "ZTM|MPK|PKP|KOLEO|INTERCITY|FLIXBUS|INFOBUS", "Komunikacja i bilety"),
+                    sub("parking", "PARKING|PARKOMAT|APCOA|GARAGE|GARAZE|SPP|KBU", "Parking"),
+                    sub("roads", "AUTOSTRADA", "Drogi i winiety")
             );
             case "fuelCar" -> List.of(
                     sub("fuel", "ORLEN|BP |SHELL|CIRCLE K|MOL |STACJA", "Paliwo"),
@@ -63,7 +65,7 @@ final class SubcategoryClassifier {
             case "clothing" -> List.of(
                     sub("secondHand", "VINTED", "Second hand/Vinted"),
                     sub("shoes", "CCC|OBUWIE|DEICHMANN|BALAGANSTUDIO", "Buty"),
-                    sub("clothes", "ZALANDO|H&M|\\bHM\\b|RESERVED|SINSAY|MOHITO|ZARA|CROPP|PRIMARK|MEDICINE|HOUSE|STRADIVARIUS|NEW YORKER", "Ubrania")
+                    sub("clothes", "ZALANDO|H&M|\\bHM\\b|RESERVED|SINSAY|MOHITO|ZARA|CROPP|PRIMARK|MEDICINE|HOUSE|HOUSEBRAND|STRADIVARIUS|NEW YORKER", "Ubrania")
             );
             case "events" -> List.of(
                     sub("cinema", "KINO|CINEMA", "Kino"),

@@ -52,7 +52,7 @@ public record AnalyticsReport(
     public record MonthlyCategoryTrend(String month, String monthKey, String category, BigDecimal spend, int count) {
     }
 
-    public record MonthlyHierarchyTrend(String month, String monthKey, String category, String subcategory, BigDecimal spend, int count) {
+    public record MonthlyHierarchyTrend(String month, String monthKey, String area, String group, String category, String subcategory, BigDecimal spend, int count) {
     }
 
     public record MonthlyBucketTrend(String month, String monthKey, String bucket, BigDecimal spend, int count) {
