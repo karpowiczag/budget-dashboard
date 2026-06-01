@@ -34,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class BudgetReportRepository implements BudgetReportStore {
-    private static final java.util.Set<String> FINANCIAL_FLOW_CATEGORIES = java.util.Set.of("Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu");
+    private static final java.util.Set<String> FINANCIAL_FLOW_CATEGORIES = com.budget.application.categorization.BudgetTaxonomy.wealthCategoryLabels();
 
     private final ReportDataJdbcRepository reports;
     private final BudgetTransactionDataJdbcRepository transactions;

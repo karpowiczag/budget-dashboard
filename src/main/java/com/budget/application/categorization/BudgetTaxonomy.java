@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public final class BudgetTaxonomy {
     static final String FLOW_INCOME = "income";
@@ -94,6 +95,10 @@ public final class BudgetTaxonomy {
 
     static final Set<String> WEALTH_CATEGORY_IDS = Set.of(CATEGORY_INVESTMENTS, CATEGORY_SAVINGS_ACCOUNT, CATEGORY_LOAN_OVERPAYMENT);
 
+    private static final Set<String> WEALTH_CATEGORY_LABELS = WEALTH_CATEGORY_IDS.stream()
+            .map(id -> CATEGORIES.get(id).label())
+            .collect(Collectors.toUnmodifiableSet());
+
     private static final Map<String, String> LEGACY_CATEGORY_LABEL_ALIASES = Map.of(
             "Oszczędności i inwestycje", CATEGORY_INVESTMENTS,
             "Zdrowie i uroda", "medicalPharmacy",
@@ -152,6 +157,15 @@ public final class BudgetTaxonomy {
             throw new IllegalArgumentException("Unknown budget category id: " + id);
         }
         return definition;
+    }
+
+    /**
+     * Canonical labels of the wealth-building categories (investments, savings
+     * account, loan overpayment). Single source of truth so persistence,
+     * analysis, and FIRE linkage cannot silently drift if a label is renamed.
+     */
+    public static Set<String> wealthCategoryLabels() {
+        return WEALTH_CATEGORY_LABELS;
     }
 
     public static String categoryIdByLabel(String label) {
