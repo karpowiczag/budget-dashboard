@@ -732,9 +732,9 @@ export function buildRecurringTimelineOption(data = []) {
       ].join("<br/>");
     }),
     xAxis: {
-      ...valueAxis({ max: 31, min: 1 }),
-      axisLabel: { color: chartText(), fontSize: 12 },
-      name: "Dzień",
+      ...valueAxis({ max: 31, min: 1, interval: 5 }),
+      axisLabel: { color: chartText(), fontSize: 12, showMaxLabel: false },
+      name: "Dzień miesiąca",
       nameGap: 28,
       nameLocation: "middle",
       splitLine: { lineStyle: { color: chartGrid() } },

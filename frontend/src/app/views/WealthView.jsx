@@ -50,7 +50,7 @@ export function WealthView({ wealthDashboard, onInspect }) {
           onRowClick={(row) => onInspect?.({ title: `Transakcje: ${row.category}`, filters: { category: row.category }, useTimeScope: false })}
           columns={[
             { key: "category", header: "Kategoria" },
-            { key: "outgoing", header: "Kwota", className: "num", render: (row) => money(row.outgoing) },
+            { key: "outgoing", header: "Wypływy (brutto)", className: "num", render: (row) => money(row.outgoing) },
             { key: "count", header: "Transakcje", className: "num" },
           ]}
         />

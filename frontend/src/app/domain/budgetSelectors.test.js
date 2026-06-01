@@ -140,7 +140,7 @@ describe("module view-model selectors", () => {
     })).toMatchObject({
       cards: [
         { label: "Inwestycje", value: 500, filter: { category: "Inwestycje" } },
-        { label: "Konto oszczędnościowe", value: 300, filter: { category: "Konto oszczędnościowe" } },
+        { label: "Konto oszczędnościowe (netto)", value: 300, filter: { category: "Konto oszczędnościowe" } },
         { label: "Nadpłaty kredytu", value: 700, filter: { category: "Nadpłata kredytu" } },
         { label: "Razem przepływy", value: 1500, detail: "transakcyjnie, bez sald kont" },
       ],

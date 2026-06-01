@@ -682,7 +682,7 @@ export function selectWealthDashboard({ financialFlows, monthly = [], reportsSec
   return {
     cards: [
       { label: "Inwestycje", value: flows.investmentTotal, detail: `${flows.investmentCount} transakcji`, filter: { category: "Inwestycje" }, tone: "good" },
-      { label: "Konto oszczędnościowe", value: flows.savingsAccountTotal, detail: `wpływy ${flows.savingsAccountInflows} · wydatki ${flows.savingsAccountOutflows}`, filter: { category: "Konto oszczędnościowe" }, tone: "good" },
+      { label: "Konto oszczędnościowe (netto)", value: flows.savingsAccountTotal, detail: `wpływy ${flows.savingsAccountInflows} · wydatki ${flows.savingsAccountOutflows}`, filter: { category: "Konto oszczędnościowe" }, tone: "good" },
       { label: "Nadpłaty kredytu", value: flows.loanOverpaymentTotal, detail: `${flows.loanOverpaymentCount} transakcji`, filter: { category: "Nadpłata kredytu" }, tone: "good" },
       { label: "Razem przepływy", value: flows.total, detail: "transakcyjnie, bez sald kont", filter: { flow: "financial" }, tone: "neutral" },
     ],

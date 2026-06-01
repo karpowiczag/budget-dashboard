@@ -217,7 +217,7 @@ describe("FireView", () => {
   it("explains where local MyFund reports are expected when data is missing", () => {
     render(<FireView fireSummary={{ reportsLoaded: false, reportsPath: "fire/investments_reports" }} />);
 
-    expect(screen.getByText("Brak raportów inwestycyjnych")).toBeInTheDocument();
+    expect(screen.getByText("Połącz portfel inwestycyjny")).toBeInTheDocument();
     expect(screen.getByText(/fire\/investments_reports/)).toBeInTheDocument();
   });
 });

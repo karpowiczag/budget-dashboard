@@ -20,9 +20,14 @@ export function FireView({ fireSettings, fireSummary, loading = false, onSaveSet
           {loading ? (
             <div className="emptyState">Ładuję dane FIRE...</div>
           ) : (
-            <div className="dataQualityBanner warn">
-              <strong>Brak raportów inwestycyjnych</strong>
-              <span>Włóż eksporty MyFund `portfelSklad` do `{summary.reportsPath || "fire/investments_reports"}` i odśwież aplikację.</span>
+            <div className="fireOnboarding">
+              <h3>Połącz portfel inwestycyjny</h3>
+              <p>Moduł FIRE prognozuje niezależność finansową na podstawie eksportów MyFund. Aby go uruchomić:</p>
+              <ol>
+                <li>Pobierz z MyFund eksport składu portfela (<code>portfelSklad</code>).</li>
+                <li>Umieść pliki w katalogu <code>{summary.reportsPath || "fire/investments_reports"}</code>.</li>
+                <li>Odśwież aplikację — prognoza, alokacja i ryzyka pojawią się automatycznie.</li>
+              </ol>
             </div>
           )}
         </Panel>
