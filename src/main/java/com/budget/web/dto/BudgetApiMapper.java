@@ -1,5 +1,7 @@
 package com.budget.web.dto;
 
+import com.budget.application.fire.FireSummary;
+import com.budget.application.fire.FireSettings;
 import com.budget.application.importing.ImportSummary;
 import com.budget.application.reporting.AnalyticsReport;
 import com.budget.application.reporting.CalendarReport;
@@ -9,6 +11,7 @@ import com.budget.application.reporting.YearSummary;
 import com.budget.application.settings.BudgetSettings;
 import com.budget.domain.importjob.ImportRun;
 import com.budget.domain.report.BudgetSnapshot;
+import java.nio.file.Path;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -75,8 +78,16 @@ public class BudgetApiMapper {
                 map(report.categoryTop(), row -> new BudgetApiDtos.CategorySpendResponse(row.category(), row.spend(), row.count())),
                 map(report.subcategoryTop(), row -> new BudgetApiDtos.SubcategorySpendResponse(row.subcategory(), row.category(), row.spend(), row.count())),
                 map(report.hierarchyTop(), row -> new BudgetApiDtos.HierarchySpendResponse(row.area(), row.group(), row.category(), row.subcategory(), row.spend(), row.count())),
+                map(report.financialFlows(), row -> new BudgetApiDtos.FinancialFlowResponse(row.category(), row.outgoing(), row.count())),
                 map(report.merchants(), row -> new BudgetApiDtos.AnalyticsMerchantSpendResponse(row.merchant(), row.sum(), row.count())),
-                map(report.oneoffs(), this::toTransaction)
+                map(report.oneoffs(), this::toTransaction),
+                map(report.monthlyCategoryTrends(), row -> new BudgetApiDtos.MonthlyCategoryTrendResponse(row.month(), row.monthKey(), row.category(), row.spend(), row.count())),
+                map(report.monthlyHierarchyTrends(), row -> new BudgetApiDtos.MonthlyHierarchyTrendResponse(row.month(), row.monthKey(), row.area(), row.group(), row.category(), row.subcategory(), row.spend(), row.count())),
+                map(report.monthlyBucketTrends(), row -> new BudgetApiDtos.MonthlyBucketTrendResponse(row.month(), row.monthKey(), row.bucket(), row.spend(), row.count())),
+                map(report.monthlyMerchantTrends(), row -> new BudgetApiDtos.MonthlyMerchantTrendResponse(row.month(), row.monthKey(), row.merchant(), row.spend(), row.count())),
+                map(report.fixednessBreakdown(), row -> new BudgetApiDtos.FixednessBreakdownResponse(row.fixedness(), row.spend(), row.count())),
+                map(report.confidenceBreakdown(), row -> new BudgetApiDtos.ConfidenceBreakdownResponse(row.confidence(), row.count(), row.spend(), row.income(), row.excluded())),
+                map(report.amountBands(), row -> new BudgetApiDtos.AmountBandResponse(row.label(), row.minAmount(), row.maxAmount(), row.count(), row.spend()))
         );
     }
 
@@ -101,10 +112,17 @@ public class BudgetApiMapper {
                 row.description(),
                 row.account(),
                 row.bankCategory(),
+                row.categoryId(),
                 row.correctedCategory(),
+                row.subcategoryId(),
                 row.area(),
                 row.group(),
                 row.subcategory(),
+                row.flowType(),
+                row.budgetGroupId(),
+                row.budgetGroup(),
+                row.reviewStatus(),
+                row.reviewReason(),
                 row.bucket(),
                 row.fixedness(),
                 row.type(),
@@ -127,6 +145,7 @@ public class BudgetApiMapper {
                 summary.status(),
                 summary.years(),
                 summary.transactions(),
+                summary.duplicatesRemoved(),
                 summary.income(),
                 summary.spend(),
                 summary.message()
@@ -140,6 +159,7 @@ public class BudgetApiMapper {
                 run.inputCsv(),
                 run.status(),
                 run.message(),
+                run.duplicatesRemoved(),
                 run.createdAt()
         );
     }
@@ -150,7 +170,7 @@ public class BudgetApiMapper {
                 settings.aggressiveMonthlySpend(),
                 settings.emergencyFundMinMonths(),
                 settings.emergencyFundComfortMonths(),
-                map(settings.categoryLimits(), row -> new BudgetApiDtos.CategoryLimitSettingDto(row.category(), row.limit(), row.action()))
+                map(settings.categoryLimits(), row -> new BudgetApiDtos.CategoryLimitSettingDto(row.scope(), row.name(), row.category(), row.limit(), row.action(), row.bucketOverride()))
         );
     }
 
@@ -163,7 +183,259 @@ public class BudgetApiMapper {
                 dto.aggressiveMonthlySpend(),
                 dto.emergencyFundMinMonths(),
                 dto.emergencyFundComfortMonths(),
-                map(dto.categoryLimits(), row -> new BudgetSettings.CategoryLimitSetting(row.category(), row.limit(), row.action()))
+                map(dto.categoryLimits(), row -> new BudgetSettings.CategoryLimitSetting(row.scope(), row.name(), row.category(), row.limit(), row.action(), row.bucketOverride()))
+        );
+    }
+
+    public BudgetApiDtos.FireSummaryResponse toFireSummary(FireSummary summary) {
+        return new BudgetApiDtos.FireSummaryResponse(
+                summary.asOf(),
+                summary.reportsLoaded(),
+                summary.reportsPath(),
+                summary.sourceCount(),
+                summary.positionCount(),
+                summary.currentAge(),
+                summary.targetAge(),
+                summary.yearsToFire(),
+                summary.currentPortfolioValue(),
+                summary.costBasis(),
+                summary.unrealizedGain(),
+                summary.emergencyFundValue(),
+                summary.retirementLockedValue(),
+                summary.liquidFireCapital(),
+                summary.bridgeableLiquidCapital(),
+                summary.emergencyReserveTarget(),
+                summary.annualSpendTarget(),
+                summary.monthlySpendTarget(),
+                summary.spendTargetConfigured(),
+                summary.safeWithdrawalRate(),
+                summary.fireNumber(),
+                summary.gapToFireNumber(),
+                summary.bridgeCapitalToAge60(),
+                summary.bridgeCapitalToAge65(),
+                summary.liquidBridgeGapToAge60(),
+                summary.liquidBridgeGapToAge65(),
+                summary.taxableCapitalValue(),
+                summary.taxableUnrealizedGain(),
+                summary.estimatedCapitalGainsTax(),
+                summary.currentMonthlyWealthContribution(),
+                toFireBudgetLink(summary.budgetLink()),
+                toFireContributionPlan(summary.contributionPlan()),
+                toFireWithdrawalPlan(summary.withdrawalPlan()),
+                toFireDataQuality(summary.dataQuality()),
+                map(summary.scenarios(), row -> new BudgetApiDtos.FireScenarioResponse(
+                        row.id(),
+                        row.label(),
+                        row.realReturn(),
+                        row.projectedAtFire(),
+                        row.gapAtFire(),
+                        row.requiredMonthlyContribution(),
+                        row.currentPlanMonthlyContribution(),
+                        row.onTrack()
+                )),
+                map(summary.allocation(), row -> new BudgetApiDtos.FireAllocationResponse(
+                        row.assetClass(),
+                        row.value(),
+                        row.share(),
+                        row.targetShare(),
+                        row.drift(),
+                        row.status()
+                )),
+                map(summary.wrappers(), row -> new BudgetApiDtos.FireWrapperResponse(
+                        row.wrapper(),
+                        row.value(),
+                        row.share(),
+                        row.positions(),
+                        row.liquidity()
+                )),
+                map(summary.portfolios(), row -> new BudgetApiDtos.FirePortfolioBreakdownResponse(
+                        row.portfolio(),
+                        row.value(),
+                        row.share(),
+                        row.investmentValue(),
+                        row.emergencyValue(),
+                        row.retirementLockedValue(),
+                        row.taxableValue(),
+                        row.positions(),
+                        row.role(),
+                        row.note()
+                )),
+                map(summary.rebalancing(), row -> new BudgetApiDtos.FireRebalanceActionResponse(
+                        row.assetClass(),
+                        row.currentShare(),
+                        row.targetShare(),
+                        row.drift(),
+                        row.amountToTarget(),
+                        row.action(),
+                        row.priority()
+                )),
+                map(summary.risks(), row -> new BudgetApiDtos.FireRiskResponse(
+                        row.id(),
+                        row.level(),
+                        row.area(),
+                        row.title(),
+                        row.metric(),
+                        row.value(),
+                        row.threshold(),
+                        row.detail(),
+                        row.recommendation()
+                )),
+                map(summary.actionItems(), row -> new BudgetApiDtos.FireActionItemResponse(
+                        row.priority(),
+                        row.type(),
+                        row.title(),
+                        row.detail(),
+                        row.amount()
+                )),
+                map(summary.positionAnalyses(), row -> new BudgetApiDtos.FirePositionAnalysisResponse(
+                        row.instrument(),
+                        row.isin(),
+                        row.portfolio(),
+                        row.assetClass(),
+                        row.instrumentType(),
+                        row.fireRole(),
+                        row.wrapper(),
+                        row.account(),
+                        row.currency(),
+                        row.priceDate(),
+                        row.value(),
+                        row.costBasis(),
+                        row.unrealizedGain(),
+                        row.returnPct(),
+                        row.shareOfPortfolio(),
+                        row.shareOfInvestments(),
+                        row.riskLevel(),
+                        row.reviewFocus(),
+                        row.decision(),
+                        row.decisionReason(),
+                        row.action(),
+                        row.perspective(),
+                        row.riskDrivers(),
+                        row.checklist()
+                )),
+                map(summary.milestones(), row -> new BudgetApiDtos.FireMilestoneResponse(
+                        row.age(),
+                        row.label(),
+                        row.description(),
+                        row.requiredCapital()
+                )),
+                map(summary.legalRules(), row -> new BudgetApiDtos.FireLegalRuleResponse(
+                        row.id(),
+                        row.label(),
+                        row.value(),
+                        row.note(),
+                        row.sourceUrl()
+                )),
+                map(summary.sources(), row -> new BudgetApiDtos.FireSourceResponse(
+                        row.fileName(),
+                        row.portfolio(),
+                        row.asOf(),
+                        row.positions(),
+                        row.value()
+                ))
+        );
+    }
+
+    public BudgetApiDtos.FireSettingsDto toFireSettings(FireSettings settings) {
+        return new BudgetApiDtos.FireSettingsDto(
+                settings.reportsPath().toString(),
+                settings.currentAge(),
+                settings.targetAge(),
+                settings.monthlySpendOverride(),
+                settings.monthlyContributionOverride(),
+                settings.safeWithdrawalRate(),
+                settings.pessimisticRealReturn(),
+                settings.expectedRealReturn(),
+                settings.optimisticRealReturn(),
+                settings.targetEquityShare(),
+                settings.targetBondShare(),
+                settings.targetCashShare(),
+                settings.targetAlternativeShare(),
+                settings.rebalanceBand()
+        );
+    }
+
+    public FireSettings toFireSettings(BudgetApiDtos.FireSettingsDto dto) {
+        if (dto == null) {
+            return null;
+        }
+        return new FireSettings(
+                Path.of(dto.reportsPath() == null || dto.reportsPath().isBlank() ? "fire/investments_reports" : dto.reportsPath()),
+                dto.currentAge(),
+                dto.targetAge(),
+                dto.monthlySpendOverride(),
+                dto.monthlyContributionOverride(),
+                dto.safeWithdrawalRate(),
+                dto.pessimisticRealReturn(),
+                dto.expectedRealReturn(),
+                dto.optimisticRealReturn(),
+                dto.targetEquityShare(),
+                dto.targetBondShare(),
+                dto.targetCashShare(),
+                dto.targetAlternativeShare(),
+                dto.rebalanceBand()
+        );
+    }
+
+    private BudgetApiDtos.FireContributionPlanResponse toFireContributionPlan(FireSummary.FireContributionPlan row) {
+        return new BudgetApiDtos.FireContributionPlanResponse(
+                row.currentMonthly(),
+                row.requiredMonthlyBase(),
+                row.additionalMonthlyNeeded(),
+                row.annualIkeCapacityForHousehold(),
+                row.annualIkzeCapacityForHousehold(),
+                row.monthlyRetirementWrapperCapacity(),
+                row.recommendation()
+        );
+    }
+
+    private BudgetApiDtos.FireBudgetLinkResponse toFireBudgetLink(FireSummary.FireBudgetLink row) {
+        return new BudgetApiDtos.FireBudgetLinkResponse(
+                row.linked(),
+                row.budgetYear(),
+                row.activeMonths(),
+                row.monthlyIncome(),
+                row.currentMonthlyLivingSpend(),
+                row.targetMonthlySpend(),
+                row.actualMonthlyInvestments(),
+                row.savingsAccountMonthlyNet(),
+                row.savingsAccountMonthlyGrossDeposits(),
+                row.loanOverpaymentMonthly(),
+                row.firePortfolioMonthlyContribution(),
+                row.targetInvestableSurplus(),
+                row.unassignedSurplusMonthly(),
+                row.emergencyReserveTarget(),
+                row.spendOverrideUsed(),
+                row.contributionOverrideUsed(),
+                row.note()
+        );
+    }
+
+    private BudgetApiDtos.FireWithdrawalPlanResponse toFireWithdrawalPlan(FireSummary.FireWithdrawalPlan row) {
+        return new BudgetApiDtos.FireWithdrawalPlanResponse(
+                row.monthlyTarget(),
+                row.annualTarget(),
+                row.liquidCapital(),
+                row.yearsCoveredByLiquidCapital(),
+                row.bridgeNeedToAge60(),
+                row.bridgeNeedToAge65(),
+                row.estimatedTaxReserve(),
+                row.sequence()
+        );
+    }
+
+    private BudgetApiDtos.FireDataQualityResponse toFireDataQuality(FireSummary.FireDataQuality row) {
+        return new BudgetApiDtos.FireDataQualityResponse(
+                row.newestReportDate(),
+                row.sourceCount(),
+                row.positionCount(),
+                row.staleSourceCount(),
+                row.unknownAssetClassCount(),
+                row.unknownAssetClassValue(),
+                row.unknownWrapperCount(),
+                row.unknownWrapperValue(),
+                row.status(),
+                row.note()
         );
     }
 
@@ -184,7 +456,11 @@ public class BudgetApiMapper {
                 row.corrections(),
                 row.lowConfidence(),
                 row.toCheck(),
-                row.toCheckAmount()
+                row.toCheckAmount(),
+                row.savingsAccountNetChange(),
+                row.savingsAccountGrossDeposits(),
+                row.savingsAccountInflows(),
+                row.savingsAccountOutflows()
         );
     }
 
@@ -215,7 +491,8 @@ public class BudgetApiMapper {
                 row.maxMonth(),
                 row.maxAmount(),
                 row.discretionary(),
-                row.count()
+                row.count(),
+                row.merchantExamples()
         );
     }
 
@@ -250,12 +527,16 @@ public class BudgetApiMapper {
                 row.monthlyCutNeeded(),
                 row.emergencyFundMin(),
                 row.emergencyFundComfort(),
+                map(row.parentLimits(), this::toCategoryLimit),
                 map(row.categoryLimits(), this::toCategoryLimit)
         );
     }
 
     private BudgetApiDtos.CategoryLimitResponse toCategoryLimit(BudgetSnapshot.CategoryLimit row) {
         return new BudgetApiDtos.CategoryLimitResponse(
+                row.scope(),
+                row.name(),
+                row.parent(),
                 row.category(),
                 row.bucket(),
                 row.currentMonthly(),

@@ -8,6 +8,7 @@ public record ImportRun(
         String inputCsv,
         String status,
         String message,
+        int duplicatesRemoved,
         OffsetDateTime createdAt
 ) {
 }

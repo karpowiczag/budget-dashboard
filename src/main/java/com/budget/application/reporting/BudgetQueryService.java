@@ -39,7 +39,7 @@ public class BudgetQueryService {
             String category,
             String subcategory
     ) {
-        var query = new TransactionQuery(year, 0, 5_000, "spend,desc", month, date, null, null, area, group, category, subcategory);
+        var query = new TransactionQuery(year, 0, 5_000, "spend,desc", month, date, null, null, null, area, group, category, subcategory);
         return repository.findAnalytics(queryForScope(scope, query));
     }
 
@@ -57,12 +57,14 @@ public class BudgetQueryService {
             case "month" -> new TransactionQuery(
                     query.year(), query.page(), query.size(), query.sort(),
                     requiredMonth(query.month(), "month"), null,
-                    query.query(), query.bucket(), query.area(), query.group(), query.category(), query.subcategory()
+                    query.query(), query.flow(), query.bucket(), query.area(), query.group(), query.category(), query.subcategory(),
+                    query.fixedness(), query.confidence(), query.reviewStatus()
             );
             case "year" -> new TransactionQuery(
                     query.year(), query.page(), query.size(), query.sort(),
                     null, null,
-                    query.query(), query.bucket(), query.area(), query.group(), query.category(), query.subcategory()
+                    query.query(), query.flow(), query.bucket(), query.area(), query.group(), query.category(), query.subcategory(),
+                    query.fixedness(), query.confidence(), query.reviewStatus()
             );
             default -> throw new IllegalArgumentException("Unsupported analytics scope: " + scope);
         };
@@ -79,7 +81,8 @@ public class BudgetQueryService {
         return new TransactionQuery(
                 query.year(), query.page(), query.size(), query.sort(),
                 dateMonth, query.date(),
-                query.query(), query.bucket(), query.area(), query.group(), query.category(), query.subcategory()
+                query.query(), query.flow(), query.bucket(), query.area(), query.group(), query.category(), query.subcategory(),
+                query.fixedness(), query.confidence(), query.reviewStatus()
         );
     }
 
@@ -91,7 +94,8 @@ public class BudgetQueryService {
         return new TransactionQuery(
                 query.year(), query.page(), query.size(), query.sort(),
                 month, query.date(),
-                query.query(), query.bucket(), query.area(), query.group(), query.category(), query.subcategory()
+                query.query(), query.flow(), query.bucket(), query.area(), query.group(), query.category(), query.subcategory(),
+                query.fixedness(), query.confidence(), query.reviewStatus()
         );
     }
 

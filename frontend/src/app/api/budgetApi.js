@@ -49,9 +49,24 @@ export async function fetchTransactions(year, params = {}) {
   return readJson(response, "Nie mogę wczytać transakcji");
 }
 
+export async function fetchImportRuns() {
+  const response = await fetch("/api/v1/imports/runs");
+  return readJson(response, "Nie mogę wczytać historii importów");
+}
+
 export async function fetchBudgetSettings() {
   const response = await fetch("/api/v1/settings/budget");
   return readJson(response, "Nie mogę wczytać ustawień budżetu");
+}
+
+export async function fetchFireSummary() {
+  const response = await fetch("/api/v1/fire/summary");
+  return readJson(response, "Nie mogę wczytać modułu FIRE");
+}
+
+export async function fetchFireSettings() {
+  const response = await fetch("/api/v1/fire/settings");
+  return readJson(response, "Nie mogę wczytać ustawień FIRE");
 }
 
 export async function updateBudgetSettings(settings) {
@@ -66,6 +81,18 @@ export async function updateBudgetSettings(settings) {
   return readJson(response, "Nie mogę zapisać ustawień budżetu");
 }
 
+export async function updateFireSettings(settings) {
+  const response = await fetch("/api/v1/fire/settings", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(settings),
+  });
+  return readJson(response, "Nie mogę zapisać ustawień FIRE");
+}
+
 export async function uploadTransactions(file) {
   const body = new FormData();
   body.append("file", file);
@@ -75,4 +102,12 @@ export async function uploadTransactions(file) {
     headers: csrfHeaders(),
   });
   return readJson(response, "Import CSV nie powiódł się");
+}
+
+export async function rebuildTransactions(year) {
+  const response = await fetch(`/api/v1/imports/rebuild${queryString({ year })}`, {
+    method: "POST",
+    headers: csrfHeaders(),
+  });
+  return readJson(response, "Przebudowa danych nie powiodła się");
 }

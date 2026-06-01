@@ -47,7 +47,7 @@ class BudgetReportRepositoryTest {
         )));
 
         store.save(result);
-        store.recordImportRun(2099, "fixture.csv", "ok", "test");
+        store.recordImportRun(2099, "fixture.csv", "ok", "test", 2);
 
         var dashboard = store.findDashboard(2099);
         assertThat(dashboard.year()).isEqualTo(2099);
@@ -69,16 +69,72 @@ class BudgetReportRepositoryTest {
             assertThat(row.transactions()).isEqualTo(3);
         });
 
-        var page = store.findTransactions(new TransactionQuery(2099, 0, 2, "postedDate,desc", "2099-01", null, "biedronka", null, null, null, null, null));
+        var page = store.findTransactions(new TransactionQuery(2099, 0, 2, "postedDate,desc", "2099-01", null, "biedronka", null, null, null, null, null, null));
         assertThat(page.totalItems()).isEqualTo(1);
         assertThat(page.items()).singleElement().satisfies(row -> {
             assertThat(row.merchant()).isEqualTo("BIEDRONKA");
             assertThat(row.spend()).isEqualByComparingTo(BigDecimal.valueOf(123.45));
         });
 
+        var spendPage = store.findTransactions(new TransactionQuery(2099, 0, 50, "spend,desc", null, null, null, "spend", null, null, null, null, null));
+        assertThat(spendPage.totalItems()).isEqualTo(2);
+        assertThat(spendPage.items()).extracting(row -> row.merchant()).contains("BIEDRONKA", "NETFLIX");
+
+        var incomePage = store.findTransactions(new TransactionQuery(2099, 0, 50, "postedDate,desc", null, null, null, "income", null, null, null, null, null));
+        assertThat(incomePage.totalItems()).isEqualTo(1);
+        assertThat(incomePage.items()).singleElement().satisfies(row -> assertThat(row.income()).isEqualByComparingTo(BigDecimal.valueOf(10_000)));
+
+        var analytics = store.findAnalytics(new TransactionQuery(2099, 0, 50, "spend,desc", null, null, null, null, null, null, null, null, null));
+        assertThat(analytics.monthlyCategoryTrends())
+                .filteredOn(row -> "2099-01".equals(row.monthKey()))
+                .extracting(row -> row.category())
+                .contains("Żywność i chemia");
+        assertThat(analytics.monthlyHierarchyTrends())
+                .filteredOn(row -> "2099-01".equals(row.monthKey()))
+                .extracting(row -> row.category())
+                .contains("Żywność i chemia");
+        assertThat(analytics.monthlyBucketTrends())
+                .filteredOn(row -> "2099-01".equals(row.monthKey()))
+                .extracting(row -> row.bucket())
+                .isNotEmpty();
+        assertThat(analytics.monthlyMerchantTrends())
+                .filteredOn(row -> "2099-01".equals(row.monthKey()))
+                .extracting(row -> row.merchant())
+                .contains("BIEDRONKA", "NETFLIX");
+        assertThat(analytics.fixednessBreakdown())
+                .extracting(row -> row.fixedness())
+                .contains("Zmienne konieczne");
+        assertThat(analytics.confidenceBreakdown())
+                .filteredOn(row -> "Wysoka".equals(row.confidence()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.count()).isEqualTo(3);
+                    assertThat(row.spend()).isEqualByComparingTo(BigDecimal.valueOf(183.45));
+                    assertThat(row.income()).isEqualByComparingTo(BigDecimal.valueOf(10_000));
+                });
+        assertThat(analytics.amountBands())
+                .filteredOn(row -> "100-250".equals(row.label()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.count()).isEqualTo(1);
+                    assertThat(row.spend()).isEqualByComparingTo(BigDecimal.valueOf(123.45));
+                });
+
+        var classifiedPage = store.findTransactions(new TransactionQuery(
+                2099, 0, 50, "postedDate,desc",
+                null, null, "biedronka", null, null, null, null, null, null,
+                "Zmienne konieczne", "Wysoka"
+        ));
+        assertThat(classifiedPage.totalItems()).isEqualTo(1);
+        assertThat(classifiedPage.items()).singleElement().satisfies(row -> {
+            assertThat(row.fixedness()).isEqualTo("Zmienne konieczne");
+            assertThat(row.confidence()).isEqualTo("Wysoka");
+        });
+
         assertThat(store.findImportRuns()).anySatisfy(run -> {
             assertThat(run.year()).isEqualTo(2099);
             assertThat(run.status()).isEqualTo("ok");
+            assertThat(run.duplicatesRemoved()).isEqualTo(2);
         });
 
         var replacement = analysisService.analyze(new BudgetInput(2099, "replacement.csv", List.of(
@@ -90,11 +146,29 @@ class BudgetReportRepositoryTest {
         var replacedDashboard = store.findDashboard(2099);
         assertThat(replacedDashboard.kpis().transactions()).isEqualTo(2);
         assertThat(replacedDashboard.kpis().spend()).isEqualByComparingTo(BigDecimal.valueOf(50));
-        var replacedPage = store.findTransactions(new TransactionQuery(2099, 0, 50, "postedDate,desc", null, null, null, null, null, null, null, null));
+        var replacedPage = store.findTransactions(new TransactionQuery(2099, 0, 50, "postedDate,desc", null, null, null, null, null, null, null, null, null));
         assertThat(replacedPage.totalItems()).isEqualTo(2);
         assertThat(replacedPage.items()).extracting(row -> row.description()).containsExactly(
                 "LIDL ZAKUP",
                 "PRZELEW EXPRESS ELIXIR PRZYCH. TEST EMPLOYER WYNAGRODZENIE"
         );
+    }
+
+    @Test
+    void derivesSavingsAccountTurnoverKpisFromWealthTransferDeposits() {
+        var result = analysisService.analyze(new BudgetInput(2098, "savings.csv", List.of(
+                new BankTransaction(LocalDate.of(2098, 3, 1), "konto", "PRZELEW EXPRESS ELIXIR PRZYCH. TEST EMPLOYER WYNAGRODZENIE", "", 9_000),
+                new BankTransaction(LocalDate.of(2098, 3, 5), "konto", "PRZELEW NA KONTO OSZCZĘDNOŚCIOWE", "", -2_000),
+                new BankTransaction(LocalDate.of(2098, 3, 6), "konto", "BIEDRONKA ZAKUP", "Bez kategorii", -100)
+        )));
+        store.save(result);
+
+        var kpis = store.findDashboard(2098).kpis();
+        // No account name matches the '%oszcz%' LIKE heuristic, so the deposit is counted
+        // through the corrected_category='Konto oszczędnościowe' pending-deposit branch.
+        assertThat(kpis.savingsAccountGrossDeposits()).isEqualByComparingTo(BigDecimal.valueOf(2_000));
+        assertThat(kpis.savingsAccountInflows()).isEqualByComparingTo(BigDecimal.valueOf(2_000));
+        assertThat(kpis.savingsAccountNetChange()).isEqualByComparingTo(BigDecimal.valueOf(2_000));
+        assertThat(kpis.savingsAccountOutflows()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 }

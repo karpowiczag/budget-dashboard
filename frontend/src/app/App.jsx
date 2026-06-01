@@ -1,149 +1,197 @@
-import { useEffect, useState } from "react";
-import { fetchAnalytics, fetchCalendar, fetchTransactions } from "./api/budgetApi.js";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchAnalytics, fetchCalendar, fetchFireSettings, fetchFireSummary, fetchTransactions, updateFireSettings } from "./api/budgetApi.js";
+import { budgetQueryKeys } from "./api/queryKeys.js";
+import { AppShell } from "./components/layout/AppShell.jsx";
 import { DashboardFooter } from "./components/layout/DashboardFooter.jsx";
-import { DashboardHeader } from "./components/layout/DashboardHeader.jsx";
-import { DashboardTabs } from "./components/layout/DashboardTabs.jsx";
-import { GlobalTimeFilter } from "./components/layout/GlobalTimeFilter.jsx";
-import { KpiStrip } from "./components/layout/KpiStrip.jsx";
+import { ModuleHeader } from "./components/layout/ModuleHeader.jsx";
+import { SidebarNav } from "./components/layout/SidebarNav.jsx";
+import { TimeScopeControl } from "./components/layout/TimeScopeControl.jsx";
+import { TransactionDrilldownModal } from "./components/tables/TransactionDrilldownModal.jsx";
 import { StateScreen } from "./components/ui/StateScreen.jsx";
 import { useBudgetData } from "./hooks/useBudgetData.js";
 import { useDashboardModel } from "./hooks/useDashboardModel.js";
-import { monthKeyFromLabel } from "./domain/budgetSelectors.js";
-import { CategoriesView } from "./views/CategoriesView.jsx";
+import { applyTheme, getInitialTheme } from "./theme.js";
+import { Moon, Sun } from "lucide-react";
+import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel } from "./domain/budgetSelectors.js";
 import { ImportView } from "./views/ImportView.jsx";
+import { FireView } from "./views/FireView.jsx";
 import { MonthControlView } from "./views/MonthControlView.jsx";
-import { MonthlyStatsView } from "./views/MonthlyStatsView.jsx";
-import { OverviewView } from "./views/OverviewView.jsx";
 import { RecurringView } from "./views/RecurringView.jsx";
+import { ReportsView } from "./views/ReportsView.jsx";
 import { SavingsPlanView } from "./views/SavingsPlanView.jsx";
 import { TransactionsView } from "./views/TransactionsView.jsx";
+import { WealthView } from "./views/WealthView.jsx";
 import "../styles.css";
 
 export default function App() {
+  const queryClient = useQueryClient();
   const {
     years,
     year,
     setYear,
     data,
+    importRuns,
     status,
     uploading,
+    rebuilding,
     importStatus,
     budgetSettings,
     settingsStatus,
+    settingsSaving,
     handleUpload,
+    handleRebuild,
     saveBudgetSettings,
   } = useBudgetData();
   const [query, setQuery] = useState("");
   const [bucket, setBucket] = useState("Wszystkie");
+  const [transactionFilters, setTransactionFilters] = useState(defaultTransactionFilters);
   const [customLimits, setCustomLimits] = useState({});
+  const [categoryBucketOverrides, setCategoryBucketOverrides] = useState({});
   const [settingsDraft, setSettingsDraft] = useState(null);
-  const [view, setView] = useState("overview");
-  const [selectedMonth, setSelectedMonth] = useState("");
-  const [selectedDay, setSelectedDay] = useState("");
-  const [timeScope, setTimeScope] = useState("all");
-  const [drillFilter, setDrillFilter] = useState(null);
-  const [analytics, setAnalytics] = useState(null);
-  const [calendar, setCalendar] = useState(null);
-  const [transactionPage, setTransactionPage] = useState(null);
+  const [fireSettingsStatus, setFireSettingsStatus] = useState(null);
+  const [view, setView] = useState("control");
+  const [theme, setTheme] = useState(getInitialTheme);
+  const [localTimes, setLocalTimes] = useState({
+    control: { scope: "month", month: "", day: "", drillFilter: null },
+    reports: { scope: "year", month: "", day: "", drillFilter: null },
+    transactions: { scope: "month", month: "", day: "", drillFilter: null },
+  });
   const [transactionPageIndex, setTransactionPageIndex] = useState(0);
+  const [transactionInspector, setTransactionInspector] = useState(null);
+  const [inspectorPageIndex, setInspectorPageIndex] = useState(0);
 
   useEffect(() => {
     if (!data?.monthly?.length) return;
     const months = data.monthly.filter((row) => row.transactions > 0);
-    setSelectedMonth(months.at(-1)?.month || data.monthly[0].month);
+    const fallbackMonth = months.at(-1)?.month || data.monthly[0].month;
+    setLocalTimes((current) => ({
+      control: { ...current.control, month: current.control.month || fallbackMonth },
+      reports: { ...current.reports, month: current.reports.month || fallbackMonth },
+      transactions: { ...current.transactions, month: current.transactions.month || fallbackMonth },
+    }));
   }, [data]);
 
   useEffect(() => {
-    setSelectedDay("");
-  }, [selectedMonth, year]);
-
-  useEffect(() => {
-    setDrillFilter(null);
-    setAnalytics(null);
-    setCalendar(null);
-    setTransactionPage(null);
+    setLocalTimes((current) => ({
+      control: { ...current.control, month: "", day: "", drillFilter: null },
+      reports: { ...current.reports, month: "", day: "", drillFilter: null },
+      transactions: { ...current.transactions, month: "", day: "", drillFilter: null },
+    }));
     setTransactionPageIndex(0);
+    setTransactionInspector(null);
+    setInspectorPageIndex(0);
   }, [year]);
 
   useEffect(() => {
     if (!budgetSettings) return;
     setSettingsDraft(budgetSettings);
     setCustomLimits(limitsToMap(budgetSettings.categoryLimits));
+    setCategoryBucketOverrides(bucketOverridesToMap(budgetSettings.categoryLimits));
   }, [budgetSettings]);
 
   useEffect(() => {
     setTransactionPageIndex(0);
-  }, [year, selectedMonth, selectedDay, timeScope, drillFilter, query, bucket]);
+  }, [year, localTimes.transactions, query, bucket, transactionFilters]);
 
-  useEffect(() => {
-    if (!data || !year || !selectedMonth) return undefined;
-    let cancelled = false;
-    const month = monthKeyFromLabel(selectedMonth);
-    fetchCalendar(year, month)
-      .then((payload) => {
-        if (!cancelled) setCalendar(payload);
-      })
-      .catch(() => {
-        if (!cancelled) setCalendar(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [data, year, selectedMonth]);
-
-  useEffect(() => {
-    if (!data || !year) return undefined;
-    let cancelled = false;
-    const filters = apiFilters({ timeScope, selectedMonth, selectedDay, drillFilter });
-    fetchAnalytics(year, filters)
-      .then((payload) => {
-        if (!cancelled) setAnalytics(payload);
-      })
-      .catch(() => {
-        if (!cancelled) setAnalytics(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [data, year, timeScope, selectedMonth, selectedDay, drillFilter]);
-
-  useEffect(() => {
-    if (!data || !year) return undefined;
-    let cancelled = false;
-    const filters = {
-      ...apiFilters({ timeScope, selectedMonth, selectedDay, drillFilter }),
+  const controlMonth = useMemo(() => monthKeyFromLabel(localTimes.control.month), [localTimes.control.month]);
+  const reportsFilters = useMemo(() => apiFilters(localTimes.reports), [localTimes.reports]);
+  const transactionsTimeFilters = useMemo(() => apiFilters(localTimes.transactions), [localTimes.transactions]);
+  const reportYearAnalyticsFilters = useMemo(() => ({ scope: "year" }), []);
+  const transactionQueryFilters = useMemo(
+    () => ({
+      ...transactionsTimeFilters,
       page: transactionPageIndex,
-      size: 50,
-      sort: "postedDate,desc",
+      size: transactionFilters.pageSize,
+      sort: transactionFilters.sort,
       query,
+      flow: transactionFilters.flow,
       bucket,
+      area: transactionFilters.area,
+      group: transactionFilters.group,
+      category: transactionFilters.category,
+      subcategory: transactionFilters.subcategory,
+      fixedness: transactionFilters.fixedness,
+      confidence: transactionFilters.confidence,
+      reviewStatus: transactionFilters.reviewStatus,
+    }),
+    [transactionsTimeFilters, transactionPageIndex, transactionFilters, query, bucket],
+  );
+  const inspectorFilters = useMemo(() => {
+    if (!transactionInspector) return null;
+    const sourceTime = localTimes[transactionInspector.timeKey] || localTimes.transactions;
+    const scopedFilters = transactionInspector.useTimeScope
+      ? transactionFilterParams(apiFilters(sourceTime))
+      : {};
+    return {
+      ...scopedFilters,
+      ...(transactionInspector.filters || {}),
+      page: inspectorPageIndex,
+      size: 25,
+      sort: transactionInspector.sort || "postedDate,desc",
     };
-    fetchTransactions(year, filters)
-      .then((payload) => {
-        if (!cancelled) setTransactionPage(payload);
-      })
-      .catch(() => {
-        if (!cancelled) setTransactionPage(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [data, year, timeScope, selectedMonth, selectedDay, drillFilter, query, bucket, transactionPageIndex]);
+  }, [localTimes, transactionInspector, inspectorPageIndex]);
+
+  const calendarQuery = useQuery({
+    queryKey: budgetQueryKeys.calendar(year, controlMonth),
+    queryFn: () => fetchCalendar(year, controlMonth),
+    enabled: !!data && !!year && !!controlMonth,
+  });
+  const reportsAnalyticsQuery = useQuery({
+    queryKey: budgetQueryKeys.analytics(year, reportsFilters),
+    queryFn: () => fetchAnalytics(year, reportsFilters),
+    enabled: !!data && !!year && view === "reports",
+  });
+  const reportYearAnalyticsQuery = useQuery({
+    queryKey: budgetQueryKeys.analytics(year, reportYearAnalyticsFilters),
+    queryFn: () => fetchAnalytics(year, reportYearAnalyticsFilters),
+    enabled: !!data && !!year && view === "reports" && reportsFilters.scope !== "year",
+  });
+  const transactionsAnalyticsQuery = useQuery({
+    queryKey: budgetQueryKeys.analytics(year, transactionsTimeFilters),
+    queryFn: () => fetchAnalytics(year, transactionsTimeFilters),
+    enabled: !!data && !!year && view === "transactions",
+  });
+  const transactionsQuery = useQuery({
+    queryKey: budgetQueryKeys.transactions(year, transactionQueryFilters),
+    queryFn: () => fetchTransactions(year, transactionQueryFilters),
+    enabled: !!data && !!year,
+  });
+  const fireQuery = useQuery({
+    queryKey: budgetQueryKeys.fire,
+    queryFn: fetchFireSummary,
+    enabled: !!data && view === "fire",
+  });
+  const fireSettingsQuery = useQuery({
+    queryKey: budgetQueryKeys.fireSettings,
+    queryFn: fetchFireSettings,
+    enabled: view === "fire",
+  });
+  const fireSettingsMutation = useMutation({
+    mutationFn: updateFireSettings,
+  });
+  const inspectorQuery = useQuery({
+    queryKey: budgetQueryKeys.transactions(year, inspectorFilters),
+    queryFn: () => fetchTransactions(year, inspectorFilters),
+    enabled: !!data && !!year && !!inspectorFilters,
+  });
 
   const model = useDashboardModel({
+    activeView: view,
+    controlTime: localTimes.control,
     data,
     years,
-    year,
-    selectedMonth,
-    selectedDay,
-    timeScope,
-    drillFilter,
-    query,
-    bucket,
-    analytics,
-    calendar,
-    transactionPage,
+    reportsTime: localTimes.reports,
+    transactionsTime: localTimes.transactions,
+    reportsAnalytics: reportsAnalyticsQuery.data || null,
+    reportsYearAnalytics: reportsFilters.scope === "year" ? (reportsAnalyticsQuery.data || null) : (reportYearAnalyticsQuery.data || null),
+    transactionsAnalytics: transactionsAnalyticsQuery.data || null,
+    calendar: calendarQuery.data || null,
+    transactionPage: transactionsQuery.data || null,
     customLimits,
+    bucketOverrides: categoryBucketOverrides,
+    importRuns,
+    fireSummary: fireQuery.data || null,
   });
 
   if (status === "loading") {
@@ -152,16 +200,32 @@ export default function App() {
 
   if (status === "empty") {
     return (
-      <main>
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Budżet domowy</p>
-            <h1>Import danych</h1>
-            <span>Dodaj pierwszy eksport bankowy CSV, żeby zbudować dashboard.</span>
-          </div>
-        </header>
+      <AppShell
+        sidebar={
+          <aside className="sidebarNav">
+            <div className="sidebarBrand">
+              <p className="eyebrow">Budżet domowy</p>
+              <span className="brandYear">Start</span>
+              <span>Zaimportuj dane, aby odblokować moduły.</span>
+            </div>
+            <div className="sidebarYears">
+              <button type="button" className="themeToggle" onClick={toggleTheme} aria-pressed={theme === "dark"}>
+                {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+                <span>{theme === "dark" ? "Jasny motyw" : "Ciemny motyw"}</span>
+              </button>
+            </div>
+          </aside>
+        }
+      >
+        <ModuleHeader
+          header={{
+            eyebrow: "Budżet domowy",
+            title: "Import danych",
+            subtitle: "Dodaj pierwszy eksport bankowy CSV, żeby zbudować dashboard.",
+          }}
+        />
         <ImportView onUpload={handleUpload} uploading={uploading} importStatus={importStatus} />
-      </main>
+      </AppShell>
     );
   }
 
@@ -169,34 +233,97 @@ export default function App() {
     return <StateScreen tone="error">Nie udało się wczytać danych z API Spring Boot.</StateScreen>;
   }
 
-  const categoryTop = model.scopedStats.categoryTop.slice(0, 10);
-  const hierarchyTop = model.scopedStats.hierarchyTop.filter((row) => row.spend > 0).slice(0, 16);
-  const planTitle = model.isHistorical ? "Symulacja oszczędności historycznych" : "Plan oszczędzania";
+  const planTitle = model.isHistorical ? "Symulacja limitów" : "Plan i limity";
 
-  function handleMonthChange(nextMonth) {
-    setSelectedMonth(nextMonth);
-    setSelectedDay("");
-    setTimeScope(timeScope === "all" || timeScope === "day" ? "month" : timeScope);
+  function updateLocalTime(key, nextTime) {
+    setLocalTimes((current) => ({
+      ...current,
+      [key]: normalizeTime(nextTime),
+    }));
   }
 
-  function handleTimeScopeChange(nextScope) {
-    if (nextScope === "day") {
-      const fallbackDay = selectedDay || model.calendarStats?.selected;
-      if (!fallbackDay) {
-        setTimeScope("month");
-        return;
+  function clearLocalDrill(key) {
+    setLocalTimes((current) => ({
+      ...current,
+      [key]: { ...current[key], drillFilter: null },
+    }));
+  }
+
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    applyTheme(next);
+    setTheme(next);
+  }
+
+  function openTransactionInspector(config) {
+    setTransactionInspector({
+      title: config.title,
+      subtitle: config.subtitle,
+      filters: config.filters || {},
+      sort: config.sort,
+      timeKey: config.timeKey || timeKeyForView(view),
+      useTimeScope: config.useTimeScope ?? true,
+    });
+    setInspectorPageIndex(0);
+  }
+
+  function handleTransactionFilterChange(field, value) {
+    setTransactionFilters((current) => {
+      const next = { ...current, [field]: value };
+      if (field === "area") {
+        next.group = "Wszystkie";
+        next.category = "Wszystkie";
+        next.subcategory = "Wszystkie";
       }
-      setSelectedDay(String(fallbackDay));
-    }
-    setTimeScope(nextScope);
+      if (field === "group") {
+        next.category = "Wszystkie";
+        next.subcategory = "Wszystkie";
+      }
+      if (field === "category") {
+        next.subcategory = "Wszystkie";
+      }
+      return next;
+    });
   }
 
-  function handleLimitChange(category, limit) {
+  function resetTransactionFilters() {
+    setQuery("");
+    setBucket("Wszystkie");
+    setTransactionFilters(defaultTransactionFilters);
+  }
+
+  function applyTransactionPreset(preset) {
+    const filters = preset?.filters || {};
+    const { bucket: presetBucket, ...transactionPreset } = filters;
+    setQuery("");
+    setBucket(presetBucket || "Wszystkie");
+    setTransactionFilters({
+      ...defaultTransactionFilters,
+      ...transactionPreset,
+      pageSize: transactionFilters.pageSize,
+    });
+  }
+
+  function handleLimitChange(scope, name, limit) {
+    const key = limitKey(scope, name);
     setCustomLimits((current) => ({
       ...current,
-      [category]: limit,
+      [key]: limit,
     }));
-    setSettingsDraft((current) => mergeLimit(current || budgetSettings, category, limit));
+    setSettingsDraft((current) => mergeLimit(current || budgetSettings, scope, name, limit));
+  }
+
+  function handleBucketOverrideChange(category, bucketOverride) {
+    setCategoryBucketOverrides((current) => {
+      const next = { ...current };
+      if (bucketOverride) {
+        next[category] = bucketOverride;
+      } else {
+        delete next[category];
+      }
+      return next;
+    });
+    setSettingsDraft((current) => mergeBucketOverride(current || budgetSettings, category, bucketOverride));
   }
 
   function handleSettingChange(field, value) {
@@ -207,16 +334,50 @@ export default function App() {
     }));
   }
 
+  async function handleSaveFireSettings(settings) {
+    setFireSettingsStatus({ type: "info", message: "Zapisuję ustawienia FIRE..." });
+    try {
+      const saved = await fireSettingsMutation.mutateAsync(settings);
+      queryClient.setQueryData(budgetQueryKeys.fireSettings, saved);
+      await queryClient.invalidateQueries({ queryKey: budgetQueryKeys.fire });
+      setFireSettingsStatus({ type: "success", message: "Ustawienia FIRE zapisane i prognoza odświeżona." });
+      return saved;
+    } catch (error) {
+      setFireSettingsStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
   async function handleSaveSettings() {
     const base = settingsDraft || budgetSettings || {};
-    const categoryLimits = Object.entries(customLimits).map(([category, limit]) => {
-      const row = model.planRows.find((item) => item.category === category);
+    const allLimitRows = [...(model.parentPlanRows || []), ...(model.planRows || [])];
+    const limitRows = Object.entries(customLimits).map(([key, limit]) => {
+      const [scope = "category", ...nameParts] = key.split(":");
+      const name = nameParts.join(":");
+      const row = allLimitRows.find((item) => limitKey(item) === key);
       return {
-        category,
+        scope,
+        name,
+        category: scope === "category" ? name : "",
         limit: Number(limit || 0),
         action: row?.action || "",
+        bucketOverride: scope === "category" ? (categoryBucketOverrides[name] || "") : "",
       };
     });
+    const categoryLimitsByKey = new Map(limitRows.map((row) => [limitKey(row), row]));
+    Object.entries(categoryBucketOverrides).forEach(([category, bucketOverride]) => {
+      const key = limitKey("category", category);
+      const row = categoryLimitsByKey.get(key) || allLimitRows.find((item) => limitKey(item) === key);
+      categoryLimitsByKey.set(key, {
+        scope: "category",
+        name: category,
+        category,
+        limit: Number(row?.limit || 0),
+        action: row?.action || "",
+        bucketOverride,
+      });
+    });
+    const categoryLimits = Array.from(categoryLimitsByKey.values());
     const payload = {
       targetMonthlySpend: Number(base.targetMonthlySpend || data.savingsPlan.targetMonthlySpend),
       aggressiveMonthlySpend: Number(base.aggressiveMonthlySpend || data.savingsPlan.aggressiveMonthlySpend),
@@ -232,128 +393,226 @@ export default function App() {
   }
 
   return (
-    <main>
-      <DashboardHeader data={data} year={year} years={years} onYearChange={setYear} />
-
-      <KpiStrip activeMonths={data.activeMonths} kpis={model.kpis} wants={model.wants} />
-
-      <DashboardTabs views={model.views} activeView={view} onViewChange={setView} />
-
-      <GlobalTimeFilter
-        activeTimeLabel={model.activeTimeLabel}
-        calendarStats={model.calendarStats}
-        drillFilter={drillFilter}
-        monthly={model.monthly}
-        selectedMonth={selectedMonth}
-        timeScope={timeScope}
-        onClearDrill={() => setDrillFilter(null)}
-        onMonthChange={handleMonthChange}
-        onSelectDay={(day) => {
-          setSelectedDay(day);
-          setTimeScope("day");
-        }}
-        onTimeScopeChange={handleTimeScopeChange}
-      />
-
-      {view === "overview" && (
-        <OverviewView
-          budgetMix={model.budgetMix}
-          kpis={model.kpis}
-          monthly={model.monthly}
-          needs={model.needs}
-          mixedNeeds={model.mixedNeeds}
-          savingsTarget={model.savingsTarget}
-          wants={model.wants}
-          wantsTarget={model.wantsTarget}
+    <AppShell
+      sidebar={
+        <SidebarNav
+          activeView={view}
+          data={data}
+          year={year}
+          years={years}
+          views={model.views}
+          theme={theme}
+          onViewChange={setView}
+          onYearChange={setYear}
+          onToggleTheme={toggleTheme}
         />
-      )}
+      }
+    >
+      <ModuleHeader header={model.moduleHeader} action={moduleTimeControl(view, model, localTimes, updateLocalTime, clearLocalDrill)} />
 
-      {view === "month" && (
+      {view === "control" && (
         <MonthControlView
-          categoryStatus={model.categoryStatus}
-          isHistorical={model.isHistorical}
-          monthControl={model.monthControl}
-        />
-      )}
-
-      {view === "monthlyStats" && (
-        <MonthlyStatsView
-          activeTimeLabel={model.activeTimeLabel}
-          scopedStats={model.scopedStats}
-          scopedTransactions={model.scopedTransactions}
+          monthDashboard={model.monthDashboard}
+          savingsFocus={model.savingsFocus}
+          spendingPlanSections={model.spendingPlanSections}
+          onInspect={openTransactionInspector}
         />
       )}
 
       {view === "plan" && (
         <SavingsPlanView
           data={data}
+          financialFlows={model.financialFlows}
+          categoryExamples={model.categoryExamples}
+          categorySubcategories={model.categorySubcategories}
           isHistorical={model.isHistorical}
           plan={model.plan}
+          parentPlanRows={model.parentPlanRows}
+          primaryPlanRows={model.primaryPlanRows}
           planRows={model.planRows}
           planSummary={model.planSummary}
           planTitle={planTitle}
           plannedInvestmentAfterCuts={model.plannedInvestmentAfterCuts}
           plannedSpendAfterCuts={model.plannedSpendAfterCuts}
+          recommendedCuts={model.recommendedCuts}
+          savingsRadar={model.savingsRadar}
+          savingsWaterfall={model.savingsWaterfall}
           settings={settingsDraft || budgetSettings}
           settingsStatus={settingsStatus}
+          saving={settingsSaving}
+          bucketOptions={BUDGET_BUCKET_OPTIONS}
           onSaveSettings={handleSaveSettings}
           onSettingChange={handleSettingChange}
           onLimitChange={handleLimitChange}
+          onBucketOverrideChange={handleBucketOverrideChange}
         />
       )}
 
-      {view === "categories" && (
-        <CategoriesView
-          categoryTop={categoryTop}
-          hierarchyTop={hierarchyTop}
-          scopedStats={model.scopedStats}
-          onDrill={setDrillFilter}
+      {view === "reports" && (
+        <ReportsView
+          dataQualityChart={model.dataQualityChart}
+          reportsSections={model.reportsSections}
+          reportsWorkspace={model.reportsWorkspace}
+          onInspect={openTransactionInspector}
         />
       )}
 
-      {view === "recurring" && (
+      {view === "wealth" && (
+        <WealthView
+          wealthDashboard={model.wealthDashboard}
+          onInspect={openTransactionInspector}
+        />
+      )}
+
+      {view === "fire" && (
+        <FireView
+          fireSettings={fireSettingsQuery.data}
+          fireSummary={fireQuery.data || model.fireSummary}
+          loading={fireQuery.isPending && !fireQuery.data && !model.fireSummary}
+          saving={fireSettingsMutation.isPending}
+          settingsStatus={fireSettingsStatus}
+          onSaveSettings={handleSaveFireSettings}
+        />
+      )}
+
+      {view === "obligations" && (
         <RecurringView
-          monthControl={model.monthControl}
-          oneoffs={model.oneoffs}
-          recurring={model.recurring}
-          recurringCalendar={model.recurringCalendar}
+          recurringSummary={model.recurringSummary}
+          onInspect={openTransactionInspector}
         />
       )}
 
       {view === "transactions" && (
         <TransactionsView
-          activeTimeLabel={model.activeTimeLabel}
+          activeTimeLabel={model.transactionsTimeScope.activeTimeLabel}
           bucket={bucket}
           buckets={model.buckets}
           drillFilteredTransactions={model.drillFilteredTransactions}
+          filterOptions={model.transactionFilterOptions}
           filteredTransactions={model.filteredTransactions}
           query={query}
+          presets={model.transactionPresets}
+          dataQualityChart={model.dataQualityChart}
+          transactionFilters={transactionFilters}
           transactionPage={model.transactionPage}
           visibleSpend={model.visibleSpend}
+          yearTransactionTotal={data.kpis.transactions}
+          onInspect={openTransactionInspector}
           onBucketChange={setBucket}
+          onFilterChange={handleTransactionFilterChange}
           onPageChange={setTransactionPageIndex}
+          onPreset={applyTransactionPreset}
           onQueryChange={setQuery}
+          onResetFilters={resetTransactionFilters}
+          onShowFullYear={() => {
+            updateLocalTime("transactions", { ...localTimes.transactions, scope: "year", day: "", drillFilter: null });
+            setTransactionPageIndex(0);
+          }}
         />
       )}
 
       {view === "import" && (
-        <ImportView onUpload={handleUpload} uploading={uploading} importStatus={importStatus} />
+        <ImportView
+          activeYear={year}
+          importHealth={model.importHealth}
+          importRuns={importRuns}
+          onRebuild={handleRebuild}
+          onUpload={handleUpload}
+          rebuilding={rebuilding}
+          uploading={uploading}
+          importStatus={importStatus}
+        />
+      )}
+
+      {transactionInspector && (
+        <TransactionDrilldownModal
+          title={transactionInspector.title}
+          subtitle={transactionInspector.subtitle || inspectorSubtitle(transactionInspector, model, year)}
+          page={inspectorQuery.data}
+          loading={inspectorQuery.isPending}
+          error={inspectorQuery.error?.message || ""}
+          onClose={() => setTransactionInspector(null)}
+          onPageChange={setInspectorPageIndex}
+        />
       )}
 
       <DashboardFooter />
-    </main>
+    </AppShell>
   );
 }
 
-function limitsToMap(categoryLimits = []) {
-  return Object.fromEntries((categoryLimits || []).map((row) => [row.category, Number(row.limit || 0)]));
+function moduleTimeControl(view, model, localTimes, updateLocalTime, clearLocalDrill) {
+  const months = model.monthly || [];
+  if (view === "control") {
+    return (
+      <TimeScopeControl
+        calendarStats={model.calendarStats}
+        chips={model.controlTimeScope.chips}
+        months={months}
+        time={localTimes.control}
+        variant="full"
+        onChange={(next) => updateLocalTime("control", next)}
+        onClearDrill={() => clearLocalDrill("control")}
+      />
+    );
+  }
+  if (view === "reports") {
+    return (
+      <TimeScopeControl
+        chips={model.reportsTimeScope.chips}
+        months={months}
+        time={localTimes.reports}
+        onChange={(next) => updateLocalTime("reports", next)}
+        onClearDrill={() => clearLocalDrill("reports")}
+      />
+    );
+  }
+  if (view === "transactions") {
+    return (
+      <TimeScopeControl
+        chips={model.transactionsTimeScope.chips}
+        months={months}
+        time={localTimes.transactions}
+        onChange={(next) => updateLocalTime("transactions", next)}
+        onClearDrill={() => clearLocalDrill("transactions")}
+      />
+    );
+  }
+  return null;
 }
 
-function mergeLimit(settings, category, limit) {
+function limitsToMap(categoryLimits = []) {
+  return Object.fromEntries((categoryLimits || []).map((row) => [limitKey(row), Number(row.limit || 0)]));
+}
+
+function bucketOverridesToMap(categoryLimits = []) {
+  return Object.fromEntries(
+    (categoryLimits || [])
+      .filter((row) => (row.scope || "category") === "category")
+      .filter((row) => row.bucketOverride)
+      .map((row) => [row.name || row.category, row.bucketOverride]),
+  );
+}
+
+const defaultTransactionFilters = {
+  flow: "Wszystkie",
+  area: "Wszystkie",
+  group: "Wszystkie",
+  category: "Wszystkie",
+  subcategory: "Wszystkie",
+  fixedness: "Wszystkie",
+  confidence: "Wszystkie",
+  reviewStatus: "Wszystkie",
+  sort: "postedDate,desc",
+  pageSize: 50,
+};
+
+function mergeLimit(settings, scope, name, limit) {
   const base = settings || {};
   const rows = [...(base.categoryLimits || [])];
-  const index = rows.findIndex((row) => row.category === category);
-  const next = { category, limit, action: rows[index]?.action || "" };
+  const key = limitKey(scope, name);
+  const index = rows.findIndex((row) => limitKey(row) === key);
+  const next = { scope, name, category: scope === "category" ? name : "", limit, action: rows[index]?.action || "", bucketOverride: rows[index]?.bucketOverride || "" };
   if (index >= 0) {
     rows[index] = next;
   } else {
@@ -362,23 +621,66 @@ function mergeLimit(settings, category, limit) {
   return { ...base, categoryLimits: rows };
 }
 
-function apiFilters({ timeScope, selectedMonth, selectedDay, drillFilter }) {
+function mergeBucketOverride(settings, category, bucketOverride) {
+  const base = settings || {};
+  const rows = [...(base.categoryLimits || [])];
+  const key = limitKey("category", category);
+  const index = rows.findIndex((row) => limitKey(row) === key);
+  if (index >= 0) {
+    rows[index] = { ...rows[index], scope: "category", name: category, category, bucketOverride };
+  } else if (bucketOverride) {
+    rows.push({ scope: "category", name: category, category, limit: 0, action: "", bucketOverride });
+  }
+  return { ...base, categoryLimits: rows };
+}
+
+export function apiFilters(input) {
+  const timeScope = input.timeScope || input.scope || "month";
+  const selectedMonth = input.selectedMonth ?? input.month ?? "";
+  const selectedDay = input.selectedDay ?? input.day ?? "";
+  const drillFilter = input.drillFilter || null;
   const month = monthKeyFromLabel(selectedMonth);
-  const filters = {
-    scope: timeScope === "all" ? "year" : timeScope,
-  };
-  if (timeScope !== "all" && month) {
-    filters.month = month;
+  let scope = timeScope === "all" ? "year" : timeScope;
+  if ((scope === "month" || scope === "day") && !month) {
+    scope = "year";
   }
-  if (timeScope === "day" && month) {
-    const day = String(selectedDay || "").padStart(2, "0");
-    if (day.trim() && day !== "00") {
-      filters.date = `${month}-${day}`;
-    }
+  const day = String(selectedDay || "").padStart(2, "0");
+  if (scope === "day" && (!day.trim() || day === "00")) {
+    scope = "month";
   }
+  const filters = { scope };
+  if (scope !== "year" && month) filters.month = month;
+  if (scope === "day" && month) filters.date = `${month}-${day}`;
   if (drillFilter?.type === "area") filters.area = drillFilter.value;
   if (drillFilter?.type === "group") filters.group = drillFilter.value;
   if (drillFilter?.type === "category") filters.category = drillFilter.value;
   if (drillFilter?.type === "subcategory") filters.subcategory = drillFilter.value;
   return filters;
+}
+
+function transactionFilterParams(filters) {
+  const { scope, ...params } = filters;
+  return params;
+}
+
+function normalizeTime(time) {
+  return {
+    scope: time?.scope === "all" ? "year" : (time?.scope || "month"),
+    month: time?.month || "",
+    day: time?.scope === "day" ? String(time?.day || "") : "",
+    drillFilter: time?.drillFilter || null,
+  };
+}
+
+function timeKeyForView(view) {
+  if (view === "reports") return "reports";
+  if (view === "transactions") return "transactions";
+  return "control";
+}
+
+function inspectorSubtitle(inspector, model, year) {
+  if (!inspector.useTimeScope) return `Cały ${year}`;
+  if (inspector.timeKey === "reports") return model.reportsTimeScope.activeTimeLabel;
+  if (inspector.timeKey === "transactions") return model.transactionsTimeScope.activeTimeLabel;
+  return model.controlTimeScope.activeTimeLabel;
 }

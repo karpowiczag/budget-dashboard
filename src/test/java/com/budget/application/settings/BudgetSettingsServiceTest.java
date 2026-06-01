@@ -31,7 +31,7 @@ class BudgetSettingsServiceTest {
     }
 
     @Test
-    void rejectsDuplicateCategoryLimitsBeforePersistence() {
+    void rejectsDuplicateBudgetLimitsBeforePersistence() {
         var settings = new BudgetSettings(
                 BigDecimal.valueOf(14_000),
                 BigDecimal.valueOf(13_000),
@@ -45,7 +45,7 @@ class BudgetSettingsServiceTest {
 
         assertThatThrownBy(() -> service.save(settings))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Duplicate category limit");
+                .hasMessageContaining("Duplicate budget limit");
     }
 
     @Test
@@ -62,8 +62,64 @@ class BudgetSettingsServiceTest {
                 .singleElement()
                 .satisfies(limit -> {
                     assertThat(limit.category()).isEqualTo("Jedzenie poza domem");
+                    assertThat(limit.scope()).isEqualTo("category");
+                    assertThat(limit.name()).isEqualTo("Jedzenie poza domem");
                     assertThat(limit.limit()).isEqualByComparingTo(BigDecimal.valueOf(500));
                     assertThat(limit.action()).isEqualTo("test");
+                    assertThat(limit.bucketOverride()).isBlank();
+                });
+    }
+
+    @Test
+    void acceptsManualBucketOverrideForCategoryLimit() {
+        var saved = service.save(new BudgetSettings(
+                BigDecimal.valueOf(14_000),
+                BigDecimal.valueOf(13_000),
+                3,
+                6,
+                List.of(new BudgetSettings.CategoryLimitSetting("category", "Lekarz i apteka", "Lekarz i apteka", BigDecimal.valueOf(900), "review", "Obowiązkowe zmienne"))
+        ));
+
+        assertThat(saved.categoryLimits())
+                .singleElement()
+                .satisfies(limit -> {
+                    assertThat(limit.category()).isEqualTo("Lekarz i apteka");
+                    assertThat(limit.bucketOverride()).isEqualTo("Obowiązkowe zmienne");
+                });
+    }
+
+    @Test
+    void rejectsUnsupportedBucketOverride() {
+        var settings = new BudgetSettings(
+                BigDecimal.valueOf(14_000),
+                BigDecimal.valueOf(13_000),
+                3,
+                6,
+                List.of(new BudgetSettings.CategoryLimitSetting("category", "Lekarz i apteka", "Lekarz i apteka", BigDecimal.valueOf(900), "review", "Random"))
+        );
+
+        assertThatThrownBy(() -> service.save(settings))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unsupported budget bucket override");
+    }
+
+    @Test
+    void acceptsParentLimitOverridesByScopeAndName() {
+        var saved = service.save(new BudgetSettings(
+                BigDecimal.valueOf(14_000),
+                BigDecimal.valueOf(13_000),
+                3,
+                6,
+                List.of(new BudgetSettings.CategoryLimitSetting("group", "Styl życia", "", BigDecimal.valueOf(2_000), "limit group"))
+        ));
+
+        assertThat(saved.categoryLimits())
+                .singleElement()
+                .satisfies(limit -> {
+                    assertThat(limit.scope()).isEqualTo("group");
+                    assertThat(limit.name()).isEqualTo("Styl życia");
+                    assertThat(limit.category()).isBlank();
+                    assertThat(limit.limit()).isEqualByComparingTo(BigDecimal.valueOf(2_000));
                 });
     }
 
