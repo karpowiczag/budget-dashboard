@@ -34,7 +34,7 @@ describe("EChart", () => {
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     render(<EChart exportName="test-chart" option={{ series: [] }} />);
 
-    await waitFor(() => expect(chart.setOption).toHaveBeenCalledWith({ animation: false, series: [] }, true));
+    await waitFor(() => expect(chart.setOption).toHaveBeenCalledWith({ animation: false, series: [], aria: { enabled: true } }, true));
     await userEvent.click(screen.getByRole("button", { name: /PNG/ }));
 
     expect(chart.getDataURL).toHaveBeenCalledWith({

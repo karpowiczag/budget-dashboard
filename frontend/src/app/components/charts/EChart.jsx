@@ -58,6 +58,7 @@ echarts.use([
 ]);
 
 export function EChart({
+  ariaLabel,
   className = "chart",
   empty,
   emptyMessage = "Brak danych dla wykresu.",
@@ -100,14 +101,17 @@ export function EChart({
 
   useEffect(() => {
     if (!chartRef.current || empty) return;
-    chartRef.current.setOption({ animation: false, ...option }, true);
+    // Enable ECharts' built-in accessibility description so the canvas exposes a
+    // text alternative to screen readers (WCAG 1.1.1).
+    chartRef.current.setOption({ animation: false, ...option, aria: { enabled: true, ...(option?.aria || {}) } }, true);
   }, [empty, option]);
 
   function exportPng() {
     const chart = chartRef.current;
     if (!chart) return;
+    const surface = getComputedStyle(document.documentElement).getPropertyValue("--surface").trim() || "#ffffff";
     const url = chart.getDataURL({
-      backgroundColor: "#ffffff",
+      backgroundColor: surface,
       pixelRatio: 2,
       type: "png",
     });
@@ -128,7 +132,7 @@ export function EChart({
           <Download size={14} /> PNG
         </button>
       )}
-      <div ref={nodeRef} className={className} />
+      <div ref={nodeRef} className={className} role="img" aria-label={ariaLabel || "Wykres danych"} />
     </div>
   );
 }

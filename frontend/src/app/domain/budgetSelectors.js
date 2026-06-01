@@ -714,7 +714,7 @@ export function selectModuleHeader({
   visibleSpend,
   wealthDashboard,
 }) {
-  const controlRisks = (monthDashboard?.categoryStatus || []).filter((row) => Number(row.currentMonthSpend || row.current || 0) > Number(row.limit || 0)).length;
+  const controlRisks = (monthDashboard?.categoryStatus || []).filter((row) => Number(row.limit || 0) > 0 && Number(row.currentMonthSpend || row.current || 0) > Number(row.limit || 0)).length;
   const toCheckAmount = Number(data?.kpis?.toCheckAmount || 0);
   const headers = {
     control: {

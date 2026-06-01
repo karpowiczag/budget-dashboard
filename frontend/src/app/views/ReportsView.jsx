@@ -270,7 +270,7 @@ function formatScopeDetail(detail) {
 
 function formatBenchmarkDetail(detail) {
   if (typeof detail !== "string") return detail || "";
-  for (const prefix of ["limit 50%: ", "punkt odniesienia 50%: ", "punkt 30%: ", "minimum 20%: "]) {
+  for (const prefix of ["limit 50%: ", "punkt odniesienia 50%: ", "punkt odniesienia 30%: ", "minimum 20%: "]) {
     if (detail.startsWith(prefix)) {
       return `${prefix}${money(Number(detail.slice(prefix.length)))}`;
     }
