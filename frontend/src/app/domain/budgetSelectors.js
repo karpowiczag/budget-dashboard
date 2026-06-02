@@ -1109,6 +1109,40 @@ export function selectGoals(goals = [], asOf) {
   };
 }
 
+// Forward cashflow forecast: project the liquid balance over a horizon from a monthly net
+// (income − spend), with optional scenario adjustments. Pure math, like debt payoff.
+export function selectForecast({ startingLiquid = 0, monthlyIncome = 0, monthlySpend = 0, months = 12, incomeAdjustmentPct = 0, expenseAdjustmentPct = 0 } = {}) {
+  const income = Math.max(0, Number(monthlyIncome || 0) * (1 + Number(incomeAdjustmentPct || 0) / 100));
+  const spend = Math.max(0, Number(monthlySpend || 0) * (1 + Number(expenseAdjustmentPct || 0) / 100));
+  const monthlyNet = Math.round(income - spend);
+  const start = Number(startingLiquid || 0);
+  const horizon = Math.max(1, Math.round(months || 12));
+  const rows = [];
+  for (let month = 1; month <= horizon; month += 1) {
+    rows.push({ month, balance: Math.round(start + monthlyNet * month), cumulativeNet: monthlyNet * month });
+  }
+  let runwayMonths = null;
+  if (monthlyNet < 0 && start > 0) {
+    runwayMonths = Math.floor(start / Math.abs(monthlyNet));
+  }
+  const checkpointAt = (month) => {
+    const row = rows.find((entry) => entry.month === month);
+    return row ? row.balance : Math.round(start + monthlyNet * month);
+  };
+  return {
+    monthlyNet,
+    adjustedIncome: Math.round(income),
+    adjustedSpend: Math.round(spend),
+    startingLiquid: Math.round(start),
+    horizon,
+    endingBalance: rows.length ? rows[rows.length - 1].balance : Math.round(start),
+    rows,
+    checkpoints: { m3: checkpointAt(3), m6: checkpointAt(6), m12: checkpointAt(12) },
+    runwayMonths,
+    negative: monthlyNet < 0,
+  };
+}
+
 export function selectRecurringSummary({ monthControl, recurring, recurringCalendar }) {
   const obligations = selectRecurringObligations(recurring || recurringCalendar || []);
   const filteredCalendar = recurringCalendar?.length ? selectRecurringObligations(recurringCalendar) : [];

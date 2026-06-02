@@ -13,6 +13,7 @@ import {
   selectDebtPayoff,
   selectDailyCalendarHeatmap,
   selectFinancialFlows,
+  selectForecast,
   selectGoals,
   selectFixednessChart,
   selectHierarchySunburst,
@@ -1039,5 +1040,29 @@ describe("selectGoals", () => {
 
   it("returns empty totals for no goals", () => {
     expect(selectGoals([], "2026-06-02")).toMatchObject({ goals: [], totalTarget: 0, totalMonthlyNeed: 0 });
+  });
+});
+
+describe("selectForecast", () => {
+  it("projects liquid balance forward at the monthly net", () => {
+    const forecast = selectForecast({ startingLiquid: 10000, monthlyIncome: 8000, monthlySpend: 6000 });
+    expect(forecast.monthlyNet).toBe(2000);
+    expect(forecast.horizon).toBe(12);
+    expect(forecast.endingBalance).toBe(34000);
+    expect(forecast.checkpoints.m3).toBe(16000);
+    expect(forecast.checkpoints.m6).toBe(22000);
+    expect(forecast.negative).toBe(false);
+    expect(forecast.runwayMonths).toBeNull();
+  });
+
+  it("applies scenario adjustments and flags negative runway", () => {
+    const flat = selectForecast({ startingLiquid: 9000, monthlyIncome: 8000, monthlySpend: 6000, incomeAdjustmentPct: -25 });
+    expect(flat.adjustedIncome).toBe(6000);
+    expect(flat.monthlyNet).toBe(0);
+
+    const drop = selectForecast({ startingLiquid: 9000, monthlyIncome: 8000, monthlySpend: 6000, incomeAdjustmentPct: -50 });
+    expect(drop.monthlyNet).toBe(-2000);
+    expect(drop.negative).toBe(true);
+    expect(drop.runwayMonths).toBe(4);
   });
 });

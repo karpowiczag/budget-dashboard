@@ -16,6 +16,7 @@ import { Moon, Sun } from "lucide-react";
 import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel, sectionForView } from "./domain/budgetSelectors.js";
 import { ImportView } from "./views/ImportView.jsx";
 import { FireView } from "./views/FireView.jsx";
+import { ForecastPanel } from "./views/ForecastPanel.jsx";
 import { GoalsPanel } from "./views/GoalsPanel.jsx";
 import { MonthControlView } from "./views/MonthControlView.jsx";
 import { OverviewView } from "./views/OverviewView.jsx";
@@ -177,7 +178,7 @@ export default function App() {
   const netWorthQuery = useQuery({
     queryKey: budgetQueryKeys.netWorth,
     queryFn: fetchNetWorth,
-    enabled: !!data && view === "wealth",
+    enabled: !!data && (view === "wealth" || view === "plan"),
   });
   const netWorthMutation = useMutation({
     mutationFn: ({ key, account }) => saveNetWorthAccount(key, account),
@@ -578,6 +579,11 @@ export default function App() {
           onDeleteGoal={handleDeleteGoal}
           savingGoal={goalMutation.isPending || goalDeleteMutation.isPending}
           status={goalStatus}
+        />
+        <ForecastPanel
+          startingLiquid={Number(netWorthQuery.data?.liquidTotal || 0)}
+          monthlyIncome={Number(model.plan?.currentMonthlyIncome || 0)}
+          monthlySpend={Number(model.plan?.currentMonthlySpend || 0)}
         />
         </>
       )}
