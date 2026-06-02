@@ -134,6 +134,17 @@ class BudgetSettingsServiceTest {
     }
 
     @Test
+    void defaultsSinkingFundCategoriesWhenUnsetAndNormalizesCustom() {
+        var unset = service.save(new BudgetSettings(BigDecimal.valueOf(14_000), BigDecimal.valueOf(13_000), 3, 6, List.of()));
+        assertThat(unset.sinkingFundCategories()).contains("Podróże i wyjazdy", "Ubezpieczenia").hasSize(7);
+
+        var custom = service.save(new BudgetSettings(
+                BigDecimal.valueOf(14_000), BigDecimal.valueOf(13_000), 3, 6, null,
+                List.of("  Podróże i wyjazdy  ", "Podróże i wyjazdy", "  ", "Sport i hobby"), List.of()));
+        assertThat(custom.sinkingFundCategories()).containsExactly("Podróże i wyjazdy", "Sport i hobby");
+    }
+
+    @Test
     void preservesValidNetIncomeRatio() {
         var saved = service.save(new BudgetSettings(BigDecimal.valueOf(14_000), BigDecimal.valueOf(13_000), 3, 6, new BigDecimal("0.82"), List.of()));
         assertThat(saved.netIncomeRatio()).isEqualByComparingTo("0.82");

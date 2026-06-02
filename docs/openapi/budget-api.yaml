@@ -1384,6 +1384,11 @@ components:
         netIncomeRatio:
           description: Net-of-gross income ratio used for the 50/30/20 benchmark (e.g. 0.75). Defaults to 0.75 when unset.
           $ref: "#/components/schemas/Ratio"
+        sinkingFundCategories:
+          description: Categories treated as sinking funds (monthly reserve = their historical average). Defaults to a built-in set when empty.
+          type: array
+          items:
+            type: string
         categoryLimits:
           type: array
           items:

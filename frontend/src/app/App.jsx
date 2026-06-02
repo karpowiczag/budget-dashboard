@@ -480,6 +480,7 @@ export default function App() {
       emergencyFundMinMonths: Number(base.emergencyFundMinMonths || 3),
       emergencyFundComfortMonths: Number(base.emergencyFundComfortMonths || 6),
       netIncomeRatio: Number(base.netIncomeRatio) > 0 ? Number(base.netIncomeRatio) : 0.75,
+      sinkingFundCategories: Array.isArray(base.sinkingFundCategories) ? base.sinkingFundCategories : [],
       categoryLimits,
     };
     try {
@@ -569,6 +570,7 @@ export default function App() {
           settingsStatus={settingsStatus}
           saving={settingsSaving}
           bucketOptions={BUDGET_BUCKET_OPTIONS}
+          categoryOptions={Array.from(new Set((model.planRows || []).map((row) => row.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pl"))}
           onSaveSettings={handleSaveSettings}
           onSettingChange={handleSettingChange}
           onLimitChange={handleLimitChange}

@@ -9,14 +9,20 @@ public record BudgetSettings(
         int emergencyFundMinMonths,
         int emergencyFundComfortMonths,
         BigDecimal netIncomeRatio,
+        List<String> sinkingFundCategories,
         List<CategoryLimitSetting> categoryLimits
 ) {
-    /** Backwards-compatible constructor; net-income ratio falls back to the service default. */
+    /** Backwards-compatible constructor; net-income ratio and sinking funds fall back to defaults. */
     public BudgetSettings(BigDecimal targetMonthlySpend, BigDecimal aggressiveMonthlySpend, int emergencyFundMinMonths, int emergencyFundComfortMonths, List<CategoryLimitSetting> categoryLimits) {
-        this(targetMonthlySpend, aggressiveMonthlySpend, emergencyFundMinMonths, emergencyFundComfortMonths, null, categoryLimits);
+        this(targetMonthlySpend, aggressiveMonthlySpend, emergencyFundMinMonths, emergencyFundComfortMonths, null, null, categoryLimits);
+    }
+
+    public BudgetSettings(BigDecimal targetMonthlySpend, BigDecimal aggressiveMonthlySpend, int emergencyFundMinMonths, int emergencyFundComfortMonths, BigDecimal netIncomeRatio, List<CategoryLimitSetting> categoryLimits) {
+        this(targetMonthlySpend, aggressiveMonthlySpend, emergencyFundMinMonths, emergencyFundComfortMonths, netIncomeRatio, null, categoryLimits);
     }
 
     public BudgetSettings {
+        sinkingFundCategories = sinkingFundCategories == null ? List.of() : List.copyOf(sinkingFundCategories);
         categoryLimits = categoryLimits == null ? List.of() : List.copyOf(categoryLimits);
     }
 

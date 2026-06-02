@@ -4441,3 +4441,29 @@ footer {
 .nwOverpayList li {
   margin: 0.15rem 0;
 }
+.sinkingFundEditor {
+  margin: 1rem 0;
+}
+.sinkingChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+}
+.sinkingChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-muted, #eef2f7);
+  font-size: 0.85rem;
+}
+.sinkingChip button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-muted, #64748b);
+}

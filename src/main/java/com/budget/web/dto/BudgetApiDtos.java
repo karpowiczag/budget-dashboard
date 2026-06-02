@@ -397,6 +397,7 @@ public final class BudgetApiDtos {
             int emergencyFundMinMonths,
             int emergencyFundComfortMonths,
             BigDecimal netIncomeRatio,
+            List<String> sinkingFundCategories,
             List<CategoryLimitSettingDto> categoryLimits
     ) {
     }

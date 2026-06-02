@@ -139,7 +139,7 @@ public class BudgetAnalysisService {
                 ? currentMonth
                 : latestActiveMonth;
         var latestMonthKey = controlMonth.toString();
-        var monthControl = monthControl(latestMonthKey, transactions, categoryPlanRows, targetMonthlySpend, periodStart, periodEnd, checkAmount, checkCount, categories, today);
+        var monthControl = monthControl(latestMonthKey, transactions, categoryPlanRows, targetMonthlySpend, periodStart, periodEnd, checkAmount, checkCount, categories, today, settings.sinkingFundCategories());
 
         var snapshot = new BudgetSnapshot(
                 input.year(),
@@ -689,7 +689,8 @@ public class BudgetAnalysisService {
             BigDecimal checkAmount,
             int checkCount,
             List<CategoryRow> categories,
-            LocalDate today
+            LocalDate today,
+            List<String> sinkingFundCategories
     ) {
         var latest = YearMonth.parse(latestMonthKey);
         var daysTotal = latest.lengthOfMonth();
@@ -762,20 +763,12 @@ public class BudgetAnalysisService {
         var categoryAverages = new LinkedHashMap<String, BigDecimal>();
         categories.forEach(row -> categoryAverages.put(row.category(), row.monthlyAverage()));
         var sinkingFunds = new ArrayList<BudgetSnapshot.SinkingFund>();
-        for (var entry : Map.of(
-                "Podróże i wyjazdy", "Podróże",
-                "Ubezpieczenia", "Ubezpieczenia",
-                "Zwierzęta", "Zwierzęta",
-                "Paliwo i auto", "Auto",
-                "Elektronika", "Elektronika",
-                "Lekarz i apteka", "Zdrowie",
-                "Uroda i kosmetyki", "Uroda"
-        ).entrySet()) {
-            var avg = categoryAverages.getOrDefault(entry.getKey(), BigDecimal.ZERO);
+        for (var category : sinkingFundCategories) {
+            var avg = categoryAverages.getOrDefault(category, BigDecimal.ZERO);
             if (avg.signum() > 0) {
                 sinkingFunds.add(new BudgetSnapshot.SinkingFund(
-                        entry.getValue(),
-                        entry.getKey(),
+                        category,
+                        category,
                         money(avg),
                         money(avg.multiply(BigDecimal.valueOf(12))),
                         "Fundusz celowy na koszty nierówne w czasie."

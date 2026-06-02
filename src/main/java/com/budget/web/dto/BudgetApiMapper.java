@@ -270,6 +270,7 @@ public class BudgetApiMapper {
                 settings.emergencyFundMinMonths(),
                 settings.emergencyFundComfortMonths(),
                 settings.netIncomeRatio(),
+                java.util.List.copyOf(settings.sinkingFundCategories()),
                 map(settings.categoryLimits(), row -> new BudgetApiDtos.CategoryLimitSettingDto(row.scope(), row.name(), row.category(), row.limit(), row.action(), row.bucketOverride()))
         );
     }
@@ -284,6 +285,7 @@ public class BudgetApiMapper {
                 dto.emergencyFundMinMonths(),
                 dto.emergencyFundComfortMonths(),
                 dto.netIncomeRatio(),
+                dto.sinkingFundCategories() == null ? null : java.util.List.copyOf(dto.sinkingFundCategories()),
                 map(dto.categoryLimits(), row -> new BudgetSettings.CategoryLimitSetting(row.scope(), row.name(), row.category(), row.limit(), row.action(), row.bucketOverride()))
         );
     }

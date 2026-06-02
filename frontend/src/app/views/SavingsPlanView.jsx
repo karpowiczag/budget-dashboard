@@ -26,6 +26,7 @@ export function SavingsPlanView({
   settings,
   settingsStatus,
   bucketOptions = [],
+  categoryOptions = [],
   onBucketOverrideChange,
   onLimitChange,
   onSaveSettings,
@@ -145,6 +146,12 @@ export function SavingsPlanView({
         </div>
         {settingsStatus && <div className={`inlineStatus ${settingsStatus.type}`}>{settingsStatus.message}</div>}
 
+        <SinkingFundEditor
+          categories={settings?.sinkingFundCategories || []}
+          options={categoryOptions}
+          onChange={(list) => onSettingChange("sinkingFundCategories", list)}
+        />
+
         <RecommendedCutsSummary recommendedCuts={recommendedCuts} isHistorical={isHistorical} />
 
         <div className="planTable">
@@ -176,6 +183,34 @@ export function SavingsPlanView({
         </details>
       </div>
     </Panel>
+  );
+}
+
+function SinkingFundEditor({ categories = [], options = [], onChange }) {
+  const available = options.filter((option) => !categories.includes(option));
+  return (
+    <div className="sinkingFundEditor">
+      <h3>Fundusze celowe (kategorie nieregularne)</h3>
+      <p className="nwMuted">Te kategorie są rezerwowane miesięcznie (średnia historyczna) i odejmowane od „ile można bezpiecznie wydać".</p>
+      <div className="sinkingChips">
+        {categories.length ? categories.map((category) => (
+          <span className="sinkingChip" key={category}>
+            {category}
+            <button type="button" aria-label={`Usuń ${category}`} onClick={() => onChange(categories.filter((item) => item !== category))}>×</button>
+          </span>
+        )) : <span className="nwMuted">Brak — używany jest zestaw domyślny.</span>}
+      </div>
+      {available.length ? (
+        <select
+          value=""
+          aria-label="Dodaj kategorię funduszu celowego"
+          onChange={(event) => { if (event.target.value) onChange([...categories, event.target.value]); }}
+        >
+          <option value="">+ dodaj kategorię…</option>
+          {available.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+      ) : null}
+    </div>
   );
 }
 

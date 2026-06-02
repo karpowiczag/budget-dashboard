@@ -35,6 +35,11 @@ public class JdbcBudgetSettingsRepository implements BudgetSettingsStore {
                 WHERE settings_key = :settingsKey
                 ORDER BY limit_scope, limit_name, category
                 """, params(), this::mapLimit);
+        var sinkingFundCategories = jdbc.query("""
+                SELECT category FROM budget_sinking_fund_categories
+                WHERE settings_key = :settingsKey
+                ORDER BY category
+                """, params(), (rs, rowNum) -> rs.getString("category"));
         var profile = profiles.getFirst();
         return Optional.of(new BudgetSettings(
                 profile.targetMonthlySpend(),
@@ -42,6 +47,7 @@ public class JdbcBudgetSettingsRepository implements BudgetSettingsStore {
                 profile.emergencyFundMinMonths(),
                 profile.emergencyFundComfortMonths(),
                 profile.netIncomeRatio(),
+                sinkingFundCategories,
                 limits
         ));
     }
@@ -80,6 +86,13 @@ public class JdbcBudgetSettingsRepository implements BudgetSettingsStore {
                     .addValue("limitAmount", limit.limit())
                     .addValue("action", limit.action())
                     .addValue("bucketOverride", limit.bucketOverride()));
+        }
+
+        for (var category : settings.sinkingFundCategories()) {
+            jdbc.update("""
+                    INSERT INTO budget_sinking_fund_categories (settings_key, category)
+                    VALUES (:settingsKey, :category)
+                    """, params().addValue("category", category));
         }
         return findDefaultSettings().orElseThrow();
     }
