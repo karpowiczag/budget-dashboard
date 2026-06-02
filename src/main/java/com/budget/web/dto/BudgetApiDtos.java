@@ -469,6 +469,25 @@ public final class BudgetApiDtos {
     ) {
     }
 
+    public record GoalResponse(
+            String goalId,
+            String name,
+            BigDecimal targetAmount,
+            BigDecimal currentAmount,
+            LocalDate targetDate,
+            String note
+    ) {
+    }
+
+    public record GoalUpsertRequest(
+            String name,
+            BigDecimal targetAmount,
+            BigDecimal currentAmount,
+            LocalDate targetDate,
+            String note
+    ) {
+    }
+
     public record FireSummaryResponse(
             LocalDate asOf,
             boolean reportsLoaded,

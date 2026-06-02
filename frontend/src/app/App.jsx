@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { deleteNetWorthLiability, fetchAnalytics, fetchCalendar, fetchFireSettings, fetchFireSummary, fetchNetWorth, fetchTransactions, saveNetWorthAccount, saveNetWorthLiability, updateFireSettings } from "./api/budgetApi.js";
+import { deleteGoal, deleteNetWorthLiability, fetchAnalytics, fetchCalendar, fetchFireSettings, fetchFireSummary, fetchGoals, fetchNetWorth, fetchTransactions, saveGoal, saveNetWorthAccount, saveNetWorthLiability, updateFireSettings } from "./api/budgetApi.js";
 import { budgetQueryKeys } from "./api/queryKeys.js";
 import { AppShell } from "./components/layout/AppShell.jsx";
 import { DashboardFooter } from "./components/layout/DashboardFooter.jsx";
@@ -16,6 +16,7 @@ import { Moon, Sun } from "lucide-react";
 import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel, sectionForView } from "./domain/budgetSelectors.js";
 import { ImportView } from "./views/ImportView.jsx";
 import { FireView } from "./views/FireView.jsx";
+import { GoalsPanel } from "./views/GoalsPanel.jsx";
 import { MonthControlView } from "./views/MonthControlView.jsx";
 import { OverviewView } from "./views/OverviewView.jsx";
 import { RecurringView } from "./views/RecurringView.jsx";
@@ -52,6 +53,7 @@ export default function App() {
   const [settingsDraft, setSettingsDraft] = useState(null);
   const [fireSettingsStatus, setFireSettingsStatus] = useState(null);
   const [netWorthStatus, setNetWorthStatus] = useState(null);
+  const [goalStatus, setGoalStatus] = useState(null);
   const [view, setView] = useState("overview");
   const [theme, setTheme] = useState(getInitialTheme);
   const [localTimes, setLocalTimes] = useState({
@@ -185,6 +187,17 @@ export default function App() {
   });
   const netWorthLiabilityDeleteMutation = useMutation({
     mutationFn: (key) => deleteNetWorthLiability(key),
+  });
+  const goalsQuery = useQuery({
+    queryKey: budgetQueryKeys.goals,
+    queryFn: fetchGoals,
+    enabled: view === "plan",
+  });
+  const goalMutation = useMutation({
+    mutationFn: ({ id, goal }) => saveGoal(id, goal),
+  });
+  const goalDeleteMutation = useMutation({
+    mutationFn: (id) => deleteGoal(id),
   });
   const inspectorQuery = useQuery({
     queryKey: budgetQueryKeys.transactions(year, inspectorFilters),
@@ -403,6 +416,32 @@ export default function App() {
     }
   }
 
+  async function handleSaveGoal(id, goal) {
+    setGoalStatus({ type: "info", message: "Zapisuję cel..." });
+    try {
+      const saved = await goalMutation.mutateAsync({ id, goal });
+      queryClient.setQueryData(budgetQueryKeys.goals, saved);
+      setGoalStatus({ type: "success", message: "Cel zapisany." });
+      return saved;
+    } catch (error) {
+      setGoalStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
+  async function handleDeleteGoal(id) {
+    setGoalStatus({ type: "info", message: "Usuwam cel..." });
+    try {
+      const saved = await goalDeleteMutation.mutateAsync(id);
+      queryClient.setQueryData(budgetQueryKeys.goals, saved);
+      setGoalStatus({ type: "success", message: "Cel usunięty." });
+      return saved;
+    } catch (error) {
+      setGoalStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
   async function handleSaveSettings() {
     const base = settingsDraft || budgetSettings || {};
     const allLimitRows = [...(model.parentPlanRows || []), ...(model.planRows || [])];
@@ -505,6 +544,7 @@ export default function App() {
       )}
 
       {view === "plan" && (
+        <>
         <SavingsPlanView
           data={data}
           financialFlows={model.financialFlows}
@@ -531,6 +571,15 @@ export default function App() {
           onLimitChange={handleLimitChange}
           onBucketOverrideChange={handleBucketOverrideChange}
         />
+        <GoalsPanel
+          goals={goalsQuery.data}
+          asOf={new Date().toISOString().slice(0, 10)}
+          onSaveGoal={handleSaveGoal}
+          onDeleteGoal={handleDeleteGoal}
+          savingGoal={goalMutation.isPending || goalDeleteMutation.isPending}
+          status={goalStatus}
+        />
+        </>
       )}
 
       {view === "reports" && (

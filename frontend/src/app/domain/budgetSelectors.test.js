@@ -13,6 +13,7 @@ import {
   selectDebtPayoff,
   selectDailyCalendarHeatmap,
   selectFinancialFlows,
+  selectGoals,
   selectFixednessChart,
   selectHierarchySunburst,
   selectImportHealth,
@@ -1005,5 +1006,38 @@ describe("selectDebtPayoff", () => {
   it("returns null when there is nothing to pay off", () => {
     expect(selectDebtPayoff({ liabilities: [] })).toBeNull();
     expect(selectDebtPayoff({ liabilities: [{ liabilityKey: "z", name: "Zero", currentPrincipal: 0 }] })).toBeNull();
+  });
+});
+
+describe("selectGoals", () => {
+  it("computes months-left, monthly need and progress from today", () => {
+    const model = selectGoals([
+      { goalId: "house", name: "Mieszkanie", targetAmount: 100000, currentAmount: 20000, targetDate: "2026-12-01" },
+      { goalId: "done", name: "Gotowe", targetAmount: 5000, currentAmount: 5000, targetDate: "2026-12-01" },
+    ], "2026-06-02");
+    const house = model.goals.find((goal) => goal.goalId === "house");
+    expect(house.remaining).toBe(80000);
+    expect(house.monthsLeft).toBe(6);
+    expect(house.monthlyNeed).toBe(Math.ceil(80000 / 6));
+    expect(house.progressPercent).toBe(20);
+    expect(house.achieved).toBe(false);
+    const done = model.goals.find((goal) => goal.goalId === "done");
+    expect(done.achieved).toBe(true);
+    expect(done.monthlyNeed).toBe(0);
+    expect(model.totalTarget).toBe(105000);
+    expect(model.totalCurrent).toBe(25000);
+  });
+
+  it("flags overdue goals and handles missing dates", () => {
+    const model = selectGoals([
+      { goalId: "late", name: "Spóźniony", targetAmount: 1000, currentAmount: 100, targetDate: "2026-01-01" },
+      { goalId: "nodate", name: "Bez terminu", targetAmount: 1000, currentAmount: 0 },
+    ], "2026-06-02");
+    expect(model.goals.find((goal) => goal.goalId === "late").overdue).toBe(true);
+    expect(model.goals.find((goal) => goal.goalId === "nodate").monthsLeft).toBeNull();
+  });
+
+  it("returns empty totals for no goals", () => {
+    expect(selectGoals([], "2026-06-02")).toMatchObject({ goals: [], totalTarget: 0, totalMonthlyNeed: 0 });
   });
 });

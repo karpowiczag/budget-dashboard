@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.budget.web.controller.BudgetApiController;
 import com.budget.web.controller.FireApiController;
+import com.budget.web.controller.GoalApiController;
 import com.budget.web.controller.NetWorthApiController;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.Schema;
@@ -41,7 +42,10 @@ class OpenApiContractTest {
             Map.entry("netWorth", "getNetWorth"),
             Map.entry("saveAccount", "updateNetWorthAccount"),
             Map.entry("saveLiability", "updateNetWorthLiability"),
-            Map.entry("deleteLiability", "deleteNetWorthLiability")
+            Map.entry("deleteLiability", "deleteNetWorthLiability"),
+            Map.entry("listGoals", "listGoals"),
+            Map.entry("updateGoal", "updateGoal"),
+            Map.entry("deleteGoal", "deleteGoal")
     );
     private static final Map<String, String> SUCCESS_SCHEMAS = Map.ofEntries(
             Map.entry("getSession", "SessionResponse"),
@@ -61,7 +65,10 @@ class OpenApiContractTest {
             Map.entry("getNetWorth", "NetWorthResponse"),
             Map.entry("updateNetWorthAccount", "NetWorthResponse"),
             Map.entry("updateNetWorthLiability", "NetWorthResponse"),
-            Map.entry("deleteNetWorthLiability", "NetWorthResponse")
+            Map.entry("deleteNetWorthLiability", "NetWorthResponse"),
+            Map.entry("listGoals", "[Goal]"),
+            Map.entry("updateGoal", "[Goal]"),
+            Map.entry("deleteGoal", "[Goal]")
     );
 
     @Autowired
@@ -79,7 +86,8 @@ class OpenApiContractTest {
         handlerMapping.getHandlerMethods().forEach((mapping, handler) -> {
             if (!BudgetApiController.class.equals(handler.getBeanType())
                     && !FireApiController.class.equals(handler.getBeanType())
-                    && !NetWorthApiController.class.equals(handler.getBeanType())) {
+                    && !NetWorthApiController.class.equals(handler.getBeanType())
+                    && !GoalApiController.class.equals(handler.getBeanType())) {
                 return;
             }
             assertWebDtoReturnType(handler.getMethod().getGenericReturnType());

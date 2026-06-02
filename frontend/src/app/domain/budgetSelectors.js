@@ -1067,6 +1067,48 @@ export function selectDebtPayoff({ liabilities = [], extraMonthly = 0 } = {}) {
   };
 }
 
+// Goals: derive months-left, required monthly contribution and progress from the goal list
+// and "today" (passed in for testability). currentAmount is user-maintained for now.
+export function selectGoals(goals = [], asOf) {
+  const todayMs = asOf ? Date.parse(asOf) : null;
+  const shaped = (goals || []).map((goal) => {
+    const target = Number(goal.targetAmount || 0);
+    const current = Number(goal.currentAmount || 0);
+    const remaining = Math.max(0, target - current);
+    let monthsLeft = null;
+    if (goal.targetDate && todayMs != null) {
+      const diffMs = Date.parse(goal.targetDate) - todayMs;
+      monthsLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24 * 30.44)));
+    }
+    const achieved = target > 0 && current >= target;
+    const monthlyNeed = remaining <= 0
+      ? 0
+      : monthsLeft && monthsLeft > 0
+        ? Math.ceil(remaining / monthsLeft)
+        : remaining;
+    return {
+      goalId: goal.goalId,
+      name: goal.name || goal.goalId,
+      targetAmount: target,
+      currentAmount: current,
+      targetDate: goal.targetDate || "",
+      note: goal.note || "",
+      remaining,
+      monthsLeft,
+      monthlyNeed,
+      progressPercent: target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0,
+      achieved,
+      overdue: !achieved && !!goal.targetDate && monthsLeft === 0,
+    };
+  });
+  return {
+    goals: shaped,
+    totalTarget: shaped.reduce((sum, goal) => sum + goal.targetAmount, 0),
+    totalCurrent: shaped.reduce((sum, goal) => sum + goal.currentAmount, 0),
+    totalMonthlyNeed: shaped.reduce((sum, goal) => sum + goal.monthlyNeed, 0),
+  };
+}
+
 export function selectRecurringSummary({ monthControl, recurring, recurringCalendar }) {
   const obligations = selectRecurringObligations(recurring || recurringCalendar || []);
   const filteredCalendar = recurringCalendar?.length ? selectRecurringObligations(recurringCalendar) : [];

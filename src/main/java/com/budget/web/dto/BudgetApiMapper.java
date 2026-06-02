@@ -10,6 +10,7 @@ import com.budget.application.reporting.TransactionPage;
 import com.budget.application.reporting.TransactionRecord;
 import com.budget.application.reporting.YearSummary;
 import com.budget.application.settings.BudgetSettings;
+import com.budget.domain.goal.Goal;
 import com.budget.domain.importjob.ImportRun;
 import com.budget.domain.networth.Account;
 import com.budget.domain.networth.Liability;
@@ -122,6 +123,28 @@ public class BudgetApiMapper {
                 request.annualInterestRate(),
                 request.monthlyPayment(),
                 request.asOf()
+        );
+    }
+
+    public BudgetApiDtos.GoalResponse toGoal(Goal goal) {
+        return new BudgetApiDtos.GoalResponse(
+                goal.goalId(),
+                goal.name(),
+                goal.targetAmount(),
+                goal.currentAmount(),
+                goal.targetDate(),
+                goal.note()
+        );
+    }
+
+    public Goal toGoal(String goalId, BudgetApiDtos.GoalUpsertRequest request) {
+        return new Goal(
+                goalId,
+                request.name(),
+                request.targetAmount(),
+                request.currentAmount(),
+                request.targetDate(),
+                request.note()
         );
     }
 

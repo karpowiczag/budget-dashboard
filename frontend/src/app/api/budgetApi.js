@@ -130,6 +130,31 @@ export async function deleteNetWorthLiability(key) {
   return readJson(response, "Nie mogę usunąć zobowiązania");
 }
 
+export async function fetchGoals() {
+  const response = await fetch("/api/v1/goals");
+  return readJson(response, "Nie mogę wczytać celów");
+}
+
+export async function saveGoal(id, goal) {
+  const response = await fetch(`/api/v1/goals/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(goal),
+  });
+  return readJson(response, "Nie mogę zapisać celu");
+}
+
+export async function deleteGoal(id) {
+  const response = await fetch(`/api/v1/goals/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: csrfHeaders(),
+  });
+  return readJson(response, "Nie mogę usunąć celu");
+}
+
 export async function uploadTransactions(file) {
   const body = new FormData();
   body.append("file", file);
