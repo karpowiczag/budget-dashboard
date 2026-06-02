@@ -51,6 +51,7 @@ export function useDashboardModel({
   bucketOverrides,
   importRuns,
   fireSummary,
+  budgetSettings,
 }) {
   const buckets = useMemo(() => selectBuckets(data), [data]);
   const planRows = useMemo(() => selectPlanRows(data, customLimits, bucketOverrides), [data, customLimits, bucketOverrides]);
@@ -105,7 +106,8 @@ export function useDashboardModel({
   const recurring = data.recurring;
   const latestYear = Math.max(...years.map((row) => Number(row.year)));
   const isHistorical = Number(data.year) < latestYear;
-  const netIncome = Number(kpis.income) * NET_INCOME_RATIO;
+  const netIncomeRatio = Number(budgetSettings?.netIncomeRatio) > 0 ? Number(budgetSettings.netIncomeRatio) : NET_INCOME_RATIO;
+  const netIncome = Number(kpis.income) * netIncomeRatio;
   const needsTarget = netIncome * 0.5;
   const savingsTarget = netIncome * 0.2;
   const wantsTarget = netIncome * 0.3;

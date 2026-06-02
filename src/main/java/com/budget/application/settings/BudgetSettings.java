@@ -8,8 +8,14 @@ public record BudgetSettings(
         BigDecimal aggressiveMonthlySpend,
         int emergencyFundMinMonths,
         int emergencyFundComfortMonths,
+        BigDecimal netIncomeRatio,
         List<CategoryLimitSetting> categoryLimits
 ) {
+    /** Backwards-compatible constructor; net-income ratio falls back to the service default. */
+    public BudgetSettings(BigDecimal targetMonthlySpend, BigDecimal aggressiveMonthlySpend, int emergencyFundMinMonths, int emergencyFundComfortMonths, List<CategoryLimitSetting> categoryLimits) {
+        this(targetMonthlySpend, aggressiveMonthlySpend, emergencyFundMinMonths, emergencyFundComfortMonths, null, categoryLimits);
+    }
+
     public BudgetSettings {
         categoryLimits = categoryLimits == null ? List.of() : List.copyOf(categoryLimits);
     }

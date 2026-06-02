@@ -1381,6 +1381,9 @@ components:
         emergencyFundComfortMonths:
           type: integer
           minimum: 1
+        netIncomeRatio:
+          description: Net-of-gross income ratio used for the 50/30/20 benchmark (e.g. 0.75). Defaults to 0.75 when unset.
+          $ref: "#/components/schemas/Ratio"
         categoryLimits:
           type: array
           items:

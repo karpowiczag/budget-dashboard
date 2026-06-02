@@ -269,6 +269,7 @@ public class BudgetApiMapper {
                 settings.aggressiveMonthlySpend(),
                 settings.emergencyFundMinMonths(),
                 settings.emergencyFundComfortMonths(),
+                settings.netIncomeRatio(),
                 map(settings.categoryLimits(), row -> new BudgetApiDtos.CategoryLimitSettingDto(row.scope(), row.name(), row.category(), row.limit(), row.action(), row.bucketOverride()))
         );
     }
@@ -282,6 +283,7 @@ public class BudgetApiMapper {
                 dto.aggressiveMonthlySpend(),
                 dto.emergencyFundMinMonths(),
                 dto.emergencyFundComfortMonths(),
+                dto.netIncomeRatio(),
                 map(dto.categoryLimits(), row -> new BudgetSettings.CategoryLimitSetting(row.scope(), row.name(), row.category(), row.limit(), row.action(), row.bucketOverride()))
         );
     }

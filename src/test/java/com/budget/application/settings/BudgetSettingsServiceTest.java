@@ -123,6 +123,22 @@ class BudgetSettingsServiceTest {
                 });
     }
 
+    @Test
+    void defaultsNetIncomeRatioWhenUnsetOrOutOfRange() {
+        var unset = service.save(new BudgetSettings(BigDecimal.valueOf(14_000), BigDecimal.valueOf(13_000), 3, 6, List.of()));
+        assertThat(unset.netIncomeRatio()).isEqualByComparingTo("0.75");
+        assertThat(service.current().netIncomeRatio()).isEqualByComparingTo("0.75");
+
+        var tooHigh = service.save(new BudgetSettings(BigDecimal.valueOf(14_000), BigDecimal.valueOf(13_000), 3, 6, new BigDecimal("1.5"), List.of()));
+        assertThat(tooHigh.netIncomeRatio()).isEqualByComparingTo("0.75");
+    }
+
+    @Test
+    void preservesValidNetIncomeRatio() {
+        var saved = service.save(new BudgetSettings(BigDecimal.valueOf(14_000), BigDecimal.valueOf(13_000), 3, 6, new BigDecimal("0.82"), List.of()));
+        assertThat(saved.netIncomeRatio()).isEqualByComparingTo("0.82");
+    }
+
     private static final class MemoryStore implements BudgetSettingsStore {
         private BudgetSettings settings;
 

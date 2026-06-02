@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class BudgetSettingsService {
+    private static final BigDecimal DEFAULT_NET_INCOME_RATIO = new BigDecimal("0.75");
     private static final Set<String> LIMIT_SCOPES = Set.of("bucket", "area", "group", "category");
     private static final Set<String> BUCKET_OVERRIDES = Set.of(
             "Obowiązkowe stałe",
@@ -44,8 +45,15 @@ public class BudgetSettingsService {
                 positiveOrDefault(settings.aggressiveMonthlySpend(), defaults.aggressiveMonthlySpend()),
                 positiveOrDefault(settings.emergencyFundMinMonths(), defaults.emergencyFundMinMonths()),
                 positiveOrDefault(settings.emergencyFundComfortMonths(), defaults.emergencyFundComfortMonths()),
+                netIncomeRatioOrDefault(settings.netIncomeRatio()),
                 settings.categoryLimits()
         );
+    }
+
+    private BigDecimal netIncomeRatioOrDefault(BigDecimal ratio) {
+        return ratio != null && ratio.signum() > 0 && ratio.compareTo(BigDecimal.ONE) <= 0
+                ? ratio.setScale(4, RoundingMode.HALF_UP)
+                : DEFAULT_NET_INCOME_RATIO;
     }
 
     private BudgetSettings validate(BudgetSettings settings) {
@@ -88,6 +96,7 @@ public class BudgetSettingsService {
                 money(normalized.aggressiveMonthlySpend()),
                 normalized.emergencyFundMinMonths(),
                 normalized.emergencyFundComfortMonths(),
+                normalized.netIncomeRatio(),
                 java.util.List.copyOf(limitsByKey.values())
         );
     }

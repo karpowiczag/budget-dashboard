@@ -396,6 +396,7 @@ public final class BudgetApiDtos {
             BigDecimal aggressiveMonthlySpend,
             int emergencyFundMinMonths,
             int emergencyFundComfortMonths,
+            BigDecimal netIncomeRatio,
             List<CategoryLimitSettingDto> categoryLimits
     ) {
     }

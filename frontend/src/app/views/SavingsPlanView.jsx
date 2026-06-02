@@ -124,6 +124,20 @@ export function SavingsPlanView({
             <p>{minMonths} mies.: {money(coreMonthlyCost * minMonths)} · komfort: {money(coreMonthlyCost * comfortMonths)}</p>
           </div>
           <div>
+            <span>Dochód netto (do 50/30/20)</span>
+            <input
+              className="planNumberInput"
+              type="number"
+              min="1"
+              max="100"
+              step="1"
+              value={Math.round((Number(settings?.netIncomeRatio) > 0 ? Number(settings.netIncomeRatio) : 0.75) * 100)}
+              onChange={(event) => onSettingChange("netIncomeRatio", Math.min(1, Math.max(0.01, Number(event.target.value || 0) / 100)))}
+              aria-label="Dochód netto jako procent brutto"
+            />
+            <p>% dochodu brutto — punkt odniesienia 50/30/20</p>
+          </div>
+          <div>
             <span>Przepływy majątkowe</span>
             <strong>{money(financialFlows.total || 0)}</strong>
             <p>szczegóły są w module Majątek, tutaj liczy się tylko cel planu</p>

@@ -222,6 +222,7 @@ export default function App() {
     bucketOverrides: categoryBucketOverrides,
     importRuns,
     fireSummary: fireQuery.data || null,
+    budgetSettings: settingsDraft || budgetSettings,
   });
 
   if (status === "loading") {
@@ -478,6 +479,7 @@ export default function App() {
       aggressiveMonthlySpend: Number(base.aggressiveMonthlySpend || data.savingsPlan.aggressiveMonthlySpend),
       emergencyFundMinMonths: Number(base.emergencyFundMinMonths || 3),
       emergencyFundComfortMonths: Number(base.emergencyFundComfortMonths || 6),
+      netIncomeRatio: Number(base.netIncomeRatio) > 0 ? Number(base.netIncomeRatio) : 0.75,
       categoryLimits,
     };
     try {
