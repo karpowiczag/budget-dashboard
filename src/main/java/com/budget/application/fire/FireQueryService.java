@@ -29,6 +29,14 @@ public class FireQueryService implements PortfolioValuePort {
     private static final String WRAPPER_TAXABLE = "Rachunek opodatkowany";
     private static final String BUCKET_INVESTMENTS = "Inwestycje";
     private static final String BUCKET_LOAN_OVERPAYMENT = "Nadpłata kredytu";
+    private static final BigDecimal ASSUMED_INFLATION = new BigDecimal("0.025");
+    private static final BigDecimal EQUITY_VOLATILITY = new BigDecimal("0.16");
+    private static final BigDecimal MIN_PORTFOLIO_VOLATILITY = new BigDecimal("0.03");
+    private static final int MONTE_CARLO_PATHS = 2000;
+    private static final long MONTE_CARLO_SEED = 20260101L;
+    private static final int GLIDEPATH_YEARS = 10;
+    private static final BigDecimal GLIDEPATH_FLOOR_EQUITY = new BigDecimal("0.50");
+    private static final String PPK_RECOMMENDATION = "Wpłacaj na PPK tyle, by uzyskać pełną dopłatę pracodawcy (1,5% bazowo, do 4% z dopłatami) — darmowy kapitał emerytalny ponad IKE/IKZE.";
 
     private final FirePortfolioReader portfolioReader;
     private final BudgetReportStore budgetStore;
@@ -117,6 +125,17 @@ public class FireQueryService implements PortfolioValuePort {
         var actionItems = actionItems(baseScenario, contributionPlan, liquidBridgeGapTo60, dataQuality, rebalancing, budgetLink, spendTargetConfigured);
         var positionAnalyses = positionAnalyzer.analyze(settings, positions, currentValue, investmentPortfolioValue, rebalancing);
 
+        var assumedInflation = ASSUMED_INFLATION;
+        var fireNumberNominalAtTarget = money(BigDecimal.valueOf(
+                fireNumber.doubleValue() * Math.pow(1 + assumedInflation.doubleValue(), Math.max(0, yearsToFire))));
+        var suggestedEquityShare = glidepathEquityShare(settings.targetEquityShare(), yearsToFire);
+        var portfolioVolatility = EQUITY_VOLATILITY.multiply(settings.targetEquityShare()).max(MIN_PORTFOLIO_VOLATILITY);
+        var monteCarloSuccessRate = spendTargetConfigured
+                ? BigDecimal.valueOf(FireProjection.monteCarloSuccessRate(
+                        currentValue, money(monthlyContribution), settings.expectedRealReturn(), portfolioVolatility,
+                        Math.max(0, yearsToFire) * 12, fireNumber, MONTE_CARLO_PATHS, MONTE_CARLO_SEED)).setScale(4, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
         return new FireSummary(
                 snapshot.asOf(),
                 !positions.isEmpty(),
@@ -148,6 +167,11 @@ public class FireQueryService implements PortfolioValuePort {
                 money(taxableGain),
                 estimatedTax,
                 money(monthlyContribution),
+                assumedInflation,
+                fireNumberNominalAtTarget,
+                suggestedEquityShare,
+                monteCarloSuccessRate,
+                PPK_RECOMMENDATION,
                 budgetLink,
                 contributionPlan,
                 withdrawalPlan,
@@ -454,6 +478,16 @@ public class FireQueryService implements PortfolioValuePort {
                 .sorted(Comparator.comparing((FireSummary.FireRebalanceAction row) -> row.priority().equals("Wysoki") ? 0 : 1)
                         .thenComparing(FireSummary.FireRebalanceAction::assetClass))
                 .toList();
+    }
+
+    private BigDecimal glidepathEquityShare(BigDecimal targetEquity, int yearsToFire) {
+        if (yearsToFire >= GLIDEPATH_YEARS) {
+            return targetEquity.setScale(4, RoundingMode.HALF_UP);
+        }
+        var floor = GLIDEPATH_FLOOR_EQUITY.min(targetEquity);
+        var fraction = BigDecimal.valueOf(Math.max(0, yearsToFire))
+                .divide(BigDecimal.valueOf(GLIDEPATH_YEARS), 6, RoundingMode.HALF_UP);
+        return floor.add(targetEquity.subtract(floor).multiply(fraction)).setScale(4, RoundingMode.HALF_UP);
     }
 
     private BigDecimal bridgeCapital(FireSettings settings, BigDecimal annualSpendTarget, int accessAge) {

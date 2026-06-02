@@ -1479,6 +1479,19 @@ components:
           $ref: "#/components/schemas/Money"
         currentMonthlyWealthContribution:
           $ref: "#/components/schemas/Money"
+        assumedInflation:
+          $ref: "#/components/schemas/Ratio"
+        fireNumberNominalAtTarget:
+          description: FIRE number in nominal PLN at the target age (today's number inflated by assumedInflation).
+          $ref: "#/components/schemas/Money"
+        suggestedEquityShare:
+          description: Glidepath-suggested equity allocation that de-risks approaching the target age.
+          $ref: "#/components/schemas/Ratio"
+        monteCarloSuccessRate:
+          description: Probability (0-1) of reaching the FIRE number by the target age under simulated returns.
+          $ref: "#/components/schemas/Ratio"
+        ppkRecommendation:
+          type: string
         budgetLink:
           $ref: "#/components/schemas/FireBudgetLink"
         contributionPlan:
