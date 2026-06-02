@@ -4424,3 +4424,20 @@ footer {
 .nwNewLiability select {
   min-width: 8rem;
 }
+.nwInlineField {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+.nwInlineField input {
+  min-width: 7rem;
+}
+.nwOverpayList {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+}
+.nwOverpayList li {
+  margin: 0.15rem 0;
+}

@@ -5,7 +5,7 @@ import { SavingsWaterfallChart } from "../components/charts/SavingsWaterfallChar
 import { ReportDataTable } from "../components/tables/ReportDataTable.jsx";
 import { Panel } from "../components/ui/Panel.jsx";
 import { money, percent } from "../domain/formatters.js";
-import { selectNetWorth } from "../domain/budgetSelectors.js";
+import { selectDebtPayoff, selectNetWorth } from "../domain/budgetSelectors.js";
 
 const KIND_OPTIONS = [
   { value: "CHECKING", label: "Rachunek bieżący" },
@@ -153,6 +153,66 @@ function NewLiabilityForm({ onSave, saving }) {
   );
 }
 
+function formatMonths(months) {
+  if (months == null) return "—";
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  if (years === 0) return `${rest} mies.`;
+  if (rest === 0) return `${years} lat`;
+  return `${years} lat ${rest} mies.`;
+}
+
+function DebtPayoffPanel({ liabilities }) {
+  const [extra, setExtra] = useState("0");
+  const plan = selectDebtPayoff({ liabilities, extraMonthly: Number(extra) || 0 });
+  if (!plan) return null;
+  const summarise = (strategy) => `${formatMonths(strategy.months)} · odsetki ${money(strategy.totalInterest)}`;
+  return (
+    <Panel title="Spłata długu: lawina vs kula śnieżna">
+      <div className="nwNewLiability">
+        <label className="nwInlineField">
+          Dodatkowa nadpłata / mies.
+          <input type="number" step="50" value={extra} aria-label="Dodatkowa nadpłata miesięczna" onChange={(event) => setExtra(event.target.value)} />
+        </label>
+        <span className="nwMuted">Budżet na dług: {money(plan.monthlyBudget)} / mies. (raty {money(plan.totalMinPayment)} + nadpłata)</span>
+      </div>
+      {!plan.feasible ? (
+        <div className="dataQualityBanner warn">
+          <span>Przy obecnych ratach dług nie zostanie spłacony — zwiększ nadpłatę lub raty miesięczne.</span>
+        </div>
+      ) : null}
+      <div className="nwSummary">
+        <div>
+          <span className="nwMuted">Lawina (od najwyższego oproc.)</span>
+          <strong className={plan.recommended === "avalanche" ? "good" : ""}>{summarise(plan.avalanche)}</strong>
+          <span className="nwMuted">kolejność: {plan.avalanche.order.join(" → ")}</span>
+        </div>
+        <div>
+          <span className="nwMuted">Kula śnieżna (od najmniejszego salda)</span>
+          <strong className={plan.recommended === "snowball" ? "good" : ""}>{summarise(plan.snowball)}</strong>
+          <span className="nwMuted">kolejność: {plan.snowball.order.join(" → ")}</span>
+        </div>
+        <div>
+          <span className="nwMuted">Rekomendacja</span>
+          <strong className="good">{plan.recommended === "avalanche" ? "Lawina" : "Kula śnieżna"}</strong>
+          {plan.interestSaved > 0 ? <span className="nwMuted">lawina oszczędza {money(plan.interestSaved)} odsetek</span> : null}
+        </div>
+      </div>
+      <p className="nwMuted">Nadpłacać dług czy inwestować? Punkt odniesienia rynkowy: {percent(plan.referenceReturn)} rocznie.</p>
+      <ul className="nwOverpayList">
+        {plan.overpayVsInvest.map((row) => (
+          <li key={row.name}>
+            <strong>{row.name}</strong> — {percent(row.rate)}: {row.verdict === "overpay" ? "nadpłacaj (zwrot pewny, wyższy niż rynek)" : "inwestowanie może dać więcej"}
+          </li>
+        ))}
+      </ul>
+      {plan.missingPayments.length ? (
+        <p className="nwMuted">Ustaw ratę miesięczną, aby uwzględnić w planie: {plan.missingPayments.join(", ")}.</p>
+      ) : null}
+    </Panel>
+  );
+}
+
 export function WealthView({ wealthDashboard, netWorth, onSaveAccount, onSaveLiability, onDeleteLiability, savingAccount = false, savingLiability = false, netWorthStatus, onInspect }) {
   const dashboard = wealthDashboard || {};
   const nw = selectNetWorth(netWorth);
@@ -279,6 +339,8 @@ export function WealthView({ wealthDashboard, netWorth, onSaveAccount, onSaveLia
           </>
         )}
       </Panel>
+
+      {nw && nw.liabilities.length > 0 ? <DebtPayoffPanel liabilities={nw.liabilities} /> : null}
 
       <section className="gridTwo">
         <Panel title="Sankey: gdzie przesuwamy pieniądze">

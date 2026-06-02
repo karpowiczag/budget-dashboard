@@ -10,6 +10,7 @@ import {
   selectCategorySubcategories,
   selectCashflowSankey,
   selectDataQualityChart,
+  selectDebtPayoff,
   selectDailyCalendarHeatmap,
   selectFinancialFlows,
   selectFixednessChart,
@@ -957,5 +958,50 @@ describe("selectNetWorth", () => {
 
   it("returns null without a payload", () => {
     expect(selectNetWorth(null)).toBeNull();
+  });
+});
+
+describe("selectDebtPayoff", () => {
+  const debts = [
+    { liabilityKey: "consumer", name: "Pożyczka", currentPrincipal: 5000, annualInterestRate: 0.2, monthlyPayment: 100 },
+    { liabilityKey: "card", name: "Karta", currentPrincipal: 1000, annualInterestRate: 0.05, monthlyPayment: 100 },
+  ];
+
+  it("prefers avalanche when high-rate debt dominates, ordering and verdicts follow rate/size", () => {
+    const plan = selectDebtPayoff({ liabilities: debts, extraMonthly: 300 });
+    expect(plan.monthlyBudget).toBe(500);
+    expect(plan.avalanche.feasible).toBe(true);
+    expect(plan.snowball.feasible).toBe(true);
+    expect(plan.avalanche.order).toEqual(["Pożyczka", "Karta"]); // 20% first
+    expect(plan.snowball.order).toEqual(["Karta", "Pożyczka"]); // smallest balance first
+    expect(plan.avalanche.totalInterest).toBeLessThanOrEqual(plan.snowball.totalInterest);
+    expect(plan.interestSaved).toBeGreaterThan(0);
+    expect(plan.recommended).toBe("avalanche");
+    expect(plan.overpayVsInvest).toEqual([
+      { name: "Pożyczka", rate: 0.2, verdict: "overpay" },
+      { name: "Karta", rate: 0.05, verdict: "invest" },
+    ]);
+  });
+
+  it("flags an infeasible plan when payments cannot cover interest", () => {
+    const plan = selectDebtPayoff({
+      liabilities: [{ liabilityKey: "x", name: "Drogi", currentPrincipal: 10000, annualInterestRate: 0.3, monthlyPayment: 50 }],
+      extraMonthly: 0,
+    });
+    expect(plan.avalanche.feasible).toBe(false);
+    expect(plan.avalanche.months).toBeNull();
+  });
+
+  it("lists liabilities missing a monthly payment", () => {
+    const plan = selectDebtPayoff({
+      liabilities: [{ liabilityKey: "m", name: "Hipoteka", currentPrincipal: 4000, annualInterestRate: 0.07, monthlyPayment: null }],
+      extraMonthly: 500,
+    });
+    expect(plan.missingPayments).toEqual(["Hipoteka"]);
+  });
+
+  it("returns null when there is nothing to pay off", () => {
+    expect(selectDebtPayoff({ liabilities: [] })).toBeNull();
+    expect(selectDebtPayoff({ liabilities: [{ liabilityKey: "z", name: "Zero", currentPrincipal: 0 }] })).toBeNull();
   });
 });

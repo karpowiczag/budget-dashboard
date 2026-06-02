@@ -973,6 +973,95 @@ export function selectNetWorth(netWorth) {
   };
 }
 
+// Phase 2d debt payoff. Pure amortization over the liabilities already in the net-worth
+// payload — no backend needed. Compares avalanche (highest rate first) vs snowball
+// (smallest balance first) under a fixed monthly budget = sum of minimum payments + extra,
+// rolling freed minimums into the next target. Also flags overpay-vs-invest per debt.
+const DEBT_MAX_MONTHS = 1200;
+export const INVEST_REFERENCE_RETURN = 0.07; // nominal long-run reference for overpay-vs-invest
+
+function simulatePayoff(debts, order, monthlyBudget) {
+  const rateOf = new Map(debts.map((debt) => [debt.key, debt.rate]));
+  const minOf = new Map(debts.map((debt) => [debt.key, debt.minPayment]));
+  const balances = new Map(debts.map((debt) => [debt.key, debt.principal]));
+  const remaining = order.map((debt) => debt.key);
+  const payoffOrder = [];
+  let months = 0;
+  let totalInterest = 0;
+  while (remaining.length > 0 && months < DEBT_MAX_MONTHS) {
+    months += 1;
+    for (const key of remaining) {
+      const interest = balances.get(key) * rateOf.get(key) / 12;
+      totalInterest += interest;
+      balances.set(key, balances.get(key) + interest);
+    }
+    let budget = monthlyBudget;
+    for (const key of remaining) {
+      const pay = Math.min(minOf.get(key), balances.get(key), Math.max(0, budget));
+      balances.set(key, balances.get(key) - pay);
+      budget -= pay;
+    }
+    for (const key of remaining) {
+      if (budget <= 0) break;
+      const pay = Math.min(balances.get(key), budget);
+      balances.set(key, balances.get(key) - pay);
+      budget -= pay;
+    }
+    for (let i = remaining.length - 1; i >= 0; i -= 1) {
+      if (balances.get(remaining[i]) <= 0.005) {
+        payoffOrder.push(remaining[i]);
+        remaining.splice(i, 1);
+      }
+    }
+  }
+  const feasible = remaining.length === 0;
+  return { feasible, months: feasible ? months : null, totalInterest: Math.round(totalInterest), payoffOrder };
+}
+
+export function selectDebtPayoff({ liabilities = [], extraMonthly = 0 } = {}) {
+  const debts = (liabilities || [])
+    .map((liability) => ({
+      key: liability.liabilityKey,
+      name: liability.name,
+      principal: Number(liability.currentPrincipal || 0),
+      rate: Number(liability.annualInterestRate || 0),
+      minPayment: Number(liability.monthlyPayment || 0),
+    }))
+    .filter((debt) => debt.principal > 0);
+  if (debts.length === 0) return null;
+  const nameOf = new Map(debts.map((debt) => [debt.key, debt.name]));
+  const totalPrincipal = debts.reduce((sum, debt) => sum + debt.principal, 0);
+  const totalMin = debts.reduce((sum, debt) => sum + debt.minPayment, 0);
+  const monthlyBudget = totalMin + Math.max(0, Number(extraMonthly || 0));
+  const avalancheOrder = [...debts].sort((a, b) => b.rate - a.rate || a.principal - b.principal);
+  const snowballOrder = [...debts].sort((a, b) => a.principal - b.principal || b.rate - a.rate);
+  const avalanche = simulatePayoff(debts, avalancheOrder, monthlyBudget);
+  const snowball = simulatePayoff(debts, snowballOrder, monthlyBudget);
+  const interestSaved = avalanche.feasible && snowball.feasible
+    ? Math.max(0, snowball.totalInterest - avalanche.totalInterest)
+    : 0;
+  const overpayVsInvest = [...debts]
+    .sort((a, b) => b.rate - a.rate)
+    .map((debt) => ({
+      name: debt.name,
+      rate: debt.rate,
+      verdict: debt.rate > INVEST_REFERENCE_RETURN ? "overpay" : "invest",
+    }));
+  return {
+    totalPrincipal: Math.round(totalPrincipal),
+    totalMinPayment: Math.round(totalMin),
+    monthlyBudget: Math.round(monthlyBudget),
+    feasible: avalanche.feasible,
+    recommended: interestSaved > 0 ? "avalanche" : "snowball",
+    interestSaved,
+    referenceReturn: INVEST_REFERENCE_RETURN,
+    avalanche: { ...avalanche, order: avalancheOrder.map((debt) => debt.name) },
+    snowball: { ...snowball, order: snowballOrder.map((debt) => debt.name) },
+    overpayVsInvest,
+    missingPayments: debts.filter((debt) => debt.minPayment <= 0).map((debt) => nameOf.get(debt.key)),
+  };
+}
+
 export function selectRecurringSummary({ monthControl, recurring, recurringCalendar }) {
   const obligations = selectRecurringObligations(recurring || recurringCalendar || []);
   const filteredCalendar = recurringCalendar?.length ? selectRecurringObligations(recurringCalendar) : [];
