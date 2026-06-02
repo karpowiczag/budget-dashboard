@@ -23,11 +23,13 @@ import {
   selectMonthlyDimensionTrends,
   selectModuleHeader,
   selectParentPlanRows,
+  selectPlanFeasibilityWarnings,
   selectPlanRows,
   selectRecurringSummary,
   selectRecommendedCuts,
   selectReportsSections,
   selectReportsWorkspace,
+  selectSafeToSpend,
   selectSavingsFocus,
   selectSavingsRadar,
   selectSpendingPlanSections,
@@ -822,5 +824,100 @@ describe("selectTransactionFilterOptions", () => {
       ],
       fixedness: ["Wszystkie", "Zmienne konieczne"],
     });
+  });
+});
+
+describe("selectSafeToSpend", () => {
+  it("reserves sinking funds and unposted recurring obligations from the residual", () => {
+    const result = selectSafeToSpend({
+      monthControl: {
+        remainingBudget: 8000,
+        remainingDays: 16,
+        elapsedDays: 15,
+        sinkingFunds: [{ monthlySetAside: 400 }, { monthlySetAside: 300 }],
+      },
+      recurring: [
+        // obligatory, due day 20 (after today=15) → reserved
+        { merchant: "Wynajem", category: "Czynsz i wynajem", months: 3, monthlyAverage: 1000, avgDay: 20 },
+        // obligatory but already posted (day 5) → not reserved
+        { merchant: "Tauron", category: "Prąd", months: 3, monthlyAverage: 200, avgDay: 5 },
+        // recurring-looking groceries are a false positive → never an obligation
+        { merchant: "Biedronka", category: "Żywność i chemia", months: 6, monthlyAverage: 1500, avgDay: 25 },
+      ],
+    });
+    expect(result).toMatchObject({
+      remainingBudget: 8000,
+      sinkingReserve: 700,
+      committedUnposted: 1000,
+      safeToSpend: 6300,
+      hasReservations: true,
+    });
+    expect(result.dailyAllowed).toBeCloseTo(393.75, 2);
+  });
+
+  it("falls back to the flat residual when there is nothing to reserve", () => {
+    expect(selectSafeToSpend({
+      monthControl: { remainingBudget: 5000, remainingDays: 10, elapsedDays: 20, sinkingFunds: [] },
+      recurring: [],
+    })).toMatchObject({ safeToSpend: 5000, dailyAllowed: 500, hasReservations: false });
+  });
+
+  it("returns null without a month control snapshot", () => {
+    expect(selectSafeToSpend({ monthControl: null })).toBeNull();
+  });
+});
+
+describe("selectPlanFeasibilityWarnings", () => {
+  it("flags a target below obligatory costs", () => {
+    const warnings = selectPlanFeasibilityWarnings({ plan: { coreMonthlyCost: 8000, targetMonthlySpend: 6000, currentMonthlyIncome: 20000 } });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({ type: "Cel wydatków poniżej kosztów stałych", severity: "Wysoki" });
+  });
+
+  it("flags a target that leaves no margin to save", () => {
+    const warnings = selectPlanFeasibilityWarnings({ plan: { coreMonthlyCost: 5000, targetMonthlySpend: 21000, currentMonthlyIncome: 20000 } });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({ type: "Brak marginesu na oszczędności", severity: "Średni" });
+  });
+
+  it("stays silent for a feasible plan", () => {
+    expect(selectPlanFeasibilityWarnings({ plan: { coreMonthlyCost: 5000, targetMonthlySpend: 13000, currentMonthlyIncome: 20000 } })).toEqual([]);
+    expect(selectPlanFeasibilityWarnings({})).toEqual([]);
+  });
+});
+
+describe("envelope-aware spending plan and net benchmarks", () => {
+  it("decomposes the residual into committed, sinking and safe-to-spend rows", () => {
+    const sections = selectSpendingPlanSections({
+      financialFlowTotal: 700,
+      monthControl: { incomeToDate: 5000, remainingBudget: 1200, dailyAllowed: 60 },
+      parentStatus: [
+        { name: "Obowiązkowe stałe", currentMonthSpend: 1000 },
+        { name: "Nieobowiązkowe", currentMonthSpend: 600 },
+      ],
+      safeToSpend: { committedUnposted: 200, sinkingReserve: 300, safeToSpend: 700, dailyAllowed: 44 },
+    });
+    expect(sections).toHaveLength(8);
+    expect(sections).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "Niezapłacone rachunki (do końca mies.)", value: 200 }),
+      expect.objectContaining({ label: "Rezerwa na koszty nieregularne", value: 300 }),
+      expect.objectContaining({ label: "Można bezpiecznie wydać", value: 700, detail: "44 dziennie" }),
+    ]));
+    expect(sections.some((row) => row.label === "Zostaje w miesiącu")).toBe(false);
+  });
+
+  it("bases the 50/30/20 benchmark detail on net income", () => {
+    const sections = selectReportsSections({
+      kpis: { income: 10000 },
+      needs: 0,
+      mixedNeeds: 0,
+      wants: 0,
+      needsTarget: 3750,
+      wantsTarget: 2250,
+      savingsTarget: 1500,
+    });
+    expect(sections.benchmarkCards[0].detail).toContain("netto");
+    expect(sections.benchmarkCards[0].detail).toContain("3750");
+    expect(sections.benchmarkCards[2].detail).toContain("1500");
   });
 });

@@ -1,11 +1,12 @@
 import { Panel } from "../components/ui/Panel.jsx";
 import { money, percent } from "../domain/formatters.js";
 
-export function OverviewView({ data, financialFlows = {}, fireSummary, onNavigate }) {
+export function OverviewView({ data, financialFlows = {}, fireSummary, onNavigate, safeToSpend = null }) {
   const monthControl = data?.monthControl || {};
   const kpis = data?.kpis || {};
   const plan = data?.savingsPlan || {};
-  const remaining = Number(monthControl.remainingBudget || 0);
+  const remaining = safeToSpend ? Number(safeToSpend.safeToSpend || 0) : Number(monthControl.remainingBudget || 0);
+  const daily = safeToSpend ? Number(safeToSpend.dailyAllowed || 0) : Number(monthControl.dailyAllowed || 0);
   const recurringCount = (data?.recurring || []).length;
 
   const cards = [
@@ -53,9 +54,9 @@ export function OverviewView({ data, financialFlows = {}, fireSummary, onNavigat
       <Panel title="Ile możemy bezpiecznie wydać?">
         <div className="overviewHero">
           <div className={`overviewHeroMain ${remaining < 0 ? "warn" : "good"}`}>
-            <span>Zostaje w tym miesiącu</span>
+            <span>Bezpiecznie do wydania</span>
             <strong>{money(remaining)}</strong>
-            <p>{money(Number(monthControl.dailyAllowed || 0))} dziennie · wydane {money(Number(monthControl.spendToDate || 0))}</p>
+            <p>{money(daily)} dziennie · wydane {money(Number(monthControl.spendToDate || 0))}</p>
           </div>
           <button type="button" className="primaryButton" onClick={() => onNavigate?.("control")}>
             Otwórz budżet

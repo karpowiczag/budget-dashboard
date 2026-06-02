@@ -437,6 +437,7 @@ export default function App() {
           fireSummary={fireQuery.data || model.fireSummary}
           onNavigate={setView}
           onInspect={openTransactionInspector}
+          safeToSpend={model.safeToSpend}
         />
       )}
 

@@ -62,6 +62,12 @@ const BUCKET_LIMIT_ALIASES = {
 };
 export const BUDGET_BUCKET_OPTIONS = ["Obowiązkowe stałe", "Obowiązkowe zmienne", "Do rozbicia", "Nieobowiązkowe", "Nieregularne", "Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu"];
 
+// Approximate net-of-gross income ratio for PL (~25% effective tax + contributions).
+// The 50/30/20 rule is defined on NET income, but the income we track is gross salary
+// ("Pensja"). Applying this ratio keeps the benchmark honest instead of overstating the
+// safe allowance by ~20%. Phase 2 makes this a per-household setting. See planning review.
+export const NET_INCOME_RATIO = 0.75;
+
 
 // Grouped, config-driven information architecture. Each top-level section maps
 // to one or more leaf views; sections with >1 view render an in-section sub-nav.
@@ -494,7 +500,7 @@ export function selectDailyCalendarHeatmap(calendar) {
     .filter((row) => row.date);
 }
 
-export function selectMonthDashboard({ bucketOverrides = {}, calendarStats, financialFlowTotal = 0, isHistorical = false, monthControl, primaryPlanRows = [] }) {
+export function selectMonthDashboard({ bucketOverrides = {}, calendarStats, financialFlowTotal = 0, isHistorical = false, monthControl, planWarnings = [], primaryPlanRows = [], safeToSpend = null }) {
   if (!monthControl) {
     return {
       title: "Miesiąc",
@@ -524,9 +530,11 @@ export function selectMonthDashboard({ bucketOverrides = {}, calendarStats, fina
       },
       {
         label: isHistorical ? "Różnica do targetu" : "Do wydania",
-        value: monthControl.remainingBudget,
-        detail: isHistorical ? "po faktycznych wydatkach" : `${monthControl.dailyAllowed} dziennie`,
-        tone: Number(monthControl.remainingBudget || 0) < 0 ? "warn" : "neutral",
+        value: safeToSpend ? safeToSpend.safeToSpend : monthControl.remainingBudget,
+        detail: isHistorical
+          ? "po faktycznych wydatkach"
+          : `${Math.round(Number((safeToSpend ? safeToSpend.dailyAllowed : monthControl.dailyAllowed) || 0))} dziennie`,
+        tone: Number((safeToSpend ? safeToSpend.safeToSpend : monthControl.remainingBudget) || 0) < 0 ? "warn" : "neutral",
         filter: { flow: "spend" },
       },
       {
@@ -542,7 +550,8 @@ export function selectMonthDashboard({ bucketOverrides = {}, calendarStats, fina
         filter: { flow: "financial" },
       },
     ],
-    alerts: monthControl.alerts || [],
+    alerts: [...(planWarnings || []), ...(monthControl.alerts || [])],
+    safeToSpend,
     categoryStatus: selectLimitRiskRows(limitStatus),
     savingsFocus: selectSavingsFocus({ planRows: limitStatus }),
     burnDown: selectBudgetBurnDown({ calendar: calendarStats?.rawCalendar, monthControl }),
@@ -558,27 +567,110 @@ export function selectMonthDashboard({ bucketOverrides = {}, calendarStats, fina
   };
 }
 
-export function selectSpendingPlanSections({ financialFlowTotal = 0, monthControl, parentStatus = [] }) {
+// Envelope-correct "safe to spend". The backend's remainingBudget is a flat residual
+// (target − spent) that overstates discretionary money because it ignores (a) recurring
+// bills due later this month that have not posted yet and (b) the monthly set-aside for
+// irregular (sinking) costs. This pure selector reserves both, reusing the sinking funds
+// and recurring obligations already present in the snapshot. The unposted-recurring part
+// is an estimate (avgDay heuristic); the sinking-fund deduction is exact.
+export function selectSafeToSpend({ monthControl, recurring = [] }) {
+  if (!monthControl) return null;
+  const remainingBudget = Number(monthControl.remainingBudget || 0);
+  const remainingDays = Number(monthControl.remainingDays || 0);
+  const elapsedDays = Number(monthControl.elapsedDays || 0);
+  const sinkingReserve = (monthControl.sinkingFunds || [])
+    .reduce((sum, fund) => sum + Number(fund.monthlySetAside || 0), 0);
+  const committedUnposted = selectRecurringObligations(recurring || [])
+    .filter((row) => Number(row.avgDay || 0) > elapsedDays)
+    .reduce((sum, row) => sum + Number(row.monthlyAverage || 0), 0);
+  const safeToSpend = remainingBudget - sinkingReserve - committedUnposted;
+  const dailyAllowed = remainingDays > 0 ? Math.max(0, safeToSpend) / remainingDays : 0;
+  return {
+    remainingBudget,
+    sinkingReserve,
+    committedUnposted,
+    safeToSpend,
+    dailyAllowed,
+    remainingDays,
+    hasReservations: sinkingReserve > 0 || committedUnposted > 0,
+  };
+}
+
+// Feasibility guardrails the backend cannot enforce at settings-save time (it lacks the
+// transaction-derived core cost). Returned in the Alert shape so they render in the
+// existing alert list. A target below obligatory costs is impossible; a target that eats
+// the whole income leaves nothing for the emergency fund or investing.
+export function selectPlanFeasibilityWarnings({ plan } = {}) {
+  if (!plan) return [];
+  const warnings = [];
+  const core = Number(plan.coreMonthlyCost || 0);
+  const target = Number(plan.targetMonthlySpend || 0);
+  const income = Number(plan.currentMonthlyIncome || 0);
+  if (core > 0 && target > 0 && target < core) {
+    warnings.push({
+      type: "Cel wydatków poniżej kosztów stałych",
+      severity: "Wysoki",
+      message: `Target ${Math.round(target)} zł jest poniżej obowiązkowych kosztów ${Math.round(core)} zł — niewykonalny bez ich obniżenia.`,
+    });
+  }
+  if (income > 0 && target > 0 && target >= income) {
+    warnings.push({
+      type: "Brak marginesu na oszczędności",
+      severity: "Średni",
+      message: `Target ${Math.round(target)} zł nie zostawia nadwyżki przy dochodzie ${Math.round(income)} zł — nie ma z czego budować funduszu awaryjnego ani inwestować.`,
+    });
+  }
+  return warnings;
+}
+
+export function selectSpendingPlanSections({ financialFlowTotal = 0, monthControl, parentStatus = [], safeToSpend = null }) {
   if (!monthControl) return [];
   const valueFor = (name) => parentStatus.find((row) => (row.name || row.category) === name)?.currentMonthSpend || 0;
   const obligatoryFixed = valueFor("Obowiązkowe stałe");
   const obligatoryVariable = valueFor("Obowiązkowe zmienne");
   const review = valueFor("Do rozbicia");
   const flexible = valueFor("Nieobowiązkowe");
-  return [
+  const rows = [
     { label: "Dochód", value: Number(monthControl.incomeToDate || 0), detail: "rozpoznane wpływy miesiąca", filter: { flow: "income" }, tone: "good" },
     { label: "Rachunki i zobowiązania", value: Number(obligatoryFixed || 0), detail: "stałe płatności i raty", filter: { bucket: "Obowiązkowe stałe" } },
     { label: "Planowane zmienne", value: Number(obligatoryVariable || 0) + Number(review || 0), detail: "potrzeby oraz kategorie do rozbicia", filter: { bucket: "Obowiązkowe zmienne" } },
     { label: "Elastyczne wydatki", value: Number(flexible || 0), detail: "nieobowiązkowe i kontrolowalne", filter: { bucket: "Nieobowiązkowe" }, tone: "warn" },
     { label: "Oszczędności i nadpłaty", value: Number(financialFlowTotal || 0), detail: "poza kosztem życia", filter: { flow: "financial" }, tone: "good" },
-    {
+  ];
+  if (!safeToSpend) {
+    rows.push({
       label: "Zostaje w miesiącu",
       value: Number(monthControl.remainingBudget || 0),
       detail: `${Number(monthControl.dailyAllowed || 0)} dziennie`,
       filter: { flow: "spend" },
       tone: Number(monthControl.remainingBudget || 0) < 0 ? "warn" : "good",
-    },
-  ];
+    });
+    return rows;
+  }
+  if (Number(safeToSpend.committedUnposted || 0) > 0) {
+    rows.push({
+      label: "Niezapłacone rachunki (do końca mies.)",
+      value: Number(safeToSpend.committedUnposted || 0),
+      detail: "cykliczne zobowiązania jeszcze przed nami",
+      tone: "neutral",
+    });
+  }
+  if (Number(safeToSpend.sinkingReserve || 0) > 0) {
+    rows.push({
+      label: "Rezerwa na koszty nieregularne",
+      value: Number(safeToSpend.sinkingReserve || 0),
+      detail: "miesięczny odkład na fundusze celowe",
+      tone: "neutral",
+    });
+  }
+  rows.push({
+    label: "Można bezpiecznie wydać",
+    value: Number(safeToSpend.safeToSpend || 0),
+    detail: `${Math.round(Number(safeToSpend.dailyAllowed || 0))} dziennie`,
+    filter: { flow: "spend" },
+    tone: Number(safeToSpend.safeToSpend || 0) < 0 ? "warn" : "good",
+  });
+  return rows;
 }
 
 export function selectReportsSections({
@@ -592,6 +684,7 @@ export function selectReportsSections({
   needs,
   mixedNeeds,
   oneoffs,
+  needsTarget,
   savingsTarget,
   scopedStats,
   yearStats,
@@ -627,9 +720,9 @@ export function selectReportsSections({
       { label: "Oszczędności/nadpłaty", value: financialFlowTotal, detail: `${financialFlowCount} transakcji poza kosztem życia`, filter: { flow: "financial" } },
     ],
     benchmarkCards: [
-      { label: "Obowiązkowe", value: Number(needs || 0) + Number(mixedNeeds || 0), detail: `punkt odniesienia 50%: ${Number(kpis?.income || 0) * 0.5}` },
-      { label: "Nieobowiązkowe", value: wants || 0, detail: `punkt odniesienia 30%: ${wantsTarget || 0}` },
-      { label: "Oszczędzanie operacyjne", value: kpis?.operatingSurplus || 0, detail: `minimum 20%: ${savingsTarget || 0}` },
+      { label: "Obowiązkowe", value: Number(needs || 0) + Number(mixedNeeds || 0), detail: `cel 50% dochodu netto: ${Math.round(Number(needsTarget ?? Number(kpis?.income || 0) * NET_INCOME_RATIO * 0.5))}` },
+      { label: "Nieobowiązkowe", value: wants || 0, detail: `cel 30% dochodu netto: ${Math.round(Number(wantsTarget || 0))}` },
+      { label: "Oszczędzanie operacyjne", value: kpis?.operatingSurplus || 0, detail: `cel 20% dochodu netto: ${Math.round(Number(savingsTarget || 0))}` },
       { label: "Nadwyżka po inwestycjach", value: kpis?.unassignedSurplus || 0, detail: "do decyzji lub dalszego inwestowania" },
     ],
     cashflowSeries: selectMonthlyCashflowSeries(monthly || []),
@@ -750,7 +843,7 @@ export function selectModuleHeader({
       title: "Ile możemy bezpiecznie wydać?",
       subtitle: "Najpierw decyzje na dziś: limit, ryzyka, transakcje do sprawdzenia.",
       cards: [
-        { label: "Zostaje", value: Number(data?.monthControl?.remainingBudget || 0), detail: `${Number(data?.monthControl?.dailyAllowed || 0)} dziennie`, tone: Number(data?.monthControl?.remainingBudget || 0) < 0 ? "warn" : "good" },
+        { label: "Zostaje", value: Number(monthDashboard?.safeToSpend?.safeToSpend ?? data?.monthControl?.remainingBudget ?? 0), detail: `${Math.round(Number(monthDashboard?.safeToSpend?.dailyAllowed ?? data?.monthControl?.dailyAllowed ?? 0))} dziennie`, tone: Number(monthDashboard?.safeToSpend?.safeToSpend ?? data?.monthControl?.remainingBudget ?? 0) < 0 ? "warn" : "good" },
         { label: "Wydane", value: Number(data?.monthControl?.spendToDate || 0), detail: activeTimeLabel || data?.monthControl?.month },
         { label: "Ryzyka limitów", value: controlRisks, detail: "główne limity ponad plan", number: true, tone: controlRisks ? "warn" : "good" },
         { label: "Do sprawdzenia", value: toCheckAmount, detail: `${Number(data?.kpis?.toCheck || 0)} transakcji`, tone: toCheckAmount ? "warn" : "good" },
