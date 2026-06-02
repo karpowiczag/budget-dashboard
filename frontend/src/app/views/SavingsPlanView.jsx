@@ -3,7 +3,7 @@ import { SavingsRadarChart } from "../components/charts/SavingsRadarChart.jsx";
 import { SavingsWaterfallChart } from "../components/charts/SavingsWaterfallChart.jsx";
 import { ReportDataTable } from "../components/tables/ReportDataTable.jsx";
 import { Panel } from "../components/ui/Panel.jsx";
-import { bucketAliasesForLimit } from "../domain/budgetSelectors.js";
+import { bucketAliasesForLimit, selectLimitRollover } from "../domain/budgetSelectors.js";
 import { money } from "../domain/formatters.js";
 
 export function SavingsPlanView({
@@ -154,6 +154,8 @@ export function SavingsPlanView({
 
         <RecommendedCutsSummary recommendedCuts={recommendedCuts} isHistorical={isHistorical} />
 
+        <LimitRolloverSection planRows={planRows} activeMonths={data?.activeMonths || 0} />
+
         <div className="planTable">
           <h3>Główne limity</h3>
           <MainLimitsList
@@ -183,6 +185,38 @@ export function SavingsPlanView({
         </details>
       </div>
     </Panel>
+  );
+}
+
+function LimitRolloverSection({ planRows = [], activeMonths = 0 }) {
+  const rollover = selectLimitRollover(planRows, activeMonths);
+  if (!rollover.rows.length || rollover.months < 2) return null;
+  const highlights = [...rollover.overspent.slice(0, 5), ...rollover.buffered.slice(0, 5)];
+  return (
+    <details className="planChartsDisclosure">
+      <summary>Rollover limitów ({rollover.months} mies.) — bufor i przekroczenia</summary>
+      <div className="recommendedCuts">
+        <div>
+          <span>Łączny bufor</span>
+          <strong className="good">{money(rollover.totalBuffer)}</strong>
+          <p>oszczędności narastająco w kategoriach pod limitem</p>
+        </div>
+        <div>
+          <span>Łączne przekroczenia</span>
+          <strong className="warn">{money(rollover.totalOverspend)}</strong>
+          <p>narastające przekroczenia limitów</p>
+        </div>
+      </div>
+      <div className="rolloverList">
+        {highlights.map((row) => (
+          <div className="rolloverRow" key={row.category}>
+            <span className="rolloverName">{row.category}</span>
+            <strong className={row.status === "over" ? "warn" : "good"}>{money(row.carryover)}</strong>
+            <span className="nwMuted">limit {money(row.limit)} · średnia {money(row.monthlyAverage)}</span>
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 

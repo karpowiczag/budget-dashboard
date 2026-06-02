@@ -15,6 +15,7 @@ import {
   selectFinancialFlows,
   selectForecast,
   selectGoals,
+  selectLimitRollover,
   selectFixednessChart,
   selectHierarchySunburst,
   selectImportHealth,
@@ -1064,5 +1065,25 @@ describe("selectForecast", () => {
     expect(drop.monthlyNet).toBe(-2000);
     expect(drop.negative).toBe(true);
     expect(drop.runwayMonths).toBe(4);
+  });
+});
+
+describe("selectLimitRollover", () => {
+  it("computes the cumulative envelope balance per limited category", () => {
+    const model = selectLimitRollover([
+      { category: "Jedzenie poza domem", limit: 600, currentMonthly: 750 },
+      { category: "Żywność i chemia", limit: 2400, currentMonthly: 2200 },
+      { category: "Bez limitu", limit: 0, currentMonthly: 100 },
+    ], 5);
+    expect(model.months).toBe(5);
+    expect(model.rows).toHaveLength(2);
+    const food = model.rows.find((row) => row.category === "Jedzenie poza domem");
+    expect(food.carryover).toBe(-750);
+    expect(food.status).toBe("over");
+    expect(food.availableThisMonth).toBe(-150);
+    expect(model.rows.find((row) => row.category === "Żywność i chemia").carryover).toBe(1000);
+    expect(model.totalBuffer).toBe(1000);
+    expect(model.totalOverspend).toBe(-750);
+    expect(model.overspent[0].category).toBe("Jedzenie poza domem");
   });
 });

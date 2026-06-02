@@ -1143,6 +1143,40 @@ export function selectForecast({ startingLiquid = 0, monthlyIncome = 0, monthlyS
   };
 }
 
+// YNAB-style limit rollover (envelope balance). Over the tracked months, the cumulative
+// budget is limit × months and cumulative spend is average × months, so the carried balance
+// is months × (limit − average): positive = a buffer built by underspending, negative = an
+// overspend drawn down. Pure frontend math from data already present (limit, average, months).
+export function selectLimitRollover(planRows = [], activeMonths = 0) {
+  const months = Math.max(0, Math.round(Number(activeMonths) || 0));
+  const rows = (planRows || [])
+    .filter((row) => Number(row.limit || 0) > 0)
+    .map((row) => {
+      const limit = Number(row.limit || 0);
+      const average = Number(row.currentMonthly || 0);
+      const carryover = Math.round(months * (limit - average));
+      return {
+        category: row.name || row.category,
+        limit,
+        monthlyAverage: average,
+        months,
+        carryover,
+        availableThisMonth: Math.round(limit + carryover),
+        status: carryover >= 0 ? "buffer" : "over",
+      };
+    });
+  const overspent = rows.filter((row) => row.carryover < 0).sort((a, b) => a.carryover - b.carryover);
+  const buffered = rows.filter((row) => row.carryover > 0).sort((a, b) => b.carryover - a.carryover);
+  return {
+    months,
+    rows,
+    overspent,
+    buffered,
+    totalBuffer: buffered.reduce((sum, row) => sum + row.carryover, 0),
+    totalOverspend: overspent.reduce((sum, row) => sum + row.carryover, 0),
+  };
+}
+
 export function selectRecurringSummary({ monthControl, recurring, recurringCalendar }) {
   const obligations = selectRecurringObligations(recurring || recurringCalendar || []);
   const filteredCalendar = recurringCalendar?.length ? selectRecurringObligations(recurringCalendar) : [];

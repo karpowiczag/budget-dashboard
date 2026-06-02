@@ -4467,3 +4467,19 @@ footer {
   line-height: 1;
   color: var(--text-muted, #64748b);
 }
+.rolloverList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.75rem;
+}
+.rolloverRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.rolloverName {
+  flex: 1;
+  min-width: 8rem;
+}
