@@ -10,14 +10,19 @@ import com.budget.application.settings.BudgetSettingsStore;
 import com.budget.domain.report.BudgetInput;
 import com.budget.domain.transaction.BankTransaction;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class BudgetAnalysisServiceTest {
     private final CategoryClassifier classifier = new CategoryClassifier();
-    private final BudgetAnalysisService service = new BudgetAnalysisService(new TransactionNormalizer(classifier), classifier, settingsService());
+    // Fixed at the start of the year so the control month equals the latest month with data
+    // (the current calendar month is never ahead of the test data), keeping assertions stable.
+    private final Clock clock = Clock.fixed(LocalDate.of(2026, 1, 1).atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
+    private final BudgetAnalysisService service = new BudgetAnalysisService(new TransactionNormalizer(classifier), classifier, settingsService(), clock);
 
     @Test
     void buildsTypedDashboardSnapshot() {
@@ -148,6 +153,23 @@ class BudgetAnalysisServiceTest {
     }
 
     @Test
+    void plannerTargetsCurrentCalendarMonthEvenBeforeItsTransactionsAreImported() {
+        var marchClock = Clock.fixed(LocalDate.of(2026, 3, 10).atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
+        var marchService = new BudgetAnalysisService(new TransactionNormalizer(classifier), classifier, settingsService(), marchClock);
+        var input = new BudgetInput(2026, "fixture.csv", List.of(
+                new BankTransaction(LocalDate.of(2026, 1, 1), "konto", "PRZELEW EXPRESS ELIXIR PRZYCH. TEST EMPLOYER WYNAGRODZENIE", "", 18_000),
+                new BankTransaction(LocalDate.of(2026, 1, 4), "konto", "BIEDRONKA ZAKUP", "", -500)
+        ));
+
+        var control = marchService.analyze(input).snapshot().monthControl();
+
+        assertThat(control.monthKey()).isEqualTo("2026-03");
+        assertThat(control.elapsedDays()).isEqualTo(10);
+        assertThat(control.remainingDays()).isEqualTo(21);
+        assertThat(control.spendToDate()).isZero();
+    }
+
+    @Test
     void usesLargestObservedMonthAsDefaultLimitForRequiredUnevenBills() {
         var input = new BudgetInput(2026, "fixture.csv", List.of(
                 new BankTransaction(LocalDate.of(2026, 1, 1), "konto", "PRZELEW EXPRESS ELIXIR PRZYCH. TEST EMPLOYER WYNAGRODZENIE", "", 18_000),
@@ -181,7 +203,7 @@ class BudgetAnalysisServiceTest {
                 6,
                 List.of(new BudgetSettings.CategoryLimitSetting("category", "Lekarz i apteka", "Lekarz i apteka", BigDecimal.valueOf(900), "", "Nieobowiązkowe"))
         );
-        var serviceWithOverride = new BudgetAnalysisService(new TransactionNormalizer(classifier), classifier, settingsService(settings));
+        var serviceWithOverride = new BudgetAnalysisService(new TransactionNormalizer(classifier), classifier, settingsService(settings), clock);
         var input = new BudgetInput(2026, "fixture.csv", List.of(
                 new BankTransaction(LocalDate.of(2026, 1, 1), "konto", "PRZELEW EXPRESS ELIXIR PRZYCH. TEST EMPLOYER WYNAGRODZENIE", "", 18_000),
                 new BankTransaction(LocalDate.of(2026, 1, 2), "konto", "APTEKA TEST", "", -400)

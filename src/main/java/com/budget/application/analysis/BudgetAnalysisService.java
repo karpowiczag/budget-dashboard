@@ -9,6 +9,7 @@ import com.budget.domain.report.BudgetInput;
 import com.budget.domain.report.BudgetSnapshot;
 import com.budget.domain.transaction.NormalizedTransaction;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.time.LocalDate;
@@ -23,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -62,11 +64,18 @@ public class BudgetAnalysisService {
     private final TransactionNormalizer normalizer;
     private final CategoryClassifier classifier;
     private final BudgetSettingsService settingsService;
+    private final Clock clock;
 
+    @Autowired
     public BudgetAnalysisService(TransactionNormalizer normalizer, CategoryClassifier classifier, BudgetSettingsService settingsService) {
+        this(normalizer, classifier, settingsService, Clock.systemDefaultZone());
+    }
+
+    BudgetAnalysisService(TransactionNormalizer normalizer, CategoryClassifier classifier, BudgetSettingsService settingsService, Clock clock) {
         this.normalizer = normalizer;
         this.classifier = classifier;
         this.settingsService = settingsService;
+        this.clock = clock;
     }
 
     public BudgetAnalysisResult analyze(BudgetInput input) {
@@ -120,8 +129,17 @@ public class BudgetAnalysisService {
         var coreMonthlyCost = divide(fixedObligatoryTotal.add(variableObligatoryTotal), activeMonthCount);
         var targetMonthlySpend = money(settings.targetMonthlySpend());
         var aggressiveMonthlySpend = money(settings.aggressiveMonthlySpend());
-        var latestMonthKey = activeMonths.getLast();
-        var monthControl = monthControl(latestMonthKey, transactions, categoryPlanRows, targetMonthlySpend, periodStart, periodEnd, checkAmount, checkCount, categories);
+        var today = LocalDate.now(clock);
+        var latestActiveMonth = YearMonth.parse(activeMonths.getLast());
+        var currentMonth = YearMonth.from(today);
+        // The planner is for the current month: when viewing the current year and the calendar
+        // month is ahead of the latest imported month, control the actual current month
+        // (anchored to today) even before its transactions are imported.
+        var controlMonth = input.year() == today.getYear() && currentMonth.isAfter(latestActiveMonth)
+                ? currentMonth
+                : latestActiveMonth;
+        var latestMonthKey = controlMonth.toString();
+        var monthControl = monthControl(latestMonthKey, transactions, categoryPlanRows, targetMonthlySpend, periodStart, periodEnd, checkAmount, checkCount, categories, today);
 
         var snapshot = new BudgetSnapshot(
                 input.year(),
@@ -670,11 +688,16 @@ public class BudgetAnalysisService {
             LocalDate periodEnd,
             BigDecimal checkAmount,
             int checkCount,
-            List<CategoryRow> categories
+            List<CategoryRow> categories,
+            LocalDate today
     ) {
         var latest = YearMonth.parse(latestMonthKey);
         var daysTotal = latest.lengthOfMonth();
-        var elapsedDays = analysisDays(latestMonthKey, periodStart, periodEnd);
+        // For the live current month, anchor "elapsed" to today; for a closed/past month use
+        // the span covered by its transactions.
+        var elapsedDays = latest.equals(YearMonth.from(today))
+                ? Math.min(today.getDayOfMonth(), daysTotal)
+                : analysisDays(latestMonthKey, periodStart, periodEnd);
         var remainingDays = Math.max(0, daysTotal - elapsedDays);
         var latestItems = transactions.stream().filter(tx -> tx.month().equals(latestMonthKey)).toList();
         var spend = sum(latestItems, NormalizedTransaction::analysisSpend);
