@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.budget.web.controller.BudgetApiController;
 import com.budget.web.controller.FireApiController;
+import com.budget.web.controller.NetWorthApiController;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.parser.OpenAPIV3Parser;
@@ -36,7 +37,9 @@ class OpenApiContractTest {
             Map.entry("saveBudgetSettings", "updateBudgetSettings"),
             Map.entry("summary", "getFireSummary"),
             Map.entry("settings", "getFireSettings"),
-            Map.entry("saveSettings", "updateFireSettings")
+            Map.entry("saveSettings", "updateFireSettings"),
+            Map.entry("netWorth", "getNetWorth"),
+            Map.entry("saveAccount", "updateNetWorthAccount")
     );
     private static final Map<String, String> SUCCESS_SCHEMAS = Map.ofEntries(
             Map.entry("getSession", "SessionResponse"),
@@ -52,7 +55,9 @@ class OpenApiContractTest {
             Map.entry("updateBudgetSettings", "BudgetSettings"),
             Map.entry("getFireSummary", "FireSummary"),
             Map.entry("getFireSettings", "FireSettings"),
-            Map.entry("updateFireSettings", "FireSettings")
+            Map.entry("updateFireSettings", "FireSettings"),
+            Map.entry("getNetWorth", "NetWorthResponse"),
+            Map.entry("updateNetWorthAccount", "NetWorthResponse")
     );
 
     @Autowired
@@ -68,7 +73,9 @@ class OpenApiContractTest {
         assertThat(openApi).isNotNull();
 
         handlerMapping.getHandlerMethods().forEach((mapping, handler) -> {
-            if (!BudgetApiController.class.equals(handler.getBeanType()) && !FireApiController.class.equals(handler.getBeanType())) {
+            if (!BudgetApiController.class.equals(handler.getBeanType())
+                    && !FireApiController.class.equals(handler.getBeanType())
+                    && !NetWorthApiController.class.equals(handler.getBeanType())) {
                 return;
             }
             assertWebDtoReturnType(handler.getMethod().getGenericReturnType());

@@ -403,6 +403,39 @@ public final class BudgetApiDtos {
     public record CategoryLimitSettingDto(String scope, String name, String category, BigDecimal limit, String action, String bucketOverride) {
     }
 
+    public record NetWorthResponse(
+            List<NetWorthAccountResponse> accounts,
+            BigDecimal liquidTotal,
+            BigDecimal emergencyFundMin,
+            BigDecimal emergencyFundComfort,
+            BigDecimal emergencyProgressComfort
+    ) {
+    }
+
+    public record NetWorthAccountResponse(
+            String accountKey,
+            String name,
+            String kind,
+            boolean liquid,
+            boolean excludeFromNetWorth,
+            boolean configured,
+            BigDecimal anchorBalance,
+            LocalDate anchorDate,
+            BigDecimal netFlowSinceAnchor,
+            BigDecimal derivedBalance
+    ) {
+    }
+
+    public record AccountUpsertRequest(
+            String name,
+            String kind,
+            boolean liquid,
+            boolean excludeFromNetWorth,
+            BigDecimal anchorBalance,
+            LocalDate anchorDate
+    ) {
+    }
+
     public record FireSummaryResponse(
             LocalDate asOf,
             boolean reportsLoaded,

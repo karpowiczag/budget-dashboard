@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchAnalytics, fetchCalendar, fetchFireSettings, fetchFireSummary, fetchTransactions, updateFireSettings } from "./api/budgetApi.js";
+import { fetchAnalytics, fetchCalendar, fetchFireSettings, fetchFireSummary, fetchNetWorth, fetchTransactions, saveNetWorthAccount, updateFireSettings } from "./api/budgetApi.js";
 import { budgetQueryKeys } from "./api/queryKeys.js";
 import { AppShell } from "./components/layout/AppShell.jsx";
 import { DashboardFooter } from "./components/layout/DashboardFooter.jsx";
@@ -51,6 +51,7 @@ export default function App() {
   const [categoryBucketOverrides, setCategoryBucketOverrides] = useState({});
   const [settingsDraft, setSettingsDraft] = useState(null);
   const [fireSettingsStatus, setFireSettingsStatus] = useState(null);
+  const [netWorthStatus, setNetWorthStatus] = useState(null);
   const [view, setView] = useState("overview");
   const [theme, setTheme] = useState(getInitialTheme);
   const [localTimes, setLocalTimes] = useState({
@@ -170,6 +171,14 @@ export default function App() {
   });
   const fireSettingsMutation = useMutation({
     mutationFn: updateFireSettings,
+  });
+  const netWorthQuery = useQuery({
+    queryKey: budgetQueryKeys.netWorth,
+    queryFn: fetchNetWorth,
+    enabled: !!data && view === "wealth",
+  });
+  const netWorthMutation = useMutation({
+    mutationFn: ({ key, account }) => saveNetWorthAccount(key, account),
   });
   const inspectorQuery = useQuery({
     queryKey: budgetQueryKeys.transactions(year, inspectorFilters),
@@ -349,6 +358,19 @@ export default function App() {
     }
   }
 
+  async function handleSaveNetWorthAccount(key, account) {
+    setNetWorthStatus({ type: "info", message: "Zapisuję konto..." });
+    try {
+      const saved = await netWorthMutation.mutateAsync({ key, account });
+      queryClient.setQueryData(budgetQueryKeys.netWorth, saved);
+      setNetWorthStatus({ type: "success", message: "Saldo zapisane i przeliczone." });
+      return saved;
+    } catch (error) {
+      setNetWorthStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
   async function handleSaveSettings() {
     const base = settingsDraft || budgetSettings || {};
     const allLimitRows = [...(model.parentPlanRows || []), ...(model.planRows || [])];
@@ -491,6 +513,10 @@ export default function App() {
       {view === "wealth" && (
         <WealthView
           wealthDashboard={model.wealthDashboard}
+          netWorth={netWorthQuery.data}
+          onSaveAccount={handleSaveNetWorthAccount}
+          savingAccount={netWorthMutation.isPending}
+          netWorthStatus={netWorthStatus}
           onInspect={openTransactionInspector}
         />
       )}

@@ -93,6 +93,23 @@ export async function updateFireSettings(settings) {
   return readJson(response, "Nie mogę zapisać ustawień FIRE");
 }
 
+export async function fetchNetWorth() {
+  const response = await fetch("/api/v1/networth");
+  return readJson(response, "Nie mogę wczytać sald kont");
+}
+
+export async function saveNetWorthAccount(key, account) {
+  const response = await fetch(`/api/v1/networth/accounts/${encodeURIComponent(key)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(account),
+  });
+  return readJson(response, "Nie mogę zapisać konta");
+}
+
 export async function uploadTransactions(file) {
   const body = new FormData();
   body.append("file", file);

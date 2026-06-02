@@ -19,6 +19,7 @@ import {
   selectMerchantShare,
   selectMonthDashboard,
   selectMonthFinancialFlow,
+  selectNetWorth,
   selectMonthlyParentLimitStatus,
   selectMonthlyDimensionTrends,
   selectModuleHeader,
@@ -919,5 +920,30 @@ describe("envelope-aware spending plan and net benchmarks", () => {
     expect(sections.benchmarkCards[0].detail).toContain("netto");
     expect(sections.benchmarkCards[0].detail).toContain("3750");
     expect(sections.benchmarkCards[2].detail).toContain("1500");
+  });
+});
+
+describe("selectNetWorth", () => {
+  it("shapes accounts, derived balances and emergency-fund progress", () => {
+    const model = selectNetWorth({
+      liquidTotal: 24500,
+      emergencyFundMin: 27000,
+      emergencyFundComfort: 54000,
+      emergencyProgressComfort: 0.4537,
+      accounts: [
+        { accountKey: "Osobiste", name: "Osobiste", kind: "CHECKING", liquid: true, excludeFromNetWorth: false, configured: true, anchorBalance: 1000, anchorDate: "2026-01-01", derivedBalance: 1500 },
+        { accountKey: "Maklerskie", name: "Maklerskie", kind: "OTHER", liquid: true, excludeFromNetWorth: false, configured: false, derivedBalance: null },
+      ],
+    });
+    expect(model.configuredCount).toBe(1);
+    expect(model.liquidTotal).toBe(24500);
+    expect(model.progressPercent).toBe(45);
+    expect(model.progressWidth).toBe(45);
+    expect(model.comfortReached).toBe(false);
+    expect(model.accounts[1]).toMatchObject({ configured: false, derivedBalance: null, statusLabel: "ustaw saldo początkowe" });
+  });
+
+  it("returns null without a payload", () => {
+    expect(selectNetWorth(null)).toBeNull();
   });
 });

@@ -313,6 +313,43 @@ paths:
                 $ref: "#/components/schemas/FireSettings"
         "400":
           $ref: "#/components/responses/Problem"
+  /api/v1/networth:
+    get:
+      operationId: getNetWorth
+      responses:
+        "200":
+          description: Liquid account balances (derived from anchor + transaction flows) and emergency-fund coverage.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetWorthResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/networth/accounts/{key}:
+    put:
+      operationId: updateNetWorthAccount
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 190
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountUpsertRequest"
+      responses:
+        "200":
+          description: Net-worth overview after saving the account configuration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetWorthResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
 components:
   parameters:
     Year:
@@ -1758,6 +1795,67 @@ components:
           $ref: "#/components/schemas/Ratio"
         rebalanceBand:
           $ref: "#/components/schemas/Ratio"
+    NetWorthResponse:
+      type: object
+      required: [accounts, liquidTotal, emergencyFundMin, emergencyFundComfort, emergencyProgressComfort]
+      properties:
+        accounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetWorthAccount"
+        liquidTotal:
+          $ref: "#/components/schemas/Money"
+        emergencyFundMin:
+          $ref: "#/components/schemas/Money"
+        emergencyFundComfort:
+          $ref: "#/components/schemas/Money"
+        emergencyProgressComfort:
+          $ref: "#/components/schemas/Ratio"
+    NetWorthAccount:
+      type: object
+      required: [accountKey, name, kind, liquid, excludeFromNetWorth, configured]
+      properties:
+        accountKey:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+        liquid:
+          type: boolean
+        excludeFromNetWorth:
+          type: boolean
+        configured:
+          type: boolean
+        anchorBalance:
+          description: Known balance at anchorDate; absent until an opening balance is set.
+          $ref: "#/components/schemas/Money"
+        anchorDate:
+          type: string
+          format: date
+        netFlowSinceAnchor:
+          description: Net of signed transaction amounts posted after anchorDate.
+          $ref: "#/components/schemas/Money"
+        derivedBalance:
+          description: anchorBalance + netFlowSinceAnchor; absent until configured.
+          $ref: "#/components/schemas/Money"
+    AccountUpsertRequest:
+      type: object
+      required: [name, kind, liquid, excludeFromNetWorth]
+      properties:
+        name:
+          type: string
+        kind:
+          type: string
+        liquid:
+          type: boolean
+        excludeFromNetWorth:
+          type: boolean
+        anchorBalance:
+          $ref: "#/components/schemas/Money"
+        anchorDate:
+          type: string
+          format: date
     ProblemDetail:
       type: object
       properties:

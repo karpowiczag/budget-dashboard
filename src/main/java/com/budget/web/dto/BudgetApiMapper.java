@@ -3,6 +3,7 @@ package com.budget.web.dto;
 import com.budget.application.fire.FireSummary;
 import com.budget.application.fire.FireSettings;
 import com.budget.application.importing.ImportSummary;
+import com.budget.application.networth.NetWorthOverview;
 import com.budget.application.reporting.AnalyticsReport;
 import com.budget.application.reporting.CalendarReport;
 import com.budget.application.reporting.TransactionPage;
@@ -10,6 +11,7 @@ import com.budget.application.reporting.TransactionRecord;
 import com.budget.application.reporting.YearSummary;
 import com.budget.application.settings.BudgetSettings;
 import com.budget.domain.importjob.ImportRun;
+import com.budget.domain.networth.Account;
 import com.budget.domain.report.BudgetSnapshot;
 import java.nio.file.Path;
 import java.util.List;
@@ -46,6 +48,43 @@ public class BudgetApiMapper {
                 map(snapshot.topMerchants(), this::toMerchant),
                 map(snapshot.recurring(), this::toRecurring),
                 map(snapshot.largeOneoffs(), this::toLargeOneOff)
+        );
+    }
+
+    public BudgetApiDtos.NetWorthResponse toNetWorth(NetWorthOverview overview) {
+        return new BudgetApiDtos.NetWorthResponse(
+                map(overview.accounts(), this::toNetWorthAccount),
+                overview.liquidTotal(),
+                overview.emergencyFundMin(),
+                overview.emergencyFundComfort(),
+                overview.emergencyProgressComfort()
+        );
+    }
+
+    public BudgetApiDtos.NetWorthAccountResponse toNetWorthAccount(NetWorthOverview.LiquidAccount row) {
+        return new BudgetApiDtos.NetWorthAccountResponse(
+                row.accountKey(),
+                row.name(),
+                row.kind(),
+                row.liquid(),
+                row.excludeFromNetWorth(),
+                row.configured(),
+                row.anchorBalance(),
+                row.anchorDate(),
+                row.netFlowSinceAnchor(),
+                row.derivedBalance()
+        );
+    }
+
+    public Account toAccount(String accountKey, BudgetApiDtos.AccountUpsertRequest request) {
+        return new Account(
+                accountKey,
+                request.name(),
+                request.kind(),
+                request.liquid(),
+                request.excludeFromNetWorth(),
+                request.anchorBalance(),
+                request.anchorDate()
         );
     }
 

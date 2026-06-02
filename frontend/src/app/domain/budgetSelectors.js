@@ -925,6 +925,40 @@ export function selectModuleHeader({
   return headers[view] || headers.control;
 }
 
+// Phase 2a net worth: shape the /networth payload (derived liquid balances + emergency
+// fund coverage) for the Majątek view — a progress bar plus an accounts editor.
+export function selectNetWorth(netWorth) {
+  if (!netWorth) return null;
+  const liquidTotal = Number(netWorth.liquidTotal || 0);
+  const emergencyFundMin = Number(netWorth.emergencyFundMin || 0);
+  const emergencyFundComfort = Number(netWorth.emergencyFundComfort || 0);
+  const progress = Number(netWorth.emergencyProgressComfort || 0);
+  const accounts = (netWorth.accounts || []).map((account) => ({
+    accountKey: account.accountKey,
+    name: account.name || account.accountKey,
+    kind: account.kind || "CHECKING",
+    liquid: account.liquid !== false,
+    excludeFromNetWorth: !!account.excludeFromNetWorth,
+    configured: !!account.configured,
+    anchorBalance: account.anchorBalance != null ? Number(account.anchorBalance) : null,
+    anchorDate: account.anchorDate || "",
+    derivedBalance: account.configured ? Number(account.derivedBalance || 0) : null,
+    statusLabel: account.configured ? "saldo wyliczone z przepływów" : "ustaw saldo początkowe",
+  }));
+  const progressPercent = Math.round(progress * 100);
+  return {
+    accounts,
+    configuredCount: accounts.filter((account) => account.configured).length,
+    liquidTotal,
+    emergencyFundMin,
+    emergencyFundComfort,
+    progressPercent,
+    progressWidth: Math.max(0, Math.min(100, progressPercent)),
+    minReached: emergencyFundComfort > 0 && liquidTotal >= emergencyFundMin,
+    comfortReached: emergencyFundComfort > 0 && liquidTotal >= emergencyFundComfort,
+  };
+}
+
 export function selectRecurringSummary({ monthControl, recurring, recurringCalendar }) {
   const obligations = selectRecurringObligations(recurring || recurringCalendar || []);
   const filteredCalendar = recurringCalendar?.length ? selectRecurringObligations(recurringCalendar) : [];
