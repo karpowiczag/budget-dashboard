@@ -32,7 +32,12 @@ public record NetWorthOverview(
             BigDecimal anchorBalance,
             LocalDate anchorDate,
             BigDecimal netFlowSinceAnchor,
-            BigDecimal derivedBalance
+            BigDecimal derivedBalance,
+            BigDecimal statementBalance,
+            LocalDate statementDate,
+            BigDecimal reconciledBalance,
+            BigDecimal drift,
+            Boolean reconciled
     ) {
     }
 }

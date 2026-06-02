@@ -78,7 +78,12 @@ public class BudgetApiMapper {
                 row.anchorBalance(),
                 row.anchorDate(),
                 row.netFlowSinceAnchor(),
-                row.derivedBalance()
+                row.derivedBalance(),
+                row.statementBalance(),
+                row.statementDate(),
+                row.reconciledBalance(),
+                row.drift(),
+                row.reconciled()
         );
     }
 
@@ -90,7 +95,9 @@ public class BudgetApiMapper {
                 request.liquid(),
                 request.excludeFromNetWorth(),
                 request.anchorBalance(),
-                request.anchorDate()
+                request.anchorDate(),
+                request.statementBalance(),
+                request.statementDate()
         );
     }
 

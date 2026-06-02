@@ -1896,6 +1896,20 @@ components:
         derivedBalance:
           description: anchorBalance + netFlowSinceAnchor; absent until configured.
           $ref: "#/components/schemas/Money"
+        statementBalance:
+          description: Optional later observed balance (e.g. from a statement) used for reconciliation.
+          $ref: "#/components/schemas/Money"
+        statementDate:
+          type: string
+          format: date
+        reconciledBalance:
+          description: Derived balance at statementDate; absent unless a statement is set.
+          $ref: "#/components/schemas/Money"
+        drift:
+          description: reconciledBalance − statementBalance; absent unless a statement is set.
+          $ref: "#/components/schemas/Money"
+        reconciled:
+          type: boolean
     AccountUpsertRequest:
       type: object
       required: [name, kind, liquid, excludeFromNetWorth]
@@ -1911,6 +1925,11 @@ components:
         anchorBalance:
           $ref: "#/components/schemas/Money"
         anchorDate:
+          type: string
+          format: date
+        statementBalance:
+          $ref: "#/components/schemas/Money"
+        statementDate:
           type: string
           format: date
     Liability:

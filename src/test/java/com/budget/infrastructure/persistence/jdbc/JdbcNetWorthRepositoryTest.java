@@ -63,7 +63,7 @@ class JdbcNetWorthRepositoryTest {
                 .isEqualByComparingTo("-183.45");
 
         store.saveAccount(new Account("konto", "Konto główne", "CHECKING", true, false,
-                new BigDecimal("1000.00"), LocalDate.of(2098, 12, 31)));
+                new BigDecimal("1000.00"), LocalDate.of(2098, 12, 31), null, null));
 
         var overview = service.overview();
         var konto = overview.accounts().stream()
@@ -89,5 +89,16 @@ class JdbcNetWorthRepositoryTest {
 
         store.deleteLiability("mortgage");
         assertThat(service.overview().liabilities()).isEmpty();
+
+        // Reconciliation: derived balance at the statement date (1000 + flows through 2099-01-02
+        // = 1000 + 10000 - 123.45 = 10876.55) matches the entered statement → no drift.
+        store.saveAccount(new Account("konto", "Konto główne", "CHECKING", true, false,
+                new BigDecimal("1000.00"), LocalDate.of(2098, 12, 31),
+                new BigDecimal("10876.55"), LocalDate.of(2099, 1, 2)));
+        var reconciled = service.overview().accounts().stream()
+                .filter(a -> a.accountKey().equals("konto")).findFirst().orElseThrow();
+        assertThat(reconciled.reconciledBalance()).isEqualByComparingTo("10876.55");
+        assertThat(reconciled.drift()).isEqualByComparingTo("0.00");
+        assertThat(reconciled.reconciled()).isTrue();
     }
 }

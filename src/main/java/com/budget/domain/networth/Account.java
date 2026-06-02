@@ -10,6 +10,10 @@ import java.time.LocalDate;
  * transaction flows posted on this account after {@code anchorDate}. {@code anchorBalance}
  * and {@code anchorDate} are {@code null} until the user sets an opening balance.
  *
+ * <p>{@code statementBalance} at {@code statementDate} is an optional later, independently
+ * observed balance (e.g. from a bank statement) used for reconciliation: the derived
+ * balance at that date is compared against it and drift is flagged.
+ *
  * <p>{@code accountKey} equals the transaction {@code account} label, so derivation can
  * match flows directly.
  */
@@ -20,6 +24,8 @@ public record Account(
         boolean liquid,
         boolean excludeFromNetWorth,
         BigDecimal anchorBalance,
-        LocalDate anchorDate
+        LocalDate anchorDate,
+        BigDecimal statementBalance,
+        LocalDate statementDate
 ) {
 }

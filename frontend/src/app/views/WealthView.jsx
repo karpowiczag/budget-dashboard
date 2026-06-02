@@ -37,6 +37,8 @@ function AccountEditorRow({ account, onSave, saving }) {
   const [liquid, setLiquid] = useState(account.liquid);
   const [anchorBalance, setAnchorBalance] = useState(account.anchorBalance != null ? String(account.anchorBalance) : "");
   const [anchorDate, setAnchorDate] = useState(account.anchorDate || "");
+  const [statementBalance, setStatementBalance] = useState(account.statementBalance != null ? String(account.statementBalance) : "");
+  const [statementDate, setStatementDate] = useState(account.statementDate || "");
   const canSave = anchorBalance !== "" && !Number.isNaN(Number(anchorBalance)) && anchorDate !== "" && !saving;
   return (
     <tr>
@@ -64,6 +66,17 @@ function AccountEditorRow({ account, onSave, saving }) {
       <td className="num">
         {account.configured ? money(account.derivedBalance) : <span className="nwMuted">ustaw saldo</span>}
       </td>
+      <td className="num">
+        <input type="number" step="0.01" value={statementBalance} placeholder="z wyciągu"
+          aria-label={`Saldo z wyciągu ${account.accountKey}`} onChange={(event) => setStatementBalance(event.target.value)} />
+        <input type="date" value={statementDate} aria-label={`Data wyciągu ${account.accountKey}`}
+          onChange={(event) => setStatementDate(event.target.value)} />
+      </td>
+      <td>
+        {account.reconciled === true ? <span className="good">✓ zgodne</span>
+          : account.reconciled === false ? <span className="warn">⚠ {money(account.drift)}</span>
+          : <span className="nwMuted">—</span>}
+      </td>
       <td>
         <button type="button" className="primaryButton" disabled={!canSave}
           onClick={() => onSave(account.accountKey, {
@@ -73,6 +86,8 @@ function AccountEditorRow({ account, onSave, saving }) {
             excludeFromNetWorth: account.excludeFromNetWorth,
             anchorBalance: Number(anchorBalance),
             anchorDate,
+            statementBalance: statementBalance === "" ? null : Number(statementBalance),
+            statementDate: statementDate === "" ? null : statementDate,
           })}>
           {saving ? "Zapisuję..." : "Zapisz"}
         </button>
@@ -291,6 +306,8 @@ export function WealthView({ wealthDashboard, netWorth, onSaveAccount, onSaveLia
                     <th>Data otwarcia</th>
                     <th>Płynność</th>
                     <th className="num">Aktualne saldo</th>
+                    <th className="num">Saldo z wyciągu</th>
+                    <th>Zgodność</th>
                     <th aria-label="Akcje" />
                   </tr>
                 </thead>
@@ -299,7 +316,7 @@ export function WealthView({ wealthDashboard, netWorth, onSaveAccount, onSaveLia
                     <AccountEditorRow key={account.accountKey} account={account} onSave={onSaveAccount} saving={savingAccount} />
                   ))}
                   {nw.accounts.length === 0 ? (
-                    <tr><td colSpan={7} className="nwMuted">Brak kont w importowanych transakcjach.</td></tr>
+                    <tr><td colSpan={9} className="nwMuted">Brak kont w importowanych transakcjach.</td></tr>
                   ) : null}
                 </tbody>
               </table>

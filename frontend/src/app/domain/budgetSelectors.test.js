@@ -936,7 +936,7 @@ describe("selectNetWorth", () => {
       emergencyFundComfort: 54000,
       emergencyProgressComfort: 0.4537,
       accounts: [
-        { accountKey: "Osobiste", name: "Osobiste", kind: "CHECKING", liquid: true, excludeFromNetWorth: false, configured: true, anchorBalance: 1000, anchorDate: "2026-01-01", derivedBalance: 1500 },
+        { accountKey: "Osobiste", name: "Osobiste", kind: "CHECKING", liquid: true, excludeFromNetWorth: false, configured: true, anchorBalance: 1000, anchorDate: "2026-01-01", derivedBalance: 1500, statementBalance: 1500, statementDate: "2026-03-31", reconciledBalance: 1500, drift: 0, reconciled: true },
         { accountKey: "Maklerskie", name: "Maklerskie", kind: "OTHER", liquid: true, excludeFromNetWorth: false, configured: false, derivedBalance: null },
       ],
       liabilities: [
@@ -952,6 +952,8 @@ describe("selectNetWorth", () => {
     expect(model.progressWidth).toBe(45);
     expect(model.comfortReached).toBe(false);
     expect(model.accounts[1]).toMatchObject({ configured: false, derivedBalance: null, statusLabel: "ustaw saldo początkowe" });
+    expect(model.accounts[0]).toMatchObject({ reconciled: true, drift: 0, reconciledBalance: 1500 });
+    expect(model.accounts[1].reconciled).toBeNull();
     expect(model.liabilities).toHaveLength(1);
     expect(model.liabilities[0]).toMatchObject({ liabilityKey: "mortgage", currentPrincipal: 30000, annualInterestRate: 0.072 });
   });

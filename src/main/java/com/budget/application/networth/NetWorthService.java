@@ -68,9 +68,21 @@ public class NetWorthService {
             if (configured && liquid && !excluded) {
                 liquidTotal = liquidTotal.add(derived);
             }
+            var statementBalance = account != null ? account.statementBalance() : null;
+            var statementDate = account != null ? account.statementDate() : null;
+            BigDecimal reconciledBalance = null;
+            BigDecimal drift = null;
+            Boolean reconciled = null;
+            if (configured && statementBalance != null && statementDate != null && statementDate.isAfter(anchorDate)) {
+                reconciledBalance = money(anchorBalance.add(store.netFlowBetween(key, anchorDate, statementDate)));
+                drift = money(reconciledBalance.subtract(statementBalance));
+                var tolerance = statementBalance.abs().multiply(new BigDecimal("0.005")).max(BigDecimal.ONE);
+                reconciled = drift.abs().compareTo(tolerance) <= 0;
+            }
             rows.add(new NetWorthOverview.LiquidAccount(
                     key, name, kind, liquid, excluded, configured,
-                    anchorBalance, anchorDate, netFlow, derived));
+                    anchorBalance, anchorDate, netFlow, derived,
+                    statementBalance, statementDate, reconciledBalance, drift, reconciled));
         }
         liquidTotal = money(liquidTotal);
 

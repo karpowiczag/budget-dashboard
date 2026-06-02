@@ -22,6 +22,9 @@ public interface NetWorthStore {
     /** Net of signed transaction amounts for an account, posted strictly after the given date. */
     BigDecimal netFlowSince(String accountKey, LocalDate sinceExclusive);
 
+    /** Net of signed transaction amounts posted in the range (afterExclusive, throughInclusive]. */
+    BigDecimal netFlowBetween(String accountKey, LocalDate afterExclusive, LocalDate throughInclusive);
+
     List<Liability> liabilities();
 
     Liability saveLiability(Liability liability);

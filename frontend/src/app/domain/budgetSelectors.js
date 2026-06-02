@@ -943,6 +943,11 @@ export function selectNetWorth(netWorth) {
     anchorBalance: account.anchorBalance != null ? Number(account.anchorBalance) : null,
     anchorDate: account.anchorDate || "",
     derivedBalance: account.configured ? Number(account.derivedBalance || 0) : null,
+    statementBalance: account.statementBalance != null ? Number(account.statementBalance) : null,
+    statementDate: account.statementDate || "",
+    reconciledBalance: account.reconciledBalance != null ? Number(account.reconciledBalance) : null,
+    drift: account.drift != null ? Number(account.drift) : null,
+    reconciled: account.reconciled == null ? null : !!account.reconciled,
     statusLabel: account.configured ? "saldo wyliczone z przepływów" : "ustaw saldo początkowe",
   }));
   const progressPercent = Math.round(progress * 100);

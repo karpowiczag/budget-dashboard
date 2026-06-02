@@ -427,7 +427,12 @@ public final class BudgetApiDtos {
             BigDecimal anchorBalance,
             LocalDate anchorDate,
             BigDecimal netFlowSinceAnchor,
-            BigDecimal derivedBalance
+            BigDecimal derivedBalance,
+            BigDecimal statementBalance,
+            LocalDate statementDate,
+            BigDecimal reconciledBalance,
+            BigDecimal drift,
+            Boolean reconciled
     ) {
     }
 
@@ -437,7 +442,9 @@ public final class BudgetApiDtos {
             boolean liquid,
             boolean excludeFromNetWorth,
             BigDecimal anchorBalance,
-            LocalDate anchorDate
+            LocalDate anchorDate,
+            BigDecimal statementBalance,
+            LocalDate statementDate
     ) {
     }
 

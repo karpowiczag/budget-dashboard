@@ -33,12 +33,16 @@ class NetWorthServiceTest {
                 List.of(), List.of(), List.of(), List.of());
     }
 
+    private static Account account(String key, String name, String kind, boolean liquid, boolean excluded, String anchor) {
+        return new Account(key, name, kind, liquid, excluded, new BigDecimal(anchor), LocalDate.parse("2026-01-01"), null, null);
+    }
+
     @Test
     void derivesNetWorthFromLiquidInvestedAndLiabilities() {
         var store = new FakeStore()
                 .discovered("mBank Osobiste", "mBank Oszczednosci", "Konto maklerskie")
-                .account(new Account("mBank Osobiste", "Osobiste", "CHECKING", true, false, new BigDecimal("1000.00"), LocalDate.parse("2026-01-01")))
-                .account(new Account("mBank Oszczednosci", "Oszczednosci", "SAVINGS", true, false, new BigDecimal("20000.00"), LocalDate.parse("2026-01-01")))
+                .account(account("mBank Osobiste", "Osobiste", "CHECKING", true, false, "1000.00"))
+                .account(account("mBank Oszczednosci", "Oszczednosci", "SAVINGS", true, false, "20000.00"))
                 .netFlow("mBank Osobiste", new BigDecimal("500.00"))
                 .netFlow("mBank Oszczednosci", new BigDecimal("3000.00"))
                 .liability(new Liability("mortgage", "Hipoteka", "MORTGAGE", new BigDecimal("30000.00"), new BigDecimal("0.072"), new BigDecimal("1500.00"), LocalDate.parse("2026-01-01")));
@@ -61,14 +65,15 @@ class NetWorthServiceTest {
                 .filter(a -> a.accountKey().equals("Konto maklerskie")).findFirst().orElseThrow();
         assertThat(maklerskie.configured()).isFalse();
         assertThat(maklerskie.derivedBalance()).isNull();
+        assertThat(maklerskie.reconciled()).isNull();
     }
 
     @Test
     void excludesNonLiquidAndExcludedAccountsFromLiquidTotal() {
         var store = new FakeStore()
                 .discovered("Bie", "Inv")
-                .account(new Account("Bie", "Biezace", "CHECKING", true, false, new BigDecimal("1000.00"), LocalDate.parse("2026-01-01")))
-                .account(new Account("Inv", "Maklerskie", "OTHER", false, true, new BigDecimal("50000.00"), LocalDate.parse("2026-01-01")))
+                .account(account("Bie", "Biezace", "CHECKING", true, false, "1000.00"))
+                .account(account("Inv", "Maklerskie", "OTHER", false, true, "50000.00"))
                 .netFlow("Bie", BigDecimal.ZERO)
                 .netFlow("Inv", BigDecimal.ZERO);
         var reports = new FakeReports(
@@ -84,7 +89,7 @@ class NetWorthServiceTest {
     @Test
     void zeroEmergencyTargetsWhenNoReports() {
         var store = new FakeStore().discovered("A")
-                .account(new Account("A", "A", "CHECKING", true, false, new BigDecimal("100.00"), LocalDate.parse("2026-01-01")))
+                .account(account("A", "A", "CHECKING", true, false, "100.00"))
                 .netFlow("A", BigDecimal.ZERO);
         var reports = new FakeReports(List.of(), null);
 
@@ -99,7 +104,7 @@ class NetWorthServiceTest {
     @Test
     void investedCapitalDefaultsToZeroWhenPortfolioFails() {
         var store = new FakeStore().discovered("A")
-                .account(new Account("A", "A", "CHECKING", true, false, new BigDecimal("100.00"), LocalDate.parse("2026-01-01")))
+                .account(account("A", "A", "CHECKING", true, false, "100.00"))
                 .netFlow("A", BigDecimal.ZERO);
         var reports = new FakeReports(List.of(), null);
         PortfolioValuePort portfolio = () -> {
@@ -112,10 +117,36 @@ class NetWorthServiceTest {
         assertThat(overview.netWorth()).isEqualByComparingTo("100.00");
     }
 
+    @Test
+    void reconcilesDerivedBalanceAgainstStatement() {
+        var store = new FakeStore()
+                .discovered("Match", "Drift")
+                .account(new Account("Match", "Zgodne", "CHECKING", true, false, new BigDecimal("1000.00"), LocalDate.parse("2026-01-01"), new BigDecimal("1500.00"), LocalDate.parse("2026-03-31")))
+                .account(new Account("Drift", "Rozjazd", "CHECKING", true, false, new BigDecimal("1000.00"), LocalDate.parse("2026-01-01"), new BigDecimal("1450.00"), LocalDate.parse("2026-03-31")))
+                .netFlow("Match", new BigDecimal("800.00"))
+                .netFlow("Drift", new BigDecimal("800.00"))
+                .flowBetween("Match", new BigDecimal("500.00"))
+                .flowBetween("Drift", new BigDecimal("500.00"));
+        var reports = new FakeReports(List.of(), null);
+
+        var overview = new NetWorthService(store, reports, () -> BigDecimal.ZERO).overview();
+
+        var match = overview.accounts().stream().filter(a -> a.accountKey().equals("Match")).findFirst().orElseThrow();
+        assertThat(match.reconciledBalance()).isEqualByComparingTo("1500.00");
+        assertThat(match.drift()).isEqualByComparingTo("0.00");
+        assertThat(match.reconciled()).isTrue();
+
+        var drift = overview.accounts().stream().filter(a -> a.accountKey().equals("Drift")).findFirst().orElseThrow();
+        assertThat(drift.reconciledBalance()).isEqualByComparingTo("1500.00");
+        assertThat(drift.drift()).isEqualByComparingTo("50.00");
+        assertThat(drift.reconciled()).isFalse();
+    }
+
     private static final class FakeStore implements NetWorthStore {
         private final List<String> discovered = new ArrayList<>();
         private final Map<String, Account> accounts = new LinkedHashMap<>();
         private final Map<String, BigDecimal> flows = new HashMap<>();
+        private final Map<String, BigDecimal> betweenFlows = new HashMap<>();
         private final Map<String, Liability> liabilities = new LinkedHashMap<>();
 
         FakeStore discovered(String... keys) {
@@ -130,6 +161,11 @@ class NetWorthServiceTest {
 
         FakeStore netFlow(String key, BigDecimal value) {
             flows.put(key, value);
+            return this;
+        }
+
+        FakeStore flowBetween(String key, BigDecimal value) {
+            betweenFlows.put(key, value);
             return this;
         }
 
@@ -157,6 +193,11 @@ class NetWorthServiceTest {
         @Override
         public BigDecimal netFlowSince(String accountKey, LocalDate sinceExclusive) {
             return flows.getOrDefault(accountKey, BigDecimal.ZERO);
+        }
+
+        @Override
+        public BigDecimal netFlowBetween(String accountKey, LocalDate afterExclusive, LocalDate throughInclusive) {
+            return betweenFlows.getOrDefault(accountKey, BigDecimal.ZERO);
         }
 
         @Override

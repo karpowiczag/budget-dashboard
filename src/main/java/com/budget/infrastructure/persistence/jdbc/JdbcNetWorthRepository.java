@@ -44,10 +44,10 @@ public class JdbcNetWorthRepository implements NetWorthStore {
         jdbc.update("""
                 INSERT INTO networth_accounts (
                     account_key, name, kind, liquid, exclude_from_net_worth,
-                    anchor_balance, anchor_date, updated_at
+                    anchor_balance, anchor_date, statement_balance, statement_date, updated_at
                 ) VALUES (
                     :accountKey, :name, :kind, :liquid, :excludeFromNetWorth,
-                    :anchorBalance, :anchorDate, :updatedAt
+                    :anchorBalance, :anchorDate, :statementBalance, :statementDate, :updatedAt
                 )
                 """, new MapSqlParameterSource()
                 .addValue("accountKey", account.accountKey())
@@ -57,6 +57,8 @@ public class JdbcNetWorthRepository implements NetWorthStore {
                 .addValue("excludeFromNetWorth", account.excludeFromNetWorth())
                 .addValue("anchorBalance", account.anchorBalance())
                 .addValue("anchorDate", account.anchorDate())
+                .addValue("statementBalance", account.statementBalance())
+                .addValue("statementDate", account.statementDate())
                 .addValue("updatedAt", OffsetDateTime.now()));
         return account;
     }
@@ -69,6 +71,18 @@ public class JdbcNetWorthRepository implements NetWorthStore {
                 """, new MapSqlParameterSource()
                 .addValue("accountKey", accountKey)
                 .addValue("since", sinceExclusive), BigDecimal.class);
+        return sum == null ? BigDecimal.ZERO : sum;
+    }
+
+    @Override
+    public BigDecimal netFlowBetween(String accountKey, LocalDate afterExclusive, LocalDate throughInclusive) {
+        var sum = jdbc.queryForObject("""
+                SELECT COALESCE(SUM(amount), 0) FROM budget_transactions
+                WHERE account = :accountKey AND posted_date > :after AND posted_date <= :through
+                """, new MapSqlParameterSource()
+                .addValue("accountKey", accountKey)
+                .addValue("after", afterExclusive)
+                .addValue("through", throughInclusive), BigDecimal.class);
         return sum == null ? BigDecimal.ZERO : sum;
     }
 
@@ -117,7 +131,9 @@ public class JdbcNetWorthRepository implements NetWorthStore {
                 rs.getBoolean("liquid"),
                 rs.getBoolean("exclude_from_net_worth"),
                 rs.getBigDecimal("anchor_balance"),
-                rs.getObject("anchor_date", LocalDate.class)
+                rs.getObject("anchor_date", LocalDate.class),
+                rs.getBigDecimal("statement_balance"),
+                rs.getObject("statement_date", LocalDate.class)
         );
     }
 
