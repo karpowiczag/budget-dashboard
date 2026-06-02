@@ -927,6 +927,10 @@ describe("selectNetWorth", () => {
   it("shapes accounts, derived balances and emergency-fund progress", () => {
     const model = selectNetWorth({
       liquidTotal: 24500,
+      investedAssets: 100000,
+      totalAssets: 124500,
+      totalLiabilities: 30000,
+      netWorth: 94500,
       emergencyFundMin: 27000,
       emergencyFundComfort: 54000,
       emergencyProgressComfort: 0.4537,
@@ -934,13 +938,21 @@ describe("selectNetWorth", () => {
         { accountKey: "Osobiste", name: "Osobiste", kind: "CHECKING", liquid: true, excludeFromNetWorth: false, configured: true, anchorBalance: 1000, anchorDate: "2026-01-01", derivedBalance: 1500 },
         { accountKey: "Maklerskie", name: "Maklerskie", kind: "OTHER", liquid: true, excludeFromNetWorth: false, configured: false, derivedBalance: null },
       ],
+      liabilities: [
+        { liabilityKey: "mortgage", name: "Hipoteka", kind: "MORTGAGE", currentPrincipal: 30000, annualInterestRate: 0.072, monthlyPayment: 1500, asOf: "2026-01-01" },
+      ],
     });
     expect(model.configuredCount).toBe(1);
     expect(model.liquidTotal).toBe(24500);
+    expect(model.investedAssets).toBe(100000);
+    expect(model.totalLiabilities).toBe(30000);
+    expect(model.netWorth).toBe(94500);
     expect(model.progressPercent).toBe(45);
     expect(model.progressWidth).toBe(45);
     expect(model.comfortReached).toBe(false);
     expect(model.accounts[1]).toMatchObject({ configured: false, derivedBalance: null, statusLabel: "ustaw saldo początkowe" });
+    expect(model.liabilities).toHaveLength(1);
+    expect(model.liabilities[0]).toMatchObject({ liabilityKey: "mortgage", currentPrincipal: 30000, annualInterestRate: 0.072 });
   });
 
   it("returns null without a payload", () => {

@@ -4,7 +4,7 @@ import { CategoryTrendChart } from "../components/charts/CategoryTrendChart.jsx"
 import { SavingsWaterfallChart } from "../components/charts/SavingsWaterfallChart.jsx";
 import { ReportDataTable } from "../components/tables/ReportDataTable.jsx";
 import { Panel } from "../components/ui/Panel.jsx";
-import { money } from "../domain/formatters.js";
+import { money, percent } from "../domain/formatters.js";
 import { selectNetWorth } from "../domain/budgetSelectors.js";
 
 const KIND_OPTIONS = [
@@ -13,6 +13,24 @@ const KIND_OPTIONS = [
   { value: "CASH", label: "Gotówka" },
   { value: "OTHER", label: "Inne aktywo" },
 ];
+
+const LIABILITY_KIND_OPTIONS = [
+  { value: "MORTGAGE", label: "Hipoteka" },
+  { value: "AUTO", label: "Kredyt auto" },
+  { value: "CONSUMER", label: "Kredyt/pożyczka" },
+  { value: "STUDENT", label: "Studencki" },
+  { value: "OTHER", label: "Inne" },
+];
+
+function slug(value) {
+  return (value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "zobowiazanie";
+}
 
 function AccountEditorRow({ account, onSave, saving }) {
   const [kind, setKind] = useState(account.kind);
@@ -31,22 +49,12 @@ function AccountEditorRow({ account, onSave, saving }) {
         </select>
       </td>
       <td className="num">
-        <input
-          type="number"
-          step="0.01"
-          value={anchorBalance}
-          placeholder="np. 12000"
-          aria-label={`Saldo otwarcia ${account.accountKey}`}
-          onChange={(event) => setAnchorBalance(event.target.value)}
-        />
+        <input type="number" step="0.01" value={anchorBalance} placeholder="np. 12000"
+          aria-label={`Saldo otwarcia ${account.accountKey}`} onChange={(event) => setAnchorBalance(event.target.value)} />
       </td>
       <td>
-        <input
-          type="date"
-          value={anchorDate}
-          aria-label={`Data salda otwarcia ${account.accountKey}`}
-          onChange={(event) => setAnchorDate(event.target.value)}
-        />
+        <input type="date" value={anchorDate} aria-label={`Data salda otwarcia ${account.accountKey}`}
+          onChange={(event) => setAnchorDate(event.target.value)} />
       </td>
       <td>
         <label className="nwCheckbox">
@@ -57,10 +65,7 @@ function AccountEditorRow({ account, onSave, saving }) {
         {account.configured ? money(account.derivedBalance) : <span className="nwMuted">ustaw saldo</span>}
       </td>
       <td>
-        <button
-          type="button"
-          className="primaryButton"
-          disabled={!canSave}
+        <button type="button" className="primaryButton" disabled={!canSave}
           onClick={() => onSave(account.accountKey, {
             name: account.name || account.accountKey,
             kind,
@@ -68,8 +73,7 @@ function AccountEditorRow({ account, onSave, saving }) {
             excludeFromNetWorth: account.excludeFromNetWorth,
             anchorBalance: Number(anchorBalance),
             anchorDate,
-          })}
-        >
+          })}>
           {saving ? "Zapisuję..." : "Zapisz"}
         </button>
       </td>
@@ -77,11 +81,114 @@ function AccountEditorRow({ account, onSave, saving }) {
   );
 }
 
-export function WealthView({ wealthDashboard, netWorth, onSaveAccount, savingAccount = false, netWorthStatus, onInspect }) {
+function LiabilityEditorRow({ liability, onSave, onDelete, saving }) {
+  const [kind, setKind] = useState(liability.kind);
+  const [principal, setPrincipal] = useState(String(liability.currentPrincipal ?? ""));
+  const [rate, setRate] = useState(liability.annualInterestRate != null ? String(liability.annualInterestRate * 100) : "");
+  const [payment, setPayment] = useState(liability.monthlyPayment != null ? String(liability.monthlyPayment) : "");
+  const canSave = principal !== "" && !Number.isNaN(Number(principal)) && !saving;
+  return (
+    <tr>
+      <td>{liability.name}</td>
+      <td>
+        <select value={kind} onChange={(event) => setKind(event.target.value)} aria-label={`Typ zobowiązania ${liability.name}`}>
+          {LIABILITY_KIND_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </td>
+      <td className="num">
+        <input type="number" step="0.01" value={principal} aria-label={`Kapitał ${liability.name}`}
+          onChange={(event) => setPrincipal(event.target.value)} />
+      </td>
+      <td className="num">
+        <input type="number" step="0.01" value={rate} placeholder="%" aria-label={`Oprocentowanie ${liability.name}`}
+          onChange={(event) => setRate(event.target.value)} />
+      </td>
+      <td className="num">
+        <input type="number" step="0.01" value={payment} placeholder="rata" aria-label={`Rata ${liability.name}`}
+          onChange={(event) => setPayment(event.target.value)} />
+      </td>
+      <td>
+        <button type="button" className="primaryButton" disabled={!canSave}
+          onClick={() => onSave(liability.liabilityKey, {
+            name: liability.name,
+            kind,
+            currentPrincipal: Number(principal),
+            annualInterestRate: rate === "" ? null : Number(rate) / 100,
+            monthlyPayment: payment === "" ? null : Number(payment),
+            asOf: liability.asOf || null,
+          })}>
+          {saving ? "..." : "Zapisz"}
+        </button>
+        <button type="button" className="nwGhost" disabled={saving} onClick={() => onDelete(liability.liabilityKey)}>Usuń</button>
+      </td>
+    </tr>
+  );
+}
+
+function NewLiabilityForm({ onSave, saving }) {
+  const [name, setName] = useState("");
+  const [kind, setKind] = useState("MORTGAGE");
+  const [principal, setPrincipal] = useState("");
+  const canAdd = name.trim() !== "" && principal !== "" && !Number.isNaN(Number(principal)) && !saving;
+  return (
+    <div className="nwNewLiability">
+      <input value={name} placeholder="Nazwa (np. Hipoteka)" aria-label="Nazwa nowego zobowiązania" onChange={(event) => setName(event.target.value)} />
+      <select value={kind} onChange={(event) => setKind(event.target.value)} aria-label="Typ nowego zobowiązania">
+        {LIABILITY_KIND_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+      <input type="number" step="0.01" value={principal} placeholder="Kapitał do spłaty" aria-label="Kapitał nowego zobowiązania" onChange={(event) => setPrincipal(event.target.value)} />
+      <button type="button" className="primaryButton" disabled={!canAdd}
+        onClick={() => {
+          onSave(slug(name), { name: name.trim(), kind, currentPrincipal: Number(principal), annualInterestRate: null, monthlyPayment: null, asOf: null });
+          setName("");
+          setPrincipal("");
+        }}>
+        {saving ? "Dodaję..." : "Dodaj zobowiązanie"}
+      </button>
+    </div>
+  );
+}
+
+export function WealthView({ wealthDashboard, netWorth, onSaveAccount, onSaveLiability, onDeleteLiability, savingAccount = false, savingLiability = false, netWorthStatus, onInspect }) {
   const dashboard = wealthDashboard || {};
   const nw = selectNetWorth(netWorth);
   return (
     <section className="viewStack">
+      <Panel title="Wartość netto">
+        {!nw ? (
+          <p className="nwMuted">Wczytuję bilans…</p>
+        ) : (
+          <div className="nwSummary">
+            <div>
+              <span className="nwMuted">Wartość netto</span>
+              <strong className={nw.netWorth < 0 ? "warn" : "good"}>{money(nw.netWorth)}</strong>
+              <span className="nwMuted">aktywa − zobowiązania</span>
+            </div>
+            <div>
+              <span className="nwMuted">Płynne środki</span>
+              <strong>{money(nw.liquidTotal)}</strong>
+            </div>
+            <div>
+              <span className="nwMuted">Inwestycje (MyFund)</span>
+              <strong>{money(nw.investedAssets)}</strong>
+              {nw.investedAssets === 0 ? <span className="nwMuted">ustaw raporty w module FIRE</span> : null}
+            </div>
+            <div>
+              <span className="nwMuted">Zobowiązania</span>
+              <strong className={nw.totalLiabilities > 0 ? "warn" : ""}>{money(nw.totalLiabilities)}</strong>
+            </div>
+          </div>
+        )}
+        <div className="dataQualityBanner neutral">
+          <strong>Salda i inwestycje liczone osobno</strong>
+          <span>Płynne salda = saldo otwarcia + przepływy z importu. Inwestycje pochodzą z raportów MyFund (moduł FIRE). Net worth = płynne + inwestycje − zobowiązania.</span>
+        </div>
+      </Panel>
+
       <Panel title="Fundusz awaryjny i salda kont">
         {!nw ? (
           <p className="nwMuted">Wczytuję salda kont…</p>
@@ -141,11 +248,36 @@ export function WealthView({ wealthDashboard, netWorth, onSaveAccount, savingAcc
         )}
       </Panel>
 
-      <Panel title="Przepływy majątkowe">
-        <div className="dataQualityBanner neutral">
-          <strong>Salda wyliczane, inwestycje osobno</strong>
-          <span>Powyżej: płynne salda kont (saldo otwarcia + przepływy). Poniżej: sumy ruchów majątkowych z importu. Wartość inwestycji (MyFund) i pełna wartość netto dochodzą w kolejnym etapie.</span>
-        </div>
+      <Panel title="Zobowiązania (kredyty, pożyczki)">
+        {!nw ? (
+          <p className="nwMuted">Wczytuję zobowiązania…</p>
+        ) : (
+          <>
+            <div className="nwTableScroll">
+              <table className="nwTable">
+                <thead>
+                  <tr>
+                    <th>Nazwa</th>
+                    <th>Typ</th>
+                    <th className="num">Kapitał</th>
+                    <th className="num">Oproc. % rocznie</th>
+                    <th className="num">Rata mies.</th>
+                    <th aria-label="Akcje" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {nw.liabilities.map((liability) => (
+                    <LiabilityEditorRow key={liability.liabilityKey} liability={liability} onSave={onSaveLiability} onDelete={onDeleteLiability} saving={savingLiability} />
+                  ))}
+                  {nw.liabilities.length === 0 ? (
+                    <tr><td colSpan={6} className="nwMuted">Brak zobowiązań. Dodaj kredyt lub pożyczkę poniżej.</td></tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+            <NewLiabilityForm onSave={onSaveLiability} saving={savingLiability} />
+          </>
+        )}
       </Panel>
 
       <section className="gridTwo">

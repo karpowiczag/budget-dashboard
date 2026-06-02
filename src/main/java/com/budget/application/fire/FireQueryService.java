@@ -1,5 +1,6 @@
 package com.budget.application.fire;
 
+import com.budget.application.networth.PortfolioValuePort;
 import com.budget.application.reporting.BudgetReportStore;
 import com.budget.application.reporting.ReportNotFoundException;
 import com.budget.application.reporting.YearSummary;
@@ -20,7 +21,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 @Service
-public class FireQueryService {
+public class FireQueryService implements PortfolioValuePort {
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
     private static final BigDecimal TWELVE = BigDecimal.valueOf(12);
     private static final String WRAPPER_EMERGENCY = "Poduszka bezpieczeństwa";
@@ -163,6 +164,16 @@ public class FireQueryService {
                 legalRules(),
                 sources(positions)
         );
+    }
+
+    /**
+     * Lightweight invested-capital read for the net-worth calculation: only sums position
+     * values, skipping the full FIRE projection. Returns zero when no portfolio is loaded.
+     */
+    @Override
+    public BigDecimal currentPortfolioValue() {
+        var snapshot = readSnapshot(settingsService.current());
+        return money(sum(snapshot.positions(), FirePortfolioPosition::valuePln));
     }
 
     private com.budget.domain.fire.FirePortfolioSnapshot readSnapshot(FireSettings settings) {

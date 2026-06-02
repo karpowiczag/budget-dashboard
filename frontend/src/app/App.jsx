@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchAnalytics, fetchCalendar, fetchFireSettings, fetchFireSummary, fetchNetWorth, fetchTransactions, saveNetWorthAccount, updateFireSettings } from "./api/budgetApi.js";
+import { deleteNetWorthLiability, fetchAnalytics, fetchCalendar, fetchFireSettings, fetchFireSummary, fetchNetWorth, fetchTransactions, saveNetWorthAccount, saveNetWorthLiability, updateFireSettings } from "./api/budgetApi.js";
 import { budgetQueryKeys } from "./api/queryKeys.js";
 import { AppShell } from "./components/layout/AppShell.jsx";
 import { DashboardFooter } from "./components/layout/DashboardFooter.jsx";
@@ -179,6 +179,12 @@ export default function App() {
   });
   const netWorthMutation = useMutation({
     mutationFn: ({ key, account }) => saveNetWorthAccount(key, account),
+  });
+  const netWorthLiabilityMutation = useMutation({
+    mutationFn: ({ key, liability }) => saveNetWorthLiability(key, liability),
+  });
+  const netWorthLiabilityDeleteMutation = useMutation({
+    mutationFn: (key) => deleteNetWorthLiability(key),
   });
   const inspectorQuery = useQuery({
     queryKey: budgetQueryKeys.transactions(year, inspectorFilters),
@@ -371,6 +377,32 @@ export default function App() {
     }
   }
 
+  async function handleSaveNetWorthLiability(key, liability) {
+    setNetWorthStatus({ type: "info", message: "Zapisuję zobowiązanie..." });
+    try {
+      const saved = await netWorthLiabilityMutation.mutateAsync({ key, liability });
+      queryClient.setQueryData(budgetQueryKeys.netWorth, saved);
+      setNetWorthStatus({ type: "success", message: "Zobowiązanie zapisane i przeliczone." });
+      return saved;
+    } catch (error) {
+      setNetWorthStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
+  async function handleDeleteNetWorthLiability(key) {
+    setNetWorthStatus({ type: "info", message: "Usuwam zobowiązanie..." });
+    try {
+      const saved = await netWorthLiabilityDeleteMutation.mutateAsync(key);
+      queryClient.setQueryData(budgetQueryKeys.netWorth, saved);
+      setNetWorthStatus({ type: "success", message: "Zobowiązanie usunięte." });
+      return saved;
+    } catch (error) {
+      setNetWorthStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
   async function handleSaveSettings() {
     const base = settingsDraft || budgetSettings || {};
     const allLimitRows = [...(model.parentPlanRows || []), ...(model.planRows || [])];
@@ -515,7 +547,10 @@ export default function App() {
           wealthDashboard={model.wealthDashboard}
           netWorth={netWorthQuery.data}
           onSaveAccount={handleSaveNetWorthAccount}
+          onSaveLiability={handleSaveNetWorthLiability}
+          onDeleteLiability={handleDeleteNetWorthLiability}
           savingAccount={netWorthMutation.isPending}
+          savingLiability={netWorthLiabilityMutation.isPending || netWorthLiabilityDeleteMutation.isPending}
           netWorthStatus={netWorthStatus}
           onInspect={openTransactionInspector}
         />

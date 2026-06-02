@@ -2,6 +2,7 @@ package com.budget.infrastructure.persistence.jdbc;
 
 import com.budget.application.networth.NetWorthStore;
 import com.budget.domain.networth.Account;
+import com.budget.domain.networth.Liability;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -71,6 +72,43 @@ public class JdbcNetWorthRepository implements NetWorthStore {
         return sum == null ? BigDecimal.ZERO : sum;
     }
 
+    @Override
+    public List<Liability> liabilities() {
+        return jdbc.query("SELECT * FROM networth_liabilities ORDER BY name", new MapSqlParameterSource(), this::mapLiability);
+    }
+
+    @Override
+    @Transactional
+    public Liability saveLiability(Liability liability) {
+        jdbc.update("DELETE FROM networth_liabilities WHERE liability_key = :liabilityKey",
+                new MapSqlParameterSource("liabilityKey", liability.liabilityKey()));
+        jdbc.update("""
+                INSERT INTO networth_liabilities (
+                    liability_key, name, kind, current_principal,
+                    annual_interest_rate, monthly_payment, as_of, updated_at
+                ) VALUES (
+                    :liabilityKey, :name, :kind, :currentPrincipal,
+                    :annualInterestRate, :monthlyPayment, :asOf, :updatedAt
+                )
+                """, new MapSqlParameterSource()
+                .addValue("liabilityKey", liability.liabilityKey())
+                .addValue("name", liability.name())
+                .addValue("kind", liability.kind())
+                .addValue("currentPrincipal", liability.currentPrincipal())
+                .addValue("annualInterestRate", liability.annualInterestRate())
+                .addValue("monthlyPayment", liability.monthlyPayment())
+                .addValue("asOf", liability.asOf())
+                .addValue("updatedAt", OffsetDateTime.now()));
+        return liability;
+    }
+
+    @Override
+    @Transactional
+    public void deleteLiability(String liabilityKey) {
+        jdbc.update("DELETE FROM networth_liabilities WHERE liability_key = :liabilityKey",
+                new MapSqlParameterSource("liabilityKey", liabilityKey));
+    }
+
     private Account map(ResultSet rs, int rowNum) throws SQLException {
         return new Account(
                 rs.getString("account_key"),
@@ -80,6 +118,18 @@ public class JdbcNetWorthRepository implements NetWorthStore {
                 rs.getBoolean("exclude_from_net_worth"),
                 rs.getBigDecimal("anchor_balance"),
                 rs.getObject("anchor_date", LocalDate.class)
+        );
+    }
+
+    private Liability mapLiability(ResultSet rs, int rowNum) throws SQLException {
+        return new Liability(
+                rs.getString("liability_key"),
+                rs.getString("name"),
+                rs.getString("kind"),
+                rs.getBigDecimal("current_principal"),
+                rs.getBigDecimal("annual_interest_rate"),
+                rs.getBigDecimal("monthly_payment"),
+                rs.getObject("as_of", LocalDate.class)
         );
     }
 }

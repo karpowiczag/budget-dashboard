@@ -946,10 +946,24 @@ export function selectNetWorth(netWorth) {
     statusLabel: account.configured ? "saldo wyliczone z przepływów" : "ustaw saldo początkowe",
   }));
   const progressPercent = Math.round(progress * 100);
+  const liabilities = (netWorth.liabilities || []).map((liability) => ({
+    liabilityKey: liability.liabilityKey,
+    name: liability.name || liability.liabilityKey,
+    kind: liability.kind || "OTHER",
+    currentPrincipal: Number(liability.currentPrincipal || 0),
+    annualInterestRate: liability.annualInterestRate != null ? Number(liability.annualInterestRate) : null,
+    monthlyPayment: liability.monthlyPayment != null ? Number(liability.monthlyPayment) : null,
+    asOf: liability.asOf || "",
+  }));
   return {
     accounts,
+    liabilities,
     configuredCount: accounts.filter((account) => account.configured).length,
     liquidTotal,
+    investedAssets: Number(netWorth.investedAssets || 0),
+    totalAssets: Number(netWorth.totalAssets || 0),
+    totalLiabilities: Number(netWorth.totalLiabilities || 0),
+    netWorth: Number(netWorth.netWorth || 0),
     emergencyFundMin,
     emergencyFundComfort,
     progressPercent,

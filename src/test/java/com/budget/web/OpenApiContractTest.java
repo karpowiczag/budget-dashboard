@@ -39,7 +39,9 @@ class OpenApiContractTest {
             Map.entry("settings", "getFireSettings"),
             Map.entry("saveSettings", "updateFireSettings"),
             Map.entry("netWorth", "getNetWorth"),
-            Map.entry("saveAccount", "updateNetWorthAccount")
+            Map.entry("saveAccount", "updateNetWorthAccount"),
+            Map.entry("saveLiability", "updateNetWorthLiability"),
+            Map.entry("deleteLiability", "deleteNetWorthLiability")
     );
     private static final Map<String, String> SUCCESS_SCHEMAS = Map.ofEntries(
             Map.entry("getSession", "SessionResponse"),
@@ -57,7 +59,9 @@ class OpenApiContractTest {
             Map.entry("getFireSettings", "FireSettings"),
             Map.entry("updateFireSettings", "FireSettings"),
             Map.entry("getNetWorth", "NetWorthResponse"),
-            Map.entry("updateNetWorthAccount", "NetWorthResponse")
+            Map.entry("updateNetWorthAccount", "NetWorthResponse"),
+            Map.entry("updateNetWorthLiability", "NetWorthResponse"),
+            Map.entry("deleteNetWorthLiability", "NetWorthResponse")
     );
 
     @Autowired

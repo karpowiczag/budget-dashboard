@@ -350,6 +350,49 @@ paths:
                 $ref: "#/components/schemas/NetWorthResponse"
         "400":
           $ref: "#/components/responses/Problem"
+  /api/v1/networth/liabilities/{key}:
+    put:
+      operationId: updateNetWorthLiability
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 190
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LiabilityUpsertRequest"
+      responses:
+        "200":
+          description: Net-worth overview after saving the liability.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetWorthResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteNetWorthLiability
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 190
+      responses:
+        "200":
+          description: Net-worth overview after removing the liability.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetWorthResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
 components:
   parameters:
     Year:
@@ -1797,13 +1840,27 @@ components:
           $ref: "#/components/schemas/Ratio"
     NetWorthResponse:
       type: object
-      required: [accounts, liquidTotal, emergencyFundMin, emergencyFundComfort, emergencyProgressComfort]
+      required: [accounts, liabilities, liquidTotal, investedAssets, totalAssets, totalLiabilities, netWorth, emergencyFundMin, emergencyFundComfort, emergencyProgressComfort]
       properties:
         accounts:
           type: array
           items:
             $ref: "#/components/schemas/NetWorthAccount"
+        liabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/Liability"
         liquidTotal:
+          $ref: "#/components/schemas/Money"
+        investedAssets:
+          description: Invested capital (MyFund portfolio value); zero when no portfolio data is loaded.
+          $ref: "#/components/schemas/Money"
+        totalAssets:
+          $ref: "#/components/schemas/Money"
+        totalLiabilities:
+          $ref: "#/components/schemas/Money"
+        netWorth:
+          description: totalAssets − totalLiabilities.
           $ref: "#/components/schemas/Money"
         emergencyFundMin:
           $ref: "#/components/schemas/Money"
@@ -1854,6 +1911,42 @@ components:
         anchorBalance:
           $ref: "#/components/schemas/Money"
         anchorDate:
+          type: string
+          format: date
+    Liability:
+      type: object
+      required: [liabilityKey, name, kind, currentPrincipal]
+      properties:
+        liabilityKey:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+        currentPrincipal:
+          $ref: "#/components/schemas/Money"
+        annualInterestRate:
+          $ref: "#/components/schemas/Ratio"
+        monthlyPayment:
+          $ref: "#/components/schemas/Money"
+        asOf:
+          type: string
+          format: date
+    LiabilityUpsertRequest:
+      type: object
+      required: [name, kind, currentPrincipal]
+      properties:
+        name:
+          type: string
+        kind:
+          type: string
+        currentPrincipal:
+          $ref: "#/components/schemas/Money"
+        annualInterestRate:
+          $ref: "#/components/schemas/Ratio"
+        monthlyPayment:
+          $ref: "#/components/schemas/Money"
+        asOf:
           type: string
           format: date
     ProblemDetail:

@@ -110,6 +110,26 @@ export async function saveNetWorthAccount(key, account) {
   return readJson(response, "Nie mogę zapisać konta");
 }
 
+export async function saveNetWorthLiability(key, liability) {
+  const response = await fetch(`/api/v1/networth/liabilities/${encodeURIComponent(key)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(liability),
+  });
+  return readJson(response, "Nie mogę zapisać zobowiązania");
+}
+
+export async function deleteNetWorthLiability(key) {
+  const response = await fetch(`/api/v1/networth/liabilities/${encodeURIComponent(key)}`, {
+    method: "DELETE",
+    headers: csrfHeaders(),
+  });
+  return readJson(response, "Nie mogę usunąć zobowiązania");
+}
+
 export async function uploadTransactions(file) {
   const body = new FormData();
   body.append("file", file);

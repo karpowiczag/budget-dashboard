@@ -405,7 +405,12 @@ public final class BudgetApiDtos {
 
     public record NetWorthResponse(
             List<NetWorthAccountResponse> accounts,
+            List<LiabilityResponse> liabilities,
             BigDecimal liquidTotal,
+            BigDecimal investedAssets,
+            BigDecimal totalAssets,
+            BigDecimal totalLiabilities,
+            BigDecimal netWorth,
             BigDecimal emergencyFundMin,
             BigDecimal emergencyFundComfort,
             BigDecimal emergencyProgressComfort
@@ -433,6 +438,27 @@ public final class BudgetApiDtos {
             boolean excludeFromNetWorth,
             BigDecimal anchorBalance,
             LocalDate anchorDate
+    ) {
+    }
+
+    public record LiabilityResponse(
+            String liabilityKey,
+            String name,
+            String kind,
+            BigDecimal currentPrincipal,
+            BigDecimal annualInterestRate,
+            BigDecimal monthlyPayment,
+            LocalDate asOf
+    ) {
+    }
+
+    public record LiabilityUpsertRequest(
+            String name,
+            String kind,
+            BigDecimal currentPrincipal,
+            BigDecimal annualInterestRate,
+            BigDecimal monthlyPayment,
+            LocalDate asOf
     ) {
     }
 

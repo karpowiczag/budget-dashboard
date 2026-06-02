@@ -9,6 +9,7 @@ import com.budget.application.reporting.BudgetReportStore;
 import com.budget.application.settings.BudgetSettings;
 import com.budget.application.settings.BudgetSettingsService;
 import com.budget.domain.networth.Account;
+import com.budget.domain.networth.Liability;
 import com.budget.domain.report.BudgetInput;
 import com.budget.domain.transaction.BankTransaction;
 import java.math.BigDecimal;
@@ -20,7 +21,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest(properties = {
         "app.database.url=jdbc:h2:mem:budget_networth;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
-        "app.security.oauth-enabled=false"
+        "app.security.oauth-enabled=false",
+        // Isolate from any real local MyFund reports so invested capital is deterministically zero.
+        "app.fire.reports-path=target/no-such-fire-reports"
 })
 class JdbcNetWorthRepositoryTest {
     @Autowired
@@ -72,5 +75,19 @@ class JdbcNetWorthRepositoryTest {
         // Emergency-fund comfort = coreMonthlyCost (123.45) * 8 months.
         assertThat(overview.emergencyFundComfort()).isEqualByComparingTo("987.60");
         assertThat(overview.emergencyProgressComfort()).isGreaterThan(BigDecimal.ZERO);
+
+        // Net worth = liquid + invested (0, no MyFund reportsPath in test) - liabilities.
+        assertThat(overview.investedAssets()).isEqualByComparingTo("0.00");
+        assertThat(overview.netWorth()).isEqualByComparingTo("10816.55");
+
+        store.saveLiability(new Liability("mortgage", "Hipoteka", "MORTGAGE",
+                new BigDecimal("4000.00"), new BigDecimal("0.072"), new BigDecimal("1500.00"), LocalDate.of(2099, 1, 1)));
+        var withDebt = service.overview();
+        assertThat(withDebt.liabilities()).hasSize(1);
+        assertThat(withDebt.totalLiabilities()).isEqualByComparingTo("4000.00");
+        assertThat(withDebt.netWorth()).isEqualByComparingTo("6816.55");
+
+        store.deleteLiability("mortgage");
+        assertThat(service.overview().liabilities()).isEmpty();
     }
 }

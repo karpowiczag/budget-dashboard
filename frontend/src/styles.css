@@ -4401,3 +4401,26 @@ footer {
   white-space: nowrap;
   font-size: 0.85rem;
 }
+.nwGhost {
+  margin-left: 0.4rem;
+  background: transparent;
+  border: 1px solid var(--border, #e2e8f0);
+  color: var(--text-muted, #64748b);
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+}
+.nwGhost:hover {
+  color: var(--text, #0f172a);
+}
+.nwNewLiability {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+.nwNewLiability input,
+.nwNewLiability select {
+  min-width: 8rem;
+}

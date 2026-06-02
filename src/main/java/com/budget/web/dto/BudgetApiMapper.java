@@ -12,6 +12,7 @@ import com.budget.application.reporting.YearSummary;
 import com.budget.application.settings.BudgetSettings;
 import com.budget.domain.importjob.ImportRun;
 import com.budget.domain.networth.Account;
+import com.budget.domain.networth.Liability;
 import com.budget.domain.report.BudgetSnapshot;
 import java.nio.file.Path;
 import java.util.List;
@@ -54,7 +55,12 @@ public class BudgetApiMapper {
     public BudgetApiDtos.NetWorthResponse toNetWorth(NetWorthOverview overview) {
         return new BudgetApiDtos.NetWorthResponse(
                 map(overview.accounts(), this::toNetWorthAccount),
+                map(overview.liabilities(), this::toLiability),
                 overview.liquidTotal(),
+                overview.investedAssets(),
+                overview.totalAssets(),
+                overview.totalLiabilities(),
+                overview.netWorth(),
                 overview.emergencyFundMin(),
                 overview.emergencyFundComfort(),
                 overview.emergencyProgressComfort()
@@ -85,6 +91,30 @@ public class BudgetApiMapper {
                 request.excludeFromNetWorth(),
                 request.anchorBalance(),
                 request.anchorDate()
+        );
+    }
+
+    public BudgetApiDtos.LiabilityResponse toLiability(Liability row) {
+        return new BudgetApiDtos.LiabilityResponse(
+                row.liabilityKey(),
+                row.name(),
+                row.kind(),
+                row.currentPrincipal(),
+                row.annualInterestRate(),
+                row.monthlyPayment(),
+                row.asOf()
+        );
+    }
+
+    public Liability toLiability(String liabilityKey, BudgetApiDtos.LiabilityUpsertRequest request) {
+        return new Liability(
+                liabilityKey,
+                request.name(),
+                request.kind(),
+                request.currentPrincipal(),
+                request.annualInterestRate(),
+                request.monthlyPayment(),
+                request.asOf()
         );
     }
 

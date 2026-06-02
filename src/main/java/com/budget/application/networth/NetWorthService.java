@@ -2,6 +2,7 @@ package com.budget.application.networth;
 
 import com.budget.application.reporting.BudgetReportStore;
 import com.budget.domain.networth.Account;
+import com.budget.domain.networth.Liability;
 import com.budget.domain.report.BudgetSnapshot;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -11,18 +12,22 @@ import java.util.LinkedHashSet;
 import org.springframework.stereotype.Service;
 
 /**
- * Derives liquid account balances from a per-account anchor plus transaction flows, and
- * reports emergency-fund coverage. Emergency-fund targets are reused from the latest
- * year's {@code SavingsPlan} (no new financial math).
+ * Derives liquid account balances from a per-account anchor plus transaction flows, folds
+ * in invested capital (MyFund portfolio) and liabilities, and reports the full net worth
+ * plus emergency-fund coverage. The two asset sources are disjoint — liquid bank balances
+ * come from imported transactions, invested capital is injected via {@link PortfolioValuePort}
+ * — so they never double-count.
  */
 @Service
 public class NetWorthService {
     private final NetWorthStore store;
     private final BudgetReportStore reports;
+    private final PortfolioValuePort portfolio;
 
-    public NetWorthService(NetWorthStore store, BudgetReportStore reports) {
+    public NetWorthService(NetWorthStore store, BudgetReportStore reports, PortfolioValuePort portfolio) {
         this.store = store;
         this.reports = reports;
+        this.portfolio = portfolio;
     }
 
     public NetWorthOverview overview() {
@@ -68,15 +73,44 @@ public class NetWorthService {
                     anchorBalance, anchorDate, netFlow, derived));
         }
         liquidTotal = money(liquidTotal);
+
+        var liabilities = store.liabilities();
+        var totalLiabilities = money(liabilities.stream()
+                .map(Liability::currentPrincipal)
+                .map(NetWorthService::nz)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        var invested = money(investedCapital());
+        var totalAssets = money(liquidTotal.add(invested));
+        var netWorth = money(totalAssets.subtract(totalLiabilities));
+
         var progress = efComfort.signum() > 0
                 ? liquidTotal.divide(efComfort, 4, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
-        return new NetWorthOverview(rows, liquidTotal, money(efMin), money(efComfort), progress);
+        return new NetWorthOverview(rows, liabilities, liquidTotal, invested, totalAssets,
+                totalLiabilities, netWorth, money(efMin), money(efComfort), progress);
     }
 
     public NetWorthOverview saveAccount(Account account) {
         store.saveAccount(account);
         return overview();
+    }
+
+    public NetWorthOverview saveLiability(Liability liability) {
+        store.saveLiability(liability);
+        return overview();
+    }
+
+    public NetWorthOverview deleteLiability(String liabilityKey) {
+        store.deleteLiability(liabilityKey);
+        return overview();
+    }
+
+    private BigDecimal investedCapital() {
+        try {
+            return nz(portfolio.currentPortfolioValue());
+        } catch (RuntimeException ignored) {
+            return BigDecimal.ZERO;
+        }
     }
 
     private static String guessKind(String accountKey) {
