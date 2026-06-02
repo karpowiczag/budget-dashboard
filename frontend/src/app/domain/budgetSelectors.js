@@ -62,21 +62,49 @@ const BUCKET_LIMIT_ALIASES = {
 };
 export const BUDGET_BUCKET_OPTIONS = ["Obowiązkowe stałe", "Obowiązkowe zmienne", "Do rozbicia", "Nieobowiązkowe", "Nieregularne", "Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu"];
 
-export function buildDashboardViews(isHistorical) {
-  return buildSidebarNavigation(isHistorical);
-}
 
+// Grouped, config-driven information architecture. Each top-level section maps
+// to one or more leaf views; sections with >1 view render an in-section sub-nav.
+// Import is a low-frequency utility, separated from the daily destinations.
 export function buildSidebarNavigation(isHistorical) {
   return [
-    { id: "control", label: "Kontrola", description: "Ten miesiąc" },
-    { id: "plan", label: isHistorical ? "Symulacja" : "Plan" },
-    { id: "reports", label: "Raporty" },
-    { id: "wealth", label: "Majątek" },
-    { id: "fire", label: "FIRE" },
-    { id: "obligations", label: "Zobowiązania" },
-    { id: "transactions", label: "Transakcje" },
-    { id: "import", label: "Import" },
+    { id: "overview", label: "Przegląd", description: "Start", views: [{ id: "overview", label: "Przegląd" }] },
+    {
+      id: "budget",
+      label: "Budżet",
+      description: "Limity i kontrola",
+      views: [
+        { id: "control", label: "Ten miesiąc" },
+        { id: "plan", label: isHistorical ? "Symulacja" : "Limity" },
+      ],
+    },
+    { id: "transactions", label: "Transakcje", description: "Księga", views: [{ id: "transactions", label: "Transakcje" }] },
+    {
+      id: "analysis",
+      label: "Analiza",
+      description: "Raporty i cykle",
+      views: [
+        { id: "reports", label: "Raporty" },
+        { id: "obligations", label: "Cykliczne" },
+      ],
+    },
+    {
+      id: "wealth",
+      label: "Majątek",
+      description: "Przepływy i FIRE",
+      views: [
+        { id: "wealth", label: "Przepływy" },
+        { id: "fire", label: "FIRE" },
+      ],
+    },
+    { id: "import", label: "Import", utility: true, views: [{ id: "import", label: "Import" }] },
   ];
+}
+
+// Flattened leaf-view -> section lookup helpers (used by the shell to resolve
+// the active section and its sub-nav from the current leaf view).
+export function sectionForView(sections, view) {
+  return (sections || []).find((section) => (section.views || []).some((entry) => entry.id === view)) || null;
 }
 
 export function selectLocalTimeScope({ calendarStats, time }) {
@@ -798,6 +826,9 @@ export function selectModuleHeader({
       cards: importHealth?.cards || [],
     },
   };
+  // Overview renders its own hero, so it has no module header (avoids a duplicate
+  // title). Unknown views still fall back to the control header.
+  if (view === "overview") return null;
   return headers[view] || headers.control;
 }
 

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildDashboardViews,
   buildSidebarNavigation,
   selectBudgetBurnDown,
   selectBuckets,
@@ -39,33 +38,26 @@ import {
   selectWealthDashboard,
 } from "./budgetSelectors.js";
 
-describe("buildDashboardViews", () => {
-  it("builds the sidebar order around current month control and removes the old summary tab", () => {
-    expect(buildDashboardViews(false).map((view) => view.id)).toEqual([
-      "control",
-      "plan",
-      "reports",
-      "wealth",
-      "fire",
-      "obligations",
-      "transactions",
-      "import",
-    ]);
+describe("sidebar navigation IA", () => {
+  it("groups leaf views into top-level sections with Import as a utility", () => {
     expect(buildSidebarNavigation(false).map((view) => view.label)).toEqual([
-      "Kontrola",
-      "Plan",
-      "Raporty",
-      "Majątek",
-      "FIRE",
-      "Zobowiązania",
+      "Przegląd",
+      "Budżet",
       "Transakcje",
+      "Analiza",
+      "Majątek",
       "Import",
     ]);
-    expect(buildDashboardViews(false).map((view) => view.label)).not.toContain("Podsumowanie");
+    // Budget merges control+plan; analysis merges reports+recurring; wealth merges flows+FIRE.
+    expect(buildSidebarNavigation(false).find((s) => s.id === "budget").views.map((v) => v.id)).toEqual(["control", "plan"]);
+    expect(buildSidebarNavigation(false).find((s) => s.id === "analysis").views.map((v) => v.id)).toEqual(["reports", "obligations"]);
+    expect(buildSidebarNavigation(false).find((s) => s.id === "wealth").views.map((v) => v.id)).toEqual(["wealth", "fire"]);
+    expect(buildSidebarNavigation(false).find((s) => s.id === "import").utility).toBe(true);
   });
 
-  it("labels a closed year plan as a simulation", () => {
-    expect(buildDashboardViews(true).find((view) => view.id === "plan")).toMatchObject({ label: "Symulacja" });
+  it("labels a closed year's plan sub-view as a simulation", () => {
+    const budget = buildSidebarNavigation(true).find((s) => s.id === "budget");
+    expect(budget.views.find((v) => v.id === "plan")).toMatchObject({ label: "Symulacja" });
   });
 });
 

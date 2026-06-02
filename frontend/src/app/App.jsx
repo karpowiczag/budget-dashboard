@@ -13,10 +13,11 @@ import { useBudgetData } from "./hooks/useBudgetData.js";
 import { useDashboardModel } from "./hooks/useDashboardModel.js";
 import { applyTheme, getInitialTheme } from "./theme.js";
 import { Moon, Sun } from "lucide-react";
-import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel } from "./domain/budgetSelectors.js";
+import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel, sectionForView } from "./domain/budgetSelectors.js";
 import { ImportView } from "./views/ImportView.jsx";
 import { FireView } from "./views/FireView.jsx";
 import { MonthControlView } from "./views/MonthControlView.jsx";
+import { OverviewView } from "./views/OverviewView.jsx";
 import { RecurringView } from "./views/RecurringView.jsx";
 import { ReportsView } from "./views/ReportsView.jsx";
 import { SavingsPlanView } from "./views/SavingsPlanView.jsx";
@@ -50,7 +51,7 @@ export default function App() {
   const [categoryBucketOverrides, setCategoryBucketOverrides] = useState({});
   const [settingsDraft, setSettingsDraft] = useState(null);
   const [fireSettingsStatus, setFireSettingsStatus] = useState(null);
-  const [view, setView] = useState("control");
+  const [view, setView] = useState("overview");
   const [theme, setTheme] = useState(getInitialTheme);
   const [localTimes, setLocalTimes] = useState({
     control: { scope: "month", month: "", day: "", drillFilter: null },
@@ -392,6 +393,8 @@ export default function App() {
     }
   }
 
+  const activeSection = sectionForView(model.views, view);
+
   return (
     <AppShell
       sidebar={
@@ -408,7 +411,34 @@ export default function App() {
         />
       }
     >
+      {activeSection && activeSection.views.length > 1 && (
+        <nav className="sectionSubnav" aria-label={activeSection.label}>
+          <div className="segmented compact">
+            {activeSection.views.map((entry) => (
+              <button
+                type="button"
+                key={entry.id}
+                className={view === entry.id ? "active" : ""}
+                onClick={() => setView(entry.id)}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
+
       <ModuleHeader header={model.moduleHeader} action={moduleTimeControl(view, model, localTimes, updateLocalTime, clearLocalDrill)} />
+
+      {view === "overview" && (
+        <OverviewView
+          data={data}
+          financialFlows={model.financialFlows}
+          fireSummary={fireQuery.data || model.fireSummary}
+          onNavigate={setView}
+          onInspect={openTransactionInspector}
+        />
+      )}
 
       {view === "control" && (
         <MonthControlView
