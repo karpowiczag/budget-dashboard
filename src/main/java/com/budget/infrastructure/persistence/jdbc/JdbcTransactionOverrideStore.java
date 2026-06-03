@@ -67,7 +67,7 @@ public class JdbcTransactionOverrideStore implements TransactionOverrideStore {
         invalidate();
     }
 
-    void invalidate() {
+    public void invalidate() {
         snapshot = null;
     }
 

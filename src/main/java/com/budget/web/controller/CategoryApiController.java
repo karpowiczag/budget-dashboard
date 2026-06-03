@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -39,6 +40,12 @@ public class CategoryApiController {
     @PutMapping("/{id}")
     BudgetApiDtos.CategoriesResponse updateCategory(@PathVariable String id, @RequestBody BudgetApiDtos.CategoryUpsertRequest request) {
         service.saveCategory(mapper.toCategory(id, request));
+        return current();
+    }
+
+    @DeleteMapping("/{id}")
+    BudgetApiDtos.CategoriesResponse deleteCategory(@PathVariable String id, @RequestParam(required = false) String reassignTo) {
+        service.delete(id, reassignTo);
         return current();
     }
 

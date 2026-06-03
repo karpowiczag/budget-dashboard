@@ -1,6 +1,7 @@
 package com.budget.web.controller;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -169,6 +170,39 @@ class CategoryApiControllerTest {
         mockMvc.perform(put("/api/v1/categories/rules/new")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"pattern\":\"COKOLWIEK\",\"categoryId\":\"nieistniejaca\",\"priority\":100,\"enabled\":true}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deletesAUserCategoryWithReassignmentToAnotherCategory() throws Exception {
+        mockMvc.perform(put("/api/v1/categories/dousuniecia")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(groceriesBody("Do usunięcia", "Obowiązkowe zmienne", false)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/v1/categories/dousuniecia").param("reassignTo", "groceries"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categories[?(@.categoryId=='dousuniecia')]").isEmpty());
+    }
+
+    @Test
+    void rejectsDeletingABuiltinCategory() throws Exception {
+        mockMvc.perform(delete("/api/v1/categories/savingsAccount").param("reassignTo", "groceries"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsDeleteWithoutOrWithSelfReassignTarget() throws Exception {
+        mockMvc.perform(put("/api/v1/categories/dousuniecia2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(groceriesBody("Do usunięcia 2", "Obowiązkowe zmienne", false)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/v1/categories/dousuniecia2"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(delete("/api/v1/categories/dousuniecia2").param("reassignTo", "dousuniecia2"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(delete("/api/v1/categories/dousuniecia2").param("reassignTo", "nieistniejaca"))
                 .andExpect(status().isBadRequest());
     }
 }

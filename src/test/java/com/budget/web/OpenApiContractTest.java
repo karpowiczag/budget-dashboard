@@ -51,6 +51,7 @@ class OpenApiContractTest {
             Map.entry("listCategories", "listCategories"),
             Map.entry("updateCategory", "updateCategory"),
             Map.entry("updateCategoryGroup", "updateCategoryGroup"),
+            Map.entry("deleteCategory", "deleteCategory"),
             Map.entry("reorderCategories", "reorderCategories"),
             Map.entry("updateCategoryRule", "updateCategoryRule"),
             Map.entry("deleteCategoryRule", "deleteCategoryRule")
@@ -81,6 +82,7 @@ class OpenApiContractTest {
             Map.entry("listCategories", "CategoriesResponse"),
             Map.entry("updateCategory", "CategoriesResponse"),
             Map.entry("updateCategoryGroup", "CategoriesResponse"),
+            Map.entry("deleteCategory", "CategoriesResponse"),
             Map.entry("reorderCategories", "CategoriesResponse"),
             Map.entry("updateCategoryRule", "CategoriesResponse"),
             Map.entry("deleteCategoryRule", "CategoriesResponse")

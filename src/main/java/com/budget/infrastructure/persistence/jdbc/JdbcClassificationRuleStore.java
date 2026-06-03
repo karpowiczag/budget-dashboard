@@ -124,7 +124,7 @@ public class JdbcClassificationRuleStore implements ClassificationRuleStore, Cla
     }
 
     /** Drop the cached snapshot; the next read rebuilds (and recompiles) it from the DB. */
-    void invalidate() {
+    public void invalidate() {
         snapshot = null;
     }
 

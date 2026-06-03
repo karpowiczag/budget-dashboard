@@ -31,10 +31,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class JdbcCategoryCatalog implements CategoryCatalog, CategoryStore {
     private final NamedParameterJdbcTemplate jdbc;
+    private final JdbcClassificationRuleStore ruleStore;
+    private final JdbcTransactionOverrideStore overrideStore;
     private volatile Snapshot snapshot;
 
-    public JdbcCategoryCatalog(NamedParameterJdbcTemplate jdbc) {
+    public JdbcCategoryCatalog(NamedParameterJdbcTemplate jdbc, JdbcClassificationRuleStore ruleStore, JdbcTransactionOverrideStore overrideStore) {
         this.jdbc = jdbc;
+        this.ruleStore = ruleStore;
+        this.overrideStore = overrideStore;
     }
 
     @Override
@@ -238,6 +242,29 @@ public class JdbcCategoryCatalog implements CategoryCatalog, CategoryStore {
                         .addValue("updatedAt", OffsetDateTime.now())
                         .addValue("categoryId", categoryId));
         invalidate();
+    }
+
+    @Override
+    @Transactional
+    public List<Integer> delete(String categoryId, String reassignToId) {
+        // Capture affected years BEFORE the re-point so the caller can re-analyze them.
+        var years = jdbc.queryForList("SELECT DISTINCT report_year FROM budget_transactions WHERE category_id = :source",
+                new MapSqlParameterSource("source", categoryId), Integer.class);
+        var params = new MapSqlParameterSource()
+                .addValue("source", categoryId)
+                .addValue("target", reassignToId)
+                .addValue("now", OffsetDateTime.now());
+        // Rules MUST be re-pointed before the category is deleted (classification_rule.category_id FK).
+        jdbc.update("UPDATE classification_rule SET category_id = :target, updated_at = :now WHERE category_id = :source", params);
+        jdbc.update("UPDATE budget_transactions SET category_id = :target WHERE category_id = :source", params);
+        jdbc.update("UPDATE transaction_override SET category_id = :target, updated_at = :now WHERE category_id = :source", params);
+        jdbc.update("DELETE FROM category WHERE category_id = :source", params);
+        // Invalidate all three read snapshots — the rule and override caches would otherwise keep
+        // serving the deleted id on the next classify/reanalyze.
+        invalidate();
+        ruleStore.invalidate();
+        overrideStore.invalidate();
+        return years;
     }
 
     @Override

@@ -1,10 +1,12 @@
 package com.budget.application.categorization;
 
+import com.budget.application.importing.BudgetImportService;
 import com.budget.domain.category.Category;
 import com.budget.domain.category.CategoryGroup;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 
 /**
@@ -20,11 +22,19 @@ public class CategoryCatalogService {
     private static final Set<String> VALID_BUCKETS = distinct(BudgetTaxonomy.CategoryDefinition::budgetBucketLabel);
     private static final Set<String> VALID_FIXEDNESS = distinct(BudgetTaxonomy.CategoryDefinition::fixedness);
     private static final Set<String> VALID_FLOWS = distinct(BudgetTaxonomy.CategoryDefinition::flowType);
+    // Hardcoded floor of ids that hardcoded matchers/analysis reproduce on rebuild — undeletable even
+    // if the builtin column were somehow wrong. The builtin flag is the primary guard.
+    private static final Set<String> STRUCTURAL_FLOOR = Stream.concat(
+            BudgetTaxonomy.wealthCategoryIds().stream(),
+            Stream.of(BudgetTaxonomy.CATEGORY_UNKNOWN, BudgetTaxonomy.CATEGORY_MARKETPLACE)
+    ).collect(Collectors.toUnmodifiableSet());
 
     private final CategoryStore store;
+    private final BudgetImportService importService;
 
-    public CategoryCatalogService(CategoryStore store) {
+    public CategoryCatalogService(CategoryStore store, BudgetImportService importService) {
         this.store = store;
+        this.importService = importService;
     }
 
     public List<CategoryGroup> groups() {
@@ -67,6 +77,41 @@ public class CategoryCatalogService {
 
     public void archive(String categoryId) {
         store.archive(categoryId);
+    }
+
+    /**
+     * Hard-delete a user category, reassigning its rules/transactions/overrides onto {@code reassignToId}
+     * (merge). Built-in / structurally-required categories are rejected (archive them instead). After the
+     * cascade commits, the affected report years are re-analyzed so dashboards reflect the merge.
+     */
+    public void delete(String categoryId, String reassignToId) {
+        if (categoryId == null || categoryId.isBlank()) {
+            throw new IllegalArgumentException("Category id is required");
+        }
+        var source = store.categories().stream()
+                .filter(category -> category.categoryId().equals(categoryId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown category: " + categoryId));
+        if (source.builtin() || STRUCTURAL_FLOOR.contains(categoryId)) {
+            throw new IllegalArgumentException("Kategoria jest wymagana przez system; zarchiwizuj ją zamiast usuwać");
+        }
+        if (reassignToId == null || reassignToId.isBlank()) {
+            throw new IllegalArgumentException("Reassignment target is required to delete a category");
+        }
+        if (reassignToId.equals(categoryId)) {
+            throw new IllegalArgumentException("Reassignment target must differ from the deleted category");
+        }
+        var target = store.categories().stream()
+                .filter(category -> category.categoryId().equals(reassignToId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown reassignment target: " + reassignToId));
+        if (target.archived()) {
+            throw new IllegalArgumentException("Reassignment target is archived");
+        }
+        var affectedYears = store.delete(categoryId, reassignToId);
+        for (var year : affectedYears) {
+            importService.reanalyzeYear(year);
+        }
     }
 
     public void reorder(List<String> groupIdsInOrder, List<String> categoryIdsInOrder) {
