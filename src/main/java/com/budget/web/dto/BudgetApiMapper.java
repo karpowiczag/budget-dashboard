@@ -204,7 +204,8 @@ public class BudgetApiMapper {
                 category.protectedFlag(),
                 category.sinkingFundEligible(),
                 category.archived(),
-                category.sortOrder()
+                category.sortOrder(),
+                category.builtin()
         );
     }
 
@@ -225,7 +226,9 @@ public class BudgetApiMapper {
                 request.protectedFlag(),
                 request.sinkingFundEligible(),
                 request.archived(),
-                request.sortOrder()
+                request.sortOrder(),
+                // builtin is system-determined: false for user upserts; preserved on update.
+                false
         );
     }
 

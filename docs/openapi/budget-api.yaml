@@ -2325,6 +2325,8 @@ components:
           type: boolean
         sortOrder:
           type: integer
+        builtin:
+          type: boolean
     CategoryUpsertRequest:
       type: object
       required: [label, area, budgetBucket, fixedness, flowType]

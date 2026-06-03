@@ -115,11 +115,11 @@ public class JdbcCategoryCatalog implements CategoryCatalog, CategoryStore {
                     INSERT INTO category (
                         category_id, label, area, analytics_group, group_id, budget_bucket_label,
                         fixedness, flow_type, discretionary, excluded, real_income,
-                        daily_paced, protected_flag, sinking_fund_eligible, sort_order, archived, updated_at
+                        daily_paced, protected_flag, sinking_fund_eligible, sort_order, archived, builtin, updated_at
                     ) VALUES (
                         :categoryId, :label, :area, :analyticsGroup, :groupId, :budgetBucketLabel,
                         :fixedness, :flowType, :discretionary, :excluded, :realIncome,
-                        :dailyPaced, :protectedFlag, :sinkingFundEligible, :sortOrder, :archived, :updatedAt
+                        :dailyPaced, :protectedFlag, :sinkingFundEligible, :sortOrder, :archived, TRUE, :updatedAt
                     )
                     """, new MapSqlParameterSource()
                     .addValue("categoryId", definition.id())
@@ -179,7 +179,11 @@ public class JdbcCategoryCatalog implements CategoryCatalog, CategoryStore {
                 .addValue("sinkingFundEligible", category.sinkingFundEligible())
                 .addValue("sortOrder", category.sortOrder())
                 .addValue("archived", category.archived())
+                .addValue("builtin", category.builtin())
                 .addValue("updatedAt", OffsetDateTime.now());
+        // The UPDATE deliberately omits `builtin`: it is system-determined (seed/create time) and
+        // never changed by an edit, so editing a built-in category can't accidentally make it
+        // deletable.
         var updated = jdbc.update("""
                 UPDATE category SET
                     label = :label, area = :area, analytics_group = :analyticsGroup, group_id = :groupId,
@@ -195,11 +199,11 @@ public class JdbcCategoryCatalog implements CategoryCatalog, CategoryStore {
                     INSERT INTO category (
                         category_id, label, area, analytics_group, group_id, budget_bucket_label,
                         fixedness, flow_type, discretionary, excluded, real_income,
-                        daily_paced, protected_flag, sinking_fund_eligible, sort_order, archived, updated_at
+                        daily_paced, protected_flag, sinking_fund_eligible, sort_order, archived, builtin, updated_at
                     ) VALUES (
                         :categoryId, :label, :area, :analyticsGroup, :groupId, :budgetBucketLabel,
                         :fixedness, :flowType, :discretionary, :excluded, :realIncome,
-                        :dailyPaced, :protectedFlag, :sinkingFundEligible, :sortOrder, :archived, :updatedAt
+                        :dailyPaced, :protectedFlag, :sinkingFundEligible, :sortOrder, :archived, :builtin, :updatedAt
                     )
                     """, params);
         }
@@ -271,7 +275,8 @@ public class JdbcCategoryCatalog implements CategoryCatalog, CategoryStore {
                 rs.getBoolean("protected_flag"),
                 rs.getBoolean("sinking_fund_eligible"),
                 rs.getBoolean("archived"),
-                rs.getInt("sort_order"));
+                rs.getInt("sort_order"),
+                rs.getBoolean("builtin"));
     }
 
     /** Drop the cached snapshot; the next read rebuilds it from the DB. */

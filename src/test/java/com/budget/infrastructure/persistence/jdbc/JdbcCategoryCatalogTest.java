@@ -89,6 +89,13 @@ class JdbcCategoryCatalogTest {
     }
 
     @Test
+    void seedsBuiltinFlagTrueForEverySeededCategory() {
+        var total = jdbc.queryForObject("SELECT COUNT(*) FROM category", new MapSqlParameterSource(), Integer.class);
+        var builtin = jdbc.queryForObject("SELECT COUNT(*) FROM category WHERE builtin = TRUE", new MapSqlParameterSource(), Integer.class);
+        assertThat(builtin).isEqualTo(total);
+    }
+
+    @Test
     void seedIsIdempotent() {
         var before = jdbc.queryForObject("SELECT COUNT(*) FROM category", new MapSqlParameterSource(), Integer.class);
         jdbcCatalog.seedIfEmpty(

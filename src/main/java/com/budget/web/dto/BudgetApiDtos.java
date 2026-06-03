@@ -551,7 +551,8 @@ public final class BudgetApiDtos {
             boolean protectedFlag,
             boolean sinkingFundEligible,
             boolean archived,
-            int sortOrder
+            int sortOrder,
+            boolean builtin
     ) {
     }
 

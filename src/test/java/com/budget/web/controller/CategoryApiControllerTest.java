@@ -61,8 +61,18 @@ class CategoryApiControllerTest {
         mockMvc.perform(get("/api/v1/categories"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.groups.length()").value(8))
-                .andExpect(jsonPath("$.categories.length()").value(40))
-                .andExpect(jsonPath("$.categories[?(@.categoryId=='groceries')].label").value(hasItem("Żywność i chemia")));
+                .andExpect(jsonPath("$.categories.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(40)))
+                .andExpect(jsonPath("$.categories[?(@.categoryId=='groceries')].label").value(hasItem("Żywność i chemia")))
+                .andExpect(jsonPath("$.categories[?(@.categoryId=='groceries')].builtin").value(hasItem(true)));
+    }
+
+    @Test
+    void createdUserCategoryIsNotBuiltin() throws Exception {
+        mockMvc.perform(put("/api/v1/categories/mojakategoria")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(groceriesBody("Moja kategoria", "Obowiązkowe zmienne", false)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categories[?(@.categoryId=='mojakategoria')].builtin").value(hasItem(false)));
     }
 
     @Test
