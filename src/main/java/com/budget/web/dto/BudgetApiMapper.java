@@ -10,6 +10,8 @@ import com.budget.application.reporting.TransactionPage;
 import com.budget.application.reporting.TransactionRecord;
 import com.budget.application.reporting.YearSummary;
 import com.budget.application.settings.BudgetSettings;
+import com.budget.domain.category.Category;
+import com.budget.domain.category.CategoryGroup;
 import com.budget.domain.goal.Goal;
 import com.budget.domain.importjob.ImportRun;
 import com.budget.domain.networth.Account;
@@ -146,6 +148,63 @@ public class BudgetApiMapper {
                 request.targetDate(),
                 request.note()
         );
+    }
+
+    public BudgetApiDtos.CategoriesResponse toCategories(List<CategoryGroup> groups, List<Category> categories) {
+        return new BudgetApiDtos.CategoriesResponse(
+                groups.stream().map(this::toCategoryGroup).toList(),
+                categories.stream().map(this::toCategoryResponse).toList()
+        );
+    }
+
+    public BudgetApiDtos.CategoryGroupResponse toCategoryGroup(CategoryGroup group) {
+        return new BudgetApiDtos.CategoryGroupResponse(group.groupId(), group.label(), group.sortOrder());
+    }
+
+    public BudgetApiDtos.CategoryResponse toCategoryResponse(Category category) {
+        return new BudgetApiDtos.CategoryResponse(
+                category.categoryId(),
+                category.label(),
+                category.area(),
+                category.analyticsGroup(),
+                category.groupId(),
+                category.budgetBucket(),
+                category.fixedness(),
+                category.flowType(),
+                category.discretionary(),
+                category.excluded(),
+                category.realIncome(),
+                category.dailyPaced(),
+                category.protectedFlag(),
+                category.sinkingFundEligible(),
+                category.archived(),
+                category.sortOrder()
+        );
+    }
+
+    public Category toCategory(String categoryId, BudgetApiDtos.CategoryUpsertRequest request) {
+        return new Category(
+                categoryId,
+                request.label(),
+                request.area(),
+                request.analyticsGroup(),
+                request.groupId(),
+                request.budgetBucket(),
+                request.fixedness(),
+                request.flowType(),
+                request.discretionary(),
+                request.excluded(),
+                request.realIncome(),
+                request.dailyPaced(),
+                request.protectedFlag(),
+                request.sinkingFundEligible(),
+                request.archived(),
+                request.sortOrder()
+        );
+    }
+
+    public CategoryGroup toCategoryGroup(String groupId, BudgetApiDtos.CategoryGroupUpsertRequest request) {
+        return new CategoryGroup(groupId, request.label(), request.sortOrder());
     }
 
     public BudgetApiDtos.CalendarResponse toCalendar(CalendarReport report) {

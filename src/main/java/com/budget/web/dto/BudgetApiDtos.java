@@ -490,6 +490,70 @@ public final class BudgetApiDtos {
     ) {
     }
 
+    public record CategoriesResponse(
+            List<CategoryGroupResponse> groups,
+            List<CategoryResponse> categories
+    ) {
+    }
+
+    public record CategoryGroupResponse(
+            String groupId,
+            String label,
+            int sortOrder
+    ) {
+    }
+
+    public record CategoryResponse(
+            String categoryId,
+            String label,
+            String area,
+            String analyticsGroup,
+            String groupId,
+            String budgetBucket,
+            String fixedness,
+            String flowType,
+            boolean discretionary,
+            boolean excluded,
+            boolean realIncome,
+            boolean dailyPaced,
+            boolean protectedFlag,
+            boolean sinkingFundEligible,
+            boolean archived,
+            int sortOrder
+    ) {
+    }
+
+    public record CategoryUpsertRequest(
+            String label,
+            String area,
+            String analyticsGroup,
+            String groupId,
+            String budgetBucket,
+            String fixedness,
+            String flowType,
+            boolean discretionary,
+            boolean excluded,
+            boolean realIncome,
+            boolean dailyPaced,
+            boolean protectedFlag,
+            boolean sinkingFundEligible,
+            boolean archived,
+            int sortOrder
+    ) {
+    }
+
+    public record CategoryGroupUpsertRequest(
+            String label,
+            int sortOrder
+    ) {
+    }
+
+    public record CategoryReorderRequest(
+            List<String> groupIds,
+            List<String> categoryIds
+    ) {
+    }
+
     public record FireSummaryResponse(
             LocalDate asOf,
             boolean reportsLoaded,

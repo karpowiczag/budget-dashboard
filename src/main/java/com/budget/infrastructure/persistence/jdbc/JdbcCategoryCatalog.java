@@ -2,12 +2,16 @@ package com.budget.infrastructure.persistence.jdbc;
 
 import com.budget.application.categorization.BudgetTaxonomy;
 import com.budget.application.categorization.CategoryCatalog;
+import com.budget.application.categorization.CategoryStore;
+import com.budget.domain.category.Category;
+import com.budget.domain.category.CategoryGroup;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -25,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
  * identical until a user edits the catalog (pinned by {@code JdbcCategoryCatalogTest}).
  */
 @Repository
-public class JdbcCategoryCatalog implements CategoryCatalog {
+public class JdbcCategoryCatalog implements CategoryCatalog, CategoryStore {
     private final NamedParameterJdbcTemplate jdbc;
     private volatile Snapshot snapshot;
 
@@ -137,6 +141,124 @@ public class JdbcCategoryCatalog implements CategoryCatalog {
                     .addValue("updatedAt", now));
         }
         invalidate();
+    }
+
+    // --- CategoryStore (Phase 3b CRUD). Every write invalidates the read snapshot so the
+    // classifier hot path never serves stale categories. ---
+
+    @Override
+    public List<CategoryGroup> groups() {
+        return jdbc.query("SELECT * FROM category_group ORDER BY sort_order, label", new MapSqlParameterSource(),
+                (rs, rowNum) -> new CategoryGroup(rs.getString("group_id"), rs.getString("label"), rs.getInt("sort_order")));
+    }
+
+    @Override
+    public List<Category> categories() {
+        return jdbc.query("SELECT * FROM category ORDER BY sort_order, label", new MapSqlParameterSource(), this::mapCategory);
+    }
+
+    @Override
+    @Transactional
+    public void saveCategory(Category category) {
+        jdbc.update("DELETE FROM category WHERE category_id = :categoryId",
+                new MapSqlParameterSource("categoryId", category.categoryId()));
+        jdbc.update("""
+                INSERT INTO category (
+                    category_id, label, area, analytics_group, group_id, budget_bucket_label,
+                    fixedness, flow_type, discretionary, excluded, real_income,
+                    daily_paced, protected_flag, sinking_fund_eligible, sort_order, archived, updated_at
+                ) VALUES (
+                    :categoryId, :label, :area, :analyticsGroup, :groupId, :budgetBucketLabel,
+                    :fixedness, :flowType, :discretionary, :excluded, :realIncome,
+                    :dailyPaced, :protectedFlag, :sinkingFundEligible, :sortOrder, :archived, :updatedAt
+                )
+                """, new MapSqlParameterSource()
+                .addValue("categoryId", category.categoryId())
+                .addValue("label", category.label())
+                .addValue("area", category.area())
+                .addValue("analyticsGroup", category.analyticsGroup())
+                .addValue("groupId", category.groupId())
+                .addValue("budgetBucketLabel", category.budgetBucket())
+                .addValue("fixedness", category.fixedness())
+                .addValue("flowType", category.flowType())
+                .addValue("discretionary", category.discretionary())
+                .addValue("excluded", category.excluded())
+                .addValue("realIncome", category.realIncome())
+                .addValue("dailyPaced", category.dailyPaced())
+                .addValue("protectedFlag", category.protectedFlag())
+                .addValue("sinkingFundEligible", category.sinkingFundEligible())
+                .addValue("sortOrder", category.sortOrder())
+                .addValue("archived", category.archived())
+                .addValue("updatedAt", OffsetDateTime.now()));
+        invalidate();
+    }
+
+    @Override
+    @Transactional
+    public void saveGroup(CategoryGroup group) {
+        // Update-or-insert (not delete+insert): categories reference group_id via a foreign key, so
+        // a rename must preserve the existing row.
+        var updated = jdbc.update("UPDATE category_group SET label = :label, sort_order = :sortOrder WHERE group_id = :groupId",
+                new MapSqlParameterSource()
+                        .addValue("label", group.label())
+                        .addValue("sortOrder", group.sortOrder())
+                        .addValue("groupId", group.groupId()));
+        if (updated == 0) {
+            jdbc.update("INSERT INTO category_group (group_id, label, sort_order) VALUES (:groupId, :label, :sortOrder)",
+                    new MapSqlParameterSource()
+                            .addValue("groupId", group.groupId())
+                            .addValue("label", group.label())
+                            .addValue("sortOrder", group.sortOrder()));
+        }
+        invalidate();
+    }
+
+    @Override
+    @Transactional
+    public void archive(String categoryId) {
+        jdbc.update("UPDATE category SET archived = TRUE, updated_at = :updatedAt WHERE category_id = :categoryId",
+                new MapSqlParameterSource()
+                        .addValue("updatedAt", OffsetDateTime.now())
+                        .addValue("categoryId", categoryId));
+        invalidate();
+    }
+
+    @Override
+    @Transactional
+    public void reorder(List<String> groupIdsInOrder, List<String> categoryIdsInOrder) {
+        for (var i = 0; i < groupIdsInOrder.size(); i++) {
+            jdbc.update("UPDATE category_group SET sort_order = :sortOrder WHERE group_id = :groupId",
+                    new MapSqlParameterSource().addValue("sortOrder", i).addValue("groupId", groupIdsInOrder.get(i)));
+        }
+        var now = OffsetDateTime.now();
+        for (var i = 0; i < categoryIdsInOrder.size(); i++) {
+            jdbc.update("UPDATE category SET sort_order = :sortOrder, updated_at = :updatedAt WHERE category_id = :categoryId",
+                    new MapSqlParameterSource()
+                            .addValue("sortOrder", i)
+                            .addValue("updatedAt", now)
+                            .addValue("categoryId", categoryIdsInOrder.get(i)));
+        }
+        invalidate();
+    }
+
+    private Category mapCategory(ResultSet rs, int rowNum) throws SQLException {
+        return new Category(
+                rs.getString("category_id"),
+                rs.getString("label"),
+                rs.getString("area"),
+                rs.getString("analytics_group"),
+                rs.getString("group_id"),
+                rs.getString("budget_bucket_label"),
+                rs.getString("fixedness"),
+                rs.getString("flow_type"),
+                rs.getBoolean("discretionary"),
+                rs.getBoolean("excluded"),
+                rs.getBoolean("real_income"),
+                rs.getBoolean("daily_paced"),
+                rs.getBoolean("protected_flag"),
+                rs.getBoolean("sinking_fund_eligible"),
+                rs.getBoolean("archived"),
+                rs.getInt("sort_order"));
     }
 
     /** Drop the cached snapshot; the next read rebuilds it from the DB. */

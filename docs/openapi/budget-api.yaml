@@ -454,6 +454,86 @@ paths:
                   $ref: "#/components/schemas/Goal"
         "400":
           $ref: "#/components/responses/Problem"
+  /api/v1/categories:
+    get:
+      operationId: listCategories
+      responses:
+        "200":
+          description: User-owned categories and groups.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/categories/{id}:
+    put:
+      operationId: updateCategory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 80
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryUpsertRequest"
+      responses:
+        "200":
+          description: Categories after saving.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/categories/groups/{id}:
+    put:
+      operationId: updateCategoryGroup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryGroupUpsertRequest"
+      responses:
+        "200":
+          description: Categories after renaming a group.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/categories/reorder:
+    post:
+      operationId: reorderCategories
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryReorderRequest"
+      responses:
+        "200":
+          description: Categories after reordering.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
 components:
   parameters:
     Year:
@@ -2082,6 +2162,117 @@ components:
           format: date
         note:
           type: string
+    CategoriesResponse:
+      type: object
+      required: [groups, categories]
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryGroup"
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+    CategoryGroup:
+      type: object
+      required: [groupId, label, sortOrder]
+      properties:
+        groupId:
+          type: string
+        label:
+          type: string
+        sortOrder:
+          type: integer
+    Category:
+      type: object
+      required: [categoryId, label, area, analyticsGroup, budgetBucket, fixedness, flowType, discretionary, excluded, realIncome, dailyPaced, protectedFlag, sinkingFundEligible, archived, sortOrder]
+      properties:
+        categoryId:
+          type: string
+        label:
+          type: string
+        area:
+          type: string
+        analyticsGroup:
+          type: string
+        groupId:
+          type: string
+        budgetBucket:
+          type: string
+        fixedness:
+          type: string
+        flowType:
+          type: string
+        discretionary:
+          type: boolean
+        excluded:
+          type: boolean
+        realIncome:
+          type: boolean
+        dailyPaced:
+          type: boolean
+        protectedFlag:
+          type: boolean
+        sinkingFundEligible:
+          type: boolean
+        archived:
+          type: boolean
+        sortOrder:
+          type: integer
+    CategoryUpsertRequest:
+      type: object
+      required: [label, area, budgetBucket, fixedness, flowType]
+      properties:
+        label:
+          type: string
+        area:
+          type: string
+        analyticsGroup:
+          type: string
+        groupId:
+          type: string
+        budgetBucket:
+          type: string
+        fixedness:
+          type: string
+        flowType:
+          type: string
+        discretionary:
+          type: boolean
+        excluded:
+          type: boolean
+        realIncome:
+          type: boolean
+        dailyPaced:
+          type: boolean
+        protectedFlag:
+          type: boolean
+        sinkingFundEligible:
+          type: boolean
+        archived:
+          type: boolean
+        sortOrder:
+          type: integer
+    CategoryGroupUpsertRequest:
+      type: object
+      required: [label]
+      properties:
+        label:
+          type: string
+        sortOrder:
+          type: integer
+    CategoryReorderRequest:
+      type: object
+      properties:
+        groupIds:
+          type: array
+          items:
+            type: string
+        categoryIds:
+          type: array
+          items:
+            type: string
     ProblemDetail:
       type: object
       properties:

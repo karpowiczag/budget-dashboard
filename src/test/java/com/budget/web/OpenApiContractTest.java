@@ -3,6 +3,7 @@ package com.budget.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.budget.web.controller.BudgetApiController;
+import com.budget.web.controller.CategoryApiController;
 import com.budget.web.controller.FireApiController;
 import com.budget.web.controller.GoalApiController;
 import com.budget.web.controller.NetWorthApiController;
@@ -45,7 +46,11 @@ class OpenApiContractTest {
             Map.entry("deleteLiability", "deleteNetWorthLiability"),
             Map.entry("listGoals", "listGoals"),
             Map.entry("updateGoal", "updateGoal"),
-            Map.entry("deleteGoal", "deleteGoal")
+            Map.entry("deleteGoal", "deleteGoal"),
+            Map.entry("listCategories", "listCategories"),
+            Map.entry("updateCategory", "updateCategory"),
+            Map.entry("updateCategoryGroup", "updateCategoryGroup"),
+            Map.entry("reorderCategories", "reorderCategories")
     );
     private static final Map<String, String> SUCCESS_SCHEMAS = Map.ofEntries(
             Map.entry("getSession", "SessionResponse"),
@@ -68,7 +73,11 @@ class OpenApiContractTest {
             Map.entry("deleteNetWorthLiability", "NetWorthResponse"),
             Map.entry("listGoals", "[Goal]"),
             Map.entry("updateGoal", "[Goal]"),
-            Map.entry("deleteGoal", "[Goal]")
+            Map.entry("deleteGoal", "[Goal]"),
+            Map.entry("listCategories", "CategoriesResponse"),
+            Map.entry("updateCategory", "CategoriesResponse"),
+            Map.entry("updateCategoryGroup", "CategoriesResponse"),
+            Map.entry("reorderCategories", "CategoriesResponse")
     );
 
     @Autowired
@@ -87,7 +96,8 @@ class OpenApiContractTest {
             if (!BudgetApiController.class.equals(handler.getBeanType())
                     && !FireApiController.class.equals(handler.getBeanType())
                     && !NetWorthApiController.class.equals(handler.getBeanType())
-                    && !GoalApiController.class.equals(handler.getBeanType())) {
+                    && !GoalApiController.class.equals(handler.getBeanType())
+                    && !CategoryApiController.class.equals(handler.getBeanType())) {
                 return;
             }
             assertWebDtoReturnType(handler.getMethod().getGenericReturnType());
