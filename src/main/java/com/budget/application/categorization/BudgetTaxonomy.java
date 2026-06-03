@@ -178,6 +178,11 @@ public final class BudgetTaxonomy {
         return LEGACY_CATEGORY_LABEL_ALIASES;
     }
 
+    /** The default classification rules, in declared (precedence) order. Source for the rule DB seed. */
+    public static List<CategoryRule> rules() {
+        return RULES;
+    }
+
     /**
      * Canonical labels of the wealth-building categories (investments, savings
      * account, loan overpayment). Single source of truth so persistence,

@@ -22,9 +22,15 @@ public class CategoryClassifier {
         this(personalRules, new BudgetTaxonomyCatalog());
     }
 
-    @Autowired
+    // Test convenience: explicit catalog (e.g. a renaming stub) with rules from the taxonomy + the
+    // supplied personal rules.
     public CategoryClassifier(PersonalCategoryRules personalRules, CategoryCatalog catalog) {
         this(new RegexCategoryRuleMatcher(personalRules), new SubcategoryClassifier(), catalog);
+    }
+
+    @Autowired
+    public CategoryClassifier(CategoryCatalog catalog, ClassificationRuleStore ruleStore) {
+        this(new RegexCategoryRuleMatcher(ruleStore), new SubcategoryClassifier(), catalog);
     }
 
     CategoryClassifier(RegexCategoryRuleMatcher regexMatcher, SubcategoryClassifier subcategoryClassifier) {

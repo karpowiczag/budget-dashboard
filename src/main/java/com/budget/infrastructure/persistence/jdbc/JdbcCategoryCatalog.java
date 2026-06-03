@@ -160,19 +160,9 @@ public class JdbcCategoryCatalog implements CategoryCatalog, CategoryStore {
     @Override
     @Transactional
     public void saveCategory(Category category) {
-        jdbc.update("DELETE FROM category WHERE category_id = :categoryId",
-                new MapSqlParameterSource("categoryId", category.categoryId()));
-        jdbc.update("""
-                INSERT INTO category (
-                    category_id, label, area, analytics_group, group_id, budget_bucket_label,
-                    fixedness, flow_type, discretionary, excluded, real_income,
-                    daily_paced, protected_flag, sinking_fund_eligible, sort_order, archived, updated_at
-                ) VALUES (
-                    :categoryId, :label, :area, :analyticsGroup, :groupId, :budgetBucketLabel,
-                    :fixedness, :flowType, :discretionary, :excluded, :realIncome,
-                    :dailyPaced, :protectedFlag, :sinkingFundEligible, :sortOrder, :archived, :updatedAt
-                )
-                """, new MapSqlParameterSource()
+        // Update-or-insert (not delete+insert): classification_rule.category_id references this row,
+        // so deleting an edited category would violate the foreign key.
+        var params = new MapSqlParameterSource()
                 .addValue("categoryId", category.categoryId())
                 .addValue("label", category.label())
                 .addValue("area", category.area())
@@ -189,7 +179,30 @@ public class JdbcCategoryCatalog implements CategoryCatalog, CategoryStore {
                 .addValue("sinkingFundEligible", category.sinkingFundEligible())
                 .addValue("sortOrder", category.sortOrder())
                 .addValue("archived", category.archived())
-                .addValue("updatedAt", OffsetDateTime.now()));
+                .addValue("updatedAt", OffsetDateTime.now());
+        var updated = jdbc.update("""
+                UPDATE category SET
+                    label = :label, area = :area, analytics_group = :analyticsGroup, group_id = :groupId,
+                    budget_bucket_label = :budgetBucketLabel, fixedness = :fixedness, flow_type = :flowType,
+                    discretionary = :discretionary, excluded = :excluded, real_income = :realIncome,
+                    daily_paced = :dailyPaced, protected_flag = :protectedFlag,
+                    sinking_fund_eligible = :sinkingFundEligible, sort_order = :sortOrder,
+                    archived = :archived, updated_at = :updatedAt
+                WHERE category_id = :categoryId
+                """, params);
+        if (updated == 0) {
+            jdbc.update("""
+                    INSERT INTO category (
+                        category_id, label, area, analytics_group, group_id, budget_bucket_label,
+                        fixedness, flow_type, discretionary, excluded, real_income,
+                        daily_paced, protected_flag, sinking_fund_eligible, sort_order, archived, updated_at
+                    ) VALUES (
+                        :categoryId, :label, :area, :analyticsGroup, :groupId, :budgetBucketLabel,
+                        :fixedness, :flowType, :discretionary, :excluded, :realIncome,
+                        :dailyPaced, :protectedFlag, :sinkingFundEligible, :sortOrder, :archived, :updatedAt
+                    )
+                    """, params);
+        }
         invalidate();
     }
 
