@@ -29,12 +29,15 @@ public class TransactionNormalizer {
             var description = clean(row.description());
             var bankCategory = clean(row.bankCategory());
             var decision = classifier.classifyDecision(bankCategory, description, value);
-            var correctedCategory = decision.category();
+            var categoryId = decision.categoryId();
+            // Resolve metadata and the display label by stable id, not by the matcher's label, so a
+            // category rename propagates and never leaves normalization with an unresolvable label.
+            var correctedCategory = labelById(categoryId, decision.category());
             var confidence = confidence(value, decision);
             var notes = notes(bankCategory, correctedCategory, confidence, decision.reviewReason());
-            var realIncome = value.signum() > 0 && classifier.isRealIncome(correctedCategory);
-            var spend = value.signum() < 0 && !classifier.isExcluded(correctedCategory);
-            var excludedFlow = classifier.isExcluded(correctedCategory) || (value.signum() > 0 && !realIncome);
+            var realIncome = value.signum() > 0 && classifier.isRealIncomeById(categoryId);
+            var spend = value.signum() < 0 && !classifier.isExcludedById(categoryId);
+            var excludedFlow = classifier.isExcludedById(categoryId) || (value.signum() > 0 && !realIncome);
             var excluded = excludedFlow ? value.abs() : BigDecimal.ZERO;
             var excludedOutgoing = excludedFlow && value.signum() < 0 ? value.negate() : BigDecimal.ZERO;
             var excludedIncoming = excludedFlow && value.signum() > 0 ? value : BigDecimal.ZERO;
@@ -47,24 +50,24 @@ public class TransactionNormalizer {
                     description,
                     row.account(),
                     bankCategory,
-                    decision.categoryId(),
+                    categoryId,
                     correctedCategory,
                     decision.subcategoryId(),
-                    classifier.budgetArea(correctedCategory),
-                    classifier.group(correctedCategory),
+                    classifier.budgetAreaById(categoryId),
+                    classifier.groupById(categoryId),
                     decision.subcategory(),
                     decision.flowType(),
                     decision.budgetGroupId(),
                     decision.budgetGroup(),
                     decision.reviewStatus(),
                     decision.reviewReason(),
-                    classifier.budgetBucket(correctedCategory),
-                    classifier.fixedness(correctedCategory),
+                    classifier.budgetBucketById(categoryId),
+                    classifier.fixednessById(categoryId),
                     value.signum() >= 0 ? "Wpływ" : "Wydatek",
                     value,
                     realIncome ? value : BigDecimal.ZERO,
                     spend ? value.negate() : BigDecimal.ZERO,
-                    spend && classifier.isDiscretionary(correctedCategory) ? value.negate() : BigDecimal.ZERO,
+                    spend && classifier.isDiscretionaryById(categoryId) ? value.negate() : BigDecimal.ZERO,
                     money(excluded),
                     money(excludedOutgoing),
                     money(excludedIncoming),
@@ -75,6 +78,14 @@ public class TransactionNormalizer {
             ));
         }
         return normalized;
+    }
+
+    private String labelById(String categoryId, String fallback) {
+        try {
+            return classifier.labelForId(categoryId);
+        } catch (RuntimeException e) {
+            return fallback;
+        }
     }
 
     private String confidence(BigDecimal value, com.budget.application.categorization.CategoryDecision decision) {

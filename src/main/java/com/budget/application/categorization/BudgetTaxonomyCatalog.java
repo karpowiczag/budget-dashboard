@@ -17,6 +17,8 @@ public class BudgetTaxonomyCatalog implements CategoryCatalog {
             "Jedzenie poza domem"
     );
 
+    private static final Set<String> DAILY_PACED_IDS = Set.of("groceries", "diningOut");
+
     /** Canonical daily-paced label set, exposed so the DB seed reuses the exact values. */
     public static Set<String> dailyPacedLabels() {
         return DAILY_PACED_LABELS;
@@ -45,5 +47,15 @@ public class BudgetTaxonomyCatalog implements CategoryCatalog {
     @Override
     public boolean isDailyPaced(String categoryLabel) {
         return DAILY_PACED_LABELS.contains(categoryLabel);
+    }
+
+    @Override
+    public Set<String> wealthCategoryIds() {
+        return BudgetTaxonomy.wealthCategoryIds();
+    }
+
+    @Override
+    public boolean isDailyPacedById(String categoryId) {
+        return DAILY_PACED_IDS.contains(categoryId);
     }
 }

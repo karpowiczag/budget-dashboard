@@ -124,6 +124,53 @@ public class CategoryClassifier {
         return catalog.wealthCategoryLabels();
     }
 
+    // --- Stable-id lookups (rename-safe). Analysis groups by category id and resolves the
+    // current display label through these, so a rename never splits a category. ---
+
+    public String labelForId(String categoryId) {
+        return catalog.definitionById(categoryId).label();
+    }
+
+    public String categoryIdByLabel(String category) {
+        return catalog.categoryIdByLabel(category);
+    }
+
+    public String budgetAreaById(String categoryId) {
+        return catalog.definitionById(categoryId).area();
+    }
+
+    public String groupById(String categoryId) {
+        return catalog.definitionById(categoryId).analyticsGroup();
+    }
+
+    public String budgetBucketById(String categoryId) {
+        return catalog.definitionById(categoryId).budgetBucketLabel();
+    }
+
+    public String fixednessById(String categoryId) {
+        return catalog.definitionById(categoryId).fixedness();
+    }
+
+    public boolean isDiscretionaryById(String categoryId) {
+        return catalog.definitionById(categoryId).discretionary();
+    }
+
+    public boolean isExcludedById(String categoryId) {
+        return catalog.definitionById(categoryId).excluded();
+    }
+
+    public boolean isRealIncomeById(String categoryId) {
+        return catalog.definitionById(categoryId).realIncome();
+    }
+
+    public boolean isDailyPacedById(String categoryId) {
+        return catalog.isDailyPacedById(categoryId);
+    }
+
+    public Set<String> wealthCategoryIds() {
+        return catalog.wealthCategoryIds();
+    }
+
     private BudgetTaxonomy.CategoryDefinition metadata(String category) {
         return catalog.definitionByLabel(category);
     }

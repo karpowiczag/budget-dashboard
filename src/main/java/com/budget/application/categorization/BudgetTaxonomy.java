@@ -33,9 +33,9 @@ public final class BudgetTaxonomy {
 
     static final String CATEGORY_UNKNOWN = "unknownReview";
     static final String CATEGORY_MARKETPLACE = "marketplaceOnline";
-    static final String CATEGORY_SAVINGS_ACCOUNT = "savingsAccount";
-    static final String CATEGORY_INVESTMENTS = "investments";
-    static final String CATEGORY_LOAN_OVERPAYMENT = "loanOverpayment";
+    public static final String CATEGORY_SAVINGS_ACCOUNT = "savingsAccount";
+    public static final String CATEGORY_INVESTMENTS = "investments";
+    public static final String CATEGORY_LOAN_OVERPAYMENT = "loanOverpayment";
 
     static final Map<String, BudgetGroup> BUDGET_GROUPS = orderedMap(List.of(
             new BudgetGroup(GROUP_INCOME, "Przychody"),
@@ -185,6 +185,11 @@ public final class BudgetTaxonomy {
      */
     public static Set<String> wealthCategoryLabels() {
         return WEALTH_CATEGORY_LABELS;
+    }
+
+    /** Stable ids of the wealth-building categories (investments, savings account, loan overpayment). */
+    public static Set<String> wealthCategoryIds() {
+        return WEALTH_CATEGORY_IDS;
     }
 
     public static String categoryIdByLabel(String label) {

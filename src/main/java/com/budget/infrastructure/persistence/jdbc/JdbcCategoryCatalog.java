@@ -70,6 +70,16 @@ public class JdbcCategoryCatalog implements CategoryCatalog {
         return snapshot().dailyPacedLabels().contains(categoryLabel);
     }
 
+    @Override
+    public Set<String> wealthCategoryIds() {
+        return snapshot().wealthIds();
+    }
+
+    @Override
+    public boolean isDailyPacedById(String categoryId) {
+        return snapshot().dailyPacedIds().contains(categoryId);
+    }
+
     /**
      * First-boot seed: populate the empty category tables from the supplied defaults. No-op once
      * any category exists, so user edits are never clobbered. Groups are inserted first to satisfy
@@ -152,16 +162,20 @@ public class JdbcCategoryCatalog implements CategoryCatalog {
         var byId = new LinkedHashMap<String, BudgetTaxonomy.CategoryDefinition>();
         var labelToId = new LinkedHashMap<String, String>();
         var wealthLabels = new LinkedHashSet<String>();
+        var wealthIds = new LinkedHashSet<String>();
         var dailyPacedLabels = new LinkedHashSet<String>();
+        var dailyPacedIds = new LinkedHashSet<String>();
         jdbc.query("SELECT * FROM category ORDER BY sort_order, label", new MapSqlParameterSource(), (ResultSet rs) -> {
             var definition = map(rs);
             byId.put(definition.id(), definition);
             labelToId.put(definition.label(), definition.id());
             if (BudgetTaxonomy.FLOW_WEALTH_TRANSFER.equals(definition.flowType())) {
                 wealthLabels.add(definition.label());
+                wealthIds.add(definition.id());
             }
             if (rs.getBoolean("daily_paced")) {
                 dailyPacedLabels.add(definition.label());
+                dailyPacedIds.add(definition.id());
             }
         });
         return new Snapshot(
@@ -169,7 +183,9 @@ public class JdbcCategoryCatalog implements CategoryCatalog {
                 Map.copyOf(labelToId),
                 Map.copyOf(BudgetTaxonomy.legacyCategoryLabelAliases()),
                 Set.copyOf(wealthLabels),
-                Set.copyOf(dailyPacedLabels));
+                Set.copyOf(wealthIds),
+                Set.copyOf(dailyPacedLabels),
+                Set.copyOf(dailyPacedIds));
     }
 
     private BudgetTaxonomy.CategoryDefinition map(ResultSet rs) throws SQLException {
@@ -192,6 +208,8 @@ public class JdbcCategoryCatalog implements CategoryCatalog {
             Map<String, String> labelToId,
             Map<String, String> aliasToId,
             Set<String> wealthLabels,
-            Set<String> dailyPacedLabels) {
+            Set<String> wealthIds,
+            Set<String> dailyPacedLabels,
+            Set<String> dailyPacedIds) {
     }
 }

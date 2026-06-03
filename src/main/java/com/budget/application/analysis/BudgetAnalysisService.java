@@ -1,5 +1,6 @@
 package com.budget.application.analysis;
 
+import com.budget.application.categorization.BudgetTaxonomy;
 import com.budget.application.categorization.CategoryClassifier;
 import com.budget.application.settings.BudgetSettings;
 import com.budget.application.settings.BudgetSettingsService;
@@ -98,9 +99,9 @@ public class BudgetAnalysisService {
         var excludedOutgoingTotal = sum(transactions, NormalizedTransaction::excludedOutgoing);
         var excludedIncomingTotal = sum(transactions, NormalizedTransaction::excludedIncoming);
         var excludedNetTotal = sum(transactions, NormalizedTransaction::excludedNet);
-        var wealthCategories = classifier.wealthCategoryLabels();
+        var wealthCategoryIds = classifier.wealthCategoryIds();
         var realSavingsOut = sum(transactions.stream()
-                .filter(tx -> wealthCategories.contains(tx.correctedCategory()))
+                .filter(tx -> wealthCategoryIds.contains(tx.categoryId()))
                 .toList(), NormalizedTransaction::excludedOutgoing);
         var operatingSurplus = money(incomeTotal.subtract(spendTotal));
         var unassignedSurplus = money(incomeTotal.subtract(spendTotal).subtract(realSavingsOut));
@@ -204,12 +205,12 @@ public class BudgetAnalysisService {
                 .orElse(null);
         var grossDeposits = sum(transactions.stream()
                 .filter(tx -> !tx.date().isBefore(fromDate) && !tx.date().isAfter(periodEnd))
-                .filter(tx -> "Konto oszczędnościowe".equals(tx.correctedCategory()))
+                .filter(tx -> BudgetTaxonomy.CATEGORY_SAVINGS_ACCOUNT.equals(tx.categoryId()))
                 .toList(), NormalizedTransaction::excludedOutgoing);
         var pendingDeposits = sum(transactions.stream()
                 .filter(tx -> !tx.date().isBefore(fromDate) && !tx.date().isAfter(periodEnd))
                 .filter(tx -> latestSavingsAccountDate == null || tx.date().isAfter(latestSavingsAccountDate))
-                .filter(tx -> "Konto oszczędnościowe".equals(tx.correctedCategory()))
+                .filter(tx -> BudgetTaxonomy.CATEGORY_SAVINGS_ACCOUNT.equals(tx.categoryId()))
                 .toList(), NormalizedTransaction::excludedOutgoing);
         var accountInflows = sum(savingsAccountTransactions.stream()
                 .filter(tx -> tx.amount().compareTo(BigDecimal.ZERO) > 0)
@@ -243,14 +244,14 @@ public class BudgetAnalysisService {
 
     private List<BudgetSnapshot.MonthlySummary> monthlyRows(List<NormalizedTransaction> transactions, List<String> months, List<String> labels, LocalDate periodStart, LocalDate periodEnd) {
         var rows = new ArrayList<BudgetSnapshot.MonthlySummary>();
-        var wealthCategories = classifier.wealthCategoryLabels();
+        var wealthCategoryIds = classifier.wealthCategoryIds();
         for (var i = 0; i < months.size(); i++) {
             var month = months.get(i);
             var items = transactions.stream().filter(tx -> tx.month().equals(month)).toList();
             var income = sum(items, NormalizedTransaction::income);
             var spend = sum(items, NormalizedTransaction::analysisSpend);
             var excluded = sum(items, NormalizedTransaction::excluded);
-            var savings = sum(items.stream().filter(tx -> wealthCategories.contains(tx.correctedCategory())).toList(), NormalizedTransaction::excludedOutgoing);
+            var savings = sum(items.stream().filter(tx -> wealthCategoryIds.contains(tx.categoryId())).toList(), NormalizedTransaction::excludedOutgoing);
             rows.add(new BudgetSnapshot.MonthlySummary(
                     labels.get(i),
                     month,
@@ -269,11 +270,14 @@ public class BudgetAnalysisService {
     }
 
     private List<CategoryRow> categoryRows(List<NormalizedTransaction> transactions, List<String> months, List<String> labels, int activeMonthCount) {
-        var names = new TreeSet<String>();
-        transactions.forEach(tx -> names.add(tx.correctedCategory()));
+        // Group by stable category id and resolve the current display label from the catalog, so a
+        // rename never splits a category into old-label and new-label rows.
+        var ids = new TreeSet<String>();
+        transactions.forEach(tx -> ids.add(tx.categoryId()));
         var rows = new ArrayList<CategoryRow>();
-        for (var category : names) {
-            var items = transactions.stream().filter(tx -> tx.correctedCategory().equals(category)).toList();
+        for (var categoryId : ids) {
+            var items = transactions.stream().filter(tx -> tx.categoryId().equals(categoryId)).toList();
+            var label = currentLabel(categoryId, items.get(0).correctedCategory());
             var monthValues = months.stream()
                     .map(month -> sum(items.stream().filter(tx -> tx.month().equals(month)).toList(), NormalizedTransaction::analysisSpend))
                     .toList();
@@ -282,22 +286,23 @@ public class BudgetAnalysisService {
             var spend = sum(items, NormalizedTransaction::analysisSpend);
             var merchantExamples = merchantExamples(items);
             rows.add(new CategoryRow(
-                    category,
-                    classifier.budgetArea(category),
-                    classifier.group(category),
-                    effectiveBudgetBucket(category, items),
+                    categoryId,
+                    label,
+                    classifier.budgetAreaById(categoryId),
+                    classifier.groupById(categoryId),
+                    effectiveBudgetBucket(categoryId, items),
                     spend,
                     sum(items, NormalizedTransaction::income),
                     sum(items, NormalizedTransaction::excluded),
                     divide(spend, activeMonthCount),
                     maxMonth,
                     maxValue,
-                    classifier.isDiscretionary(category),
+                    classifier.isDiscretionaryById(categoryId),
                     items.size(),
                     merchantExamples
             ));
         }
-        rows.sort(Comparator.comparing(CategoryRow::spend).reversed());
+        rows.sort(Comparator.comparing(CategoryRow::spend).reversed().thenComparing(CategoryRow::category));
         return rows;
     }
 
@@ -394,14 +399,26 @@ public class BudgetAnalysisService {
         return notes == null || notes.isBlank() ? note : notes + "; " + note;
     }
 
-    private String effectiveBudgetBucket(String category, List<NormalizedTransaction> items) {
+    private String effectiveBudgetBucket(String categoryId, List<NormalizedTransaction> items) {
         return items.stream()
                 .collect(java.util.stream.Collectors.groupingBy(NormalizedTransaction::budgetBucket, LinkedHashMap::new, java.util.stream.Collectors.counting()))
                 .entrySet()
                 .stream()
                 .max(Map.Entry.comparingByValue())
                 .map(Map.Entry::getKey)
-                .orElseGet(() -> classifier.budgetBucket(category));
+                .orElseGet(() -> classifier.budgetBucketById(categoryId));
+    }
+
+    /**
+     * Current display label for a category id (rename-safe), falling back to the transaction's
+     * stored label if the id is no longer in the catalog.
+     */
+    private String currentLabel(String categoryId, String storedLabel) {
+        try {
+            return classifier.labelForId(categoryId);
+        } catch (RuntimeException e) {
+            return storedLabel;
+        }
     }
 
     private List<String> merchantExamples(List<NormalizedTransaction> items) {
@@ -426,25 +443,26 @@ public class BudgetAnalysisService {
 
     private List<BudgetSnapshot.HierarchySummary> hierarchyRows(List<NormalizedTransaction> transactions, int activeMonthCount) {
         var keys = new TreeSet<String>();
-        transactions.forEach(tx -> keys.add(tx.budgetArea() + "\u001F" + tx.group() + "\u001F" + tx.correctedCategory() + "\u001F" + tx.subcategory()));
+        transactions.forEach(tx -> keys.add(tx.budgetArea() + "\u001F" + tx.group() + "\u001F" + tx.categoryId() + "\u001F" + tx.subcategory()));
         var rows = new ArrayList<BudgetSnapshot.HierarchySummary>();
         for (var key : keys) {
             var parts = key.split("\u001F", -1);
             var items = transactions.stream()
-                    .filter(tx -> tx.budgetArea().equals(parts[0]) && tx.group().equals(parts[1]) && tx.correctedCategory().equals(parts[2]) && tx.subcategory().equals(parts[3]))
+                    .filter(tx -> tx.budgetArea().equals(parts[0]) && tx.group().equals(parts[1]) && tx.categoryId().equals(parts[2]) && tx.subcategory().equals(parts[3]))
                     .toList();
             var spend = sum(items, NormalizedTransaction::analysisSpend);
+            var label = currentLabel(parts[2], items.isEmpty() ? parts[2] : items.get(0).correctedCategory());
             rows.add(new BudgetSnapshot.HierarchySummary(
                     parts[0],
                     parts[1],
-                    parts[2],
+                    label,
                     parts[3],
                     money(spend),
                     money(sum(items, NormalizedTransaction::income)),
                     money(sum(items, NormalizedTransaction::excluded)),
                     divide(spend, activeMonthCount),
                     items.size(),
-                    classifier.isDiscretionary(parts[2])
+                    classifier.isDiscretionaryById(parts[2])
             ));
         }
         rows.sort(Comparator
@@ -485,9 +503,9 @@ public class BudgetAnalysisService {
         var variableObligatory = sum(transactions.stream().filter(tx -> BUCKET_VARIABLE_OBLIGATORY.equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
         var review = sum(transactions.stream().filter(tx -> BUCKET_REVIEW.equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
         var flexible = sum(transactions.stream().filter(tx -> BUCKET_FLEXIBLE.equals(tx.budgetBucket())).toList(), NormalizedTransaction::analysisSpend);
-        var investments = sum(transactions.stream().filter(tx -> "Inwestycje".equals(tx.correctedCategory())).toList(), NormalizedTransaction::excludedOutgoing);
-        var savingsAccount = sum(transactions.stream().filter(tx -> "Konto oszczędnościowe".equals(tx.correctedCategory())).toList(), NormalizedTransaction::excludedOutgoing);
-        var loanOverpayments = sum(transactions.stream().filter(tx -> "Nadpłata kredytu".equals(tx.correctedCategory())).toList(), NormalizedTransaction::excludedOutgoing);
+        var investments = sum(transactions.stream().filter(tx -> BudgetTaxonomy.CATEGORY_INVESTMENTS.equals(tx.categoryId())).toList(), NormalizedTransaction::excludedOutgoing);
+        var savingsAccount = sum(transactions.stream().filter(tx -> BudgetTaxonomy.CATEGORY_SAVINGS_ACCOUNT.equals(tx.categoryId())).toList(), NormalizedTransaction::excludedOutgoing);
+        var loanOverpayments = sum(transactions.stream().filter(tx -> BudgetTaxonomy.CATEGORY_LOAN_OVERPAYMENT.equals(tx.categoryId())).toList(), NormalizedTransaction::excludedOutgoing);
         return List.of(
                 mixRow(BUCKET_FIXED_OBLIGATORY, fixedObligatory, activeMonthCount, incomeTotal, "Rachunki, raty i zobowiązania do zapłacenia w pierwszej kolejności"),
                 mixRow(BUCKET_VARIABLE_OBLIGATORY, variableObligatory, activeMonthCount, incomeTotal, "Konieczne koszty zmienne: jedzenie, zdrowie, transport"),
@@ -704,8 +722,11 @@ public class BudgetAnalysisService {
 
         var statuses = new ArrayList<BudgetSnapshot.CategoryStatus>();
         for (var row : categoryPlanRows) {
-            var current = sum(latestItems.stream().filter(tx -> tx.correctedCategory().equals(row.category())).toList(), NormalizedTransaction::analysisSpend);
-            var projected = projectCategoryMonthEnd(row.category(), current, elapsedDays, daysTotal);
+            // Match transactions to the plan row by stable id (resolved from the row's current
+            // label) so a rename does not break the live month control.
+            var rowCategoryId = classifier.categoryIdByLabel(row.category());
+            var current = sum(latestItems.stream().filter(tx -> tx.categoryId().equals(rowCategoryId)).toList(), NormalizedTransaction::analysisSpend);
+            var projected = projectCategoryMonthEnd(rowCategoryId, current, elapsedDays, daysTotal);
             var limit = row.limit();
             statuses.add(new BudgetSnapshot.CategoryStatus(
                     row.category(),
@@ -810,8 +831,8 @@ public class BudgetAnalysisService {
             if (tx.analysisSpend().signum() <= 0) {
                 continue;
             }
-            var key = tx.merchant() + "\u001F" + tx.correctedCategory();
-            var agg = merchantMonths.computeIfAbsent(key, ignored -> new RecurringAgg(tx.merchant(), tx.correctedCategory(), tx.budgetBucket()));
+            var key = tx.merchant() + "\u001F" + tx.categoryId();
+            var agg = merchantMonths.computeIfAbsent(key, ignored -> new RecurringAgg(tx.merchant(), tx.categoryId(), tx.correctedCategory(), tx.budgetBucket()));
             agg.months.add(tx.month());
             agg.amount = agg.amount.add(tx.analysisSpend());
             agg.count++;
@@ -823,7 +844,7 @@ public class BudgetAnalysisService {
                 .filter(agg -> agg.months.size() >= threshold || (agg.amount.compareTo(BigDecimal.valueOf(1000)) >= 0 && agg.months.size() >= 2))
                 .map(agg -> new BudgetSnapshot.RecurringItem(
                         agg.merchant,
-                        agg.category,
+                        currentLabel(agg.categoryId, agg.category),
                         agg.bucket,
                         money(agg.amount),
                         agg.months.size(),
@@ -865,11 +886,11 @@ public class BudgetAnalysisService {
         return (int) (end.toEpochDay() - start.toEpochDay()) + 1;
     }
 
-    private BigDecimal projectCategoryMonthEnd(String category, BigDecimal current, int elapsedDays, int daysTotal) {
+    private BigDecimal projectCategoryMonthEnd(String categoryId, BigDecimal current, int elapsedDays, int daysTotal) {
         if (current == null || current.signum() <= 0 || elapsedDays <= 0 || elapsedDays >= daysTotal) {
             return money(current);
         }
-        if (classifier.isDailyPaced(category)) {
+        if (classifier.isDailyPacedById(categoryId)) {
             return money(divide(current, elapsedDays).multiply(BigDecimal.valueOf(daysTotal)));
         }
         return money(current);
@@ -945,6 +966,7 @@ public class BudgetAnalysisService {
     }
 
     private record CategoryRow(
+            String categoryId,
             String category,
             String area,
             String group,
@@ -988,6 +1010,7 @@ public class BudgetAnalysisService {
 
     private static final class RecurringAgg {
         private final String merchant;
+        private final String categoryId;
         private final String category;
         private final String bucket;
         private final Set<String> months = new LinkedHashSet<>();
@@ -996,8 +1019,9 @@ public class BudgetAnalysisService {
         private int count;
         private LocalDate lastDate;
 
-        private RecurringAgg(String merchant, String category, String bucket) {
+        private RecurringAgg(String merchant, String categoryId, String category, String bucket) {
             this.merchant = merchant;
+            this.categoryId = categoryId;
             this.category = category;
             this.bucket = bucket;
         }

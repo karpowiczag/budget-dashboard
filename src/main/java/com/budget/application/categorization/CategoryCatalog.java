@@ -27,9 +27,15 @@ public interface CategoryCatalog {
     /** Labels whose outflow is wealth-building (savings/investments/overpayment) and excluded from spend. */
     Set<String> wealthCategoryLabels();
 
+    /** Stable ids of the wealth-building categories — rename-safe equivalent of {@link #wealthCategoryLabels()}. */
+    Set<String> wealthCategoryIds();
+
     /**
      * True when month-end projection should linearly pace the category by elapsed days
      * (high-frequency, evenly-spread spending such as groceries and dining out).
      */
     boolean isDailyPaced(String categoryLabel);
+
+    /** Rename-safe equivalent of {@link #isDailyPaced(String)}, keyed by stable category id. */
+    boolean isDailyPacedById(String categoryId);
 }
