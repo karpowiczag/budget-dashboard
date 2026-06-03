@@ -19,6 +19,7 @@ export function TransactionsView({
   transactionPage,
   visibleSpend,
   yearTransactionTotal,
+  categoryOptions,
   onInspect,
   onBucketChange,
   onFilterChange,
@@ -27,6 +28,7 @@ export function TransactionsView({
   onQueryChange,
   onResetFilters,
   onShowFullYear,
+  onRecategorize,
 }) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [qualityOpen, setQualityOpen] = useState(false);
@@ -177,6 +179,8 @@ export function TransactionsView({
         transactions={filteredTransactions}
         sort={filters.sort}
         onSort={(nextSort) => onFilterChange("sort", nextSort)}
+        categoryOptions={categoryOptions}
+        onRecategorize={onRecategorize}
       />
       <div className="pager">
         <button disabled={page <= 0} onClick={() => onPageChange(page - 1)}>Poprzednia</button>

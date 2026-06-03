@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { deleteCategoryRule, deleteGoal, deleteNetWorthLiability, fetchAnalytics, fetchCalendar, fetchCategories, fetchFireSettings, fetchFireSummary, fetchGoals, fetchNetWorth, fetchTransactions, saveCategory, saveCategoryGroup, saveCategoryRule, saveGoal, saveNetWorthAccount, saveNetWorthLiability, updateFireSettings } from "./api/budgetApi.js";
+import { deleteCategoryRule, deleteGoal, deleteNetWorthLiability, fetchAnalytics, fetchCalendar, fetchCategories, fetchFireSettings, fetchFireSummary, fetchGoals, fetchNetWorth, fetchTransactions, recategorizeTransaction, saveCategory, saveCategoryGroup, saveCategoryRule, saveGoal, saveNetWorthAccount, saveNetWorthLiability, updateFireSettings } from "./api/budgetApi.js";
 import { budgetQueryKeys } from "./api/queryKeys.js";
 import { AppShell } from "./components/layout/AppShell.jsx";
 import { DashboardFooter } from "./components/layout/DashboardFooter.jsx";
@@ -13,7 +13,7 @@ import { useBudgetData } from "./hooks/useBudgetData.js";
 import { useDashboardModel } from "./hooks/useDashboardModel.js";
 import { applyTheme, getInitialTheme } from "./theme.js";
 import { Moon, Sun } from "lucide-react";
-import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel, sectionForView } from "./domain/budgetSelectors.js";
+import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel, sectionForView, selectCategoryCatalog } from "./domain/budgetSelectors.js";
 import { CategoriesView } from "./views/CategoriesView.jsx";
 import { ImportView } from "./views/ImportView.jsx";
 import { FireView } from "./views/FireView.jsx";
@@ -205,7 +205,8 @@ export default function App() {
   const categoriesQuery = useQuery({
     queryKey: budgetQueryKeys.categories,
     queryFn: fetchCategories,
-    enabled: view === "categories",
+    // Also loaded on the transactions view to populate the per-row recategorize picker.
+    enabled: view === "categories" || view === "transactions",
   });
   const categoryMutation = useMutation({
     mutationFn: ({ id, category }) => saveCategory(id, category),
@@ -218,6 +219,9 @@ export default function App() {
   });
   const ruleDeleteMutation = useMutation({
     mutationFn: (id) => deleteCategoryRule(id),
+  });
+  const recategorizeMutation = useMutation({
+    mutationFn: ({ id, categoryId }) => recategorizeTransaction(year, id, categoryId),
   });
   const inspectorQuery = useQuery({
     queryKey: budgetQueryKeys.transactions(year, inspectorFilters),
@@ -526,6 +530,19 @@ export default function App() {
     }
   }
 
+  async function handleRecategorize(transactionId, categoryId) {
+    try {
+      await recategorizeMutation.mutateAsync({ id: transactionId, categoryId });
+      // A recategorize re-analyzes the whole year, so refresh every dependent read.
+      queryClient.invalidateQueries({ queryKey: ["budget", "transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "calendar"] });
+    } catch (error) {
+      // The mutation tracks the error; the category simply stays unchanged on refresh.
+    }
+  }
+
   async function handleSaveSettings() {
     const base = settingsDraft || budgetSettings || {};
     const allLimitRows = [...(model.parentPlanRows || []), ...(model.planRows || [])];
@@ -742,6 +759,8 @@ export default function App() {
           transactionPage={model.transactionPage}
           visibleSpend={model.visibleSpend}
           yearTransactionTotal={data.kpis.transactions}
+          categoryOptions={selectCategoryCatalog(categoriesQuery.data).categoryOptions}
+          onRecategorize={handleRecategorize}
           onInspect={openTransactionInspector}
           onBucketChange={setBucket}
           onFilterChange={handleTransactionFilterChange}

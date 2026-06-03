@@ -216,6 +216,18 @@ export async function deleteCategoryRule(id) {
   return readJson(response, "Nie mogę usunąć reguły");
 }
 
+export async function recategorizeTransaction(year, id, categoryId) {
+  const response = await fetch(`/api/v1/reports/${year}/transactions/${encodeURIComponent(id)}/recategorize`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify({ categoryId }),
+  });
+  return readJson(response, "Nie mogę zmienić kategorii transakcji");
+}
+
 export async function uploadTransactions(file) {
   const body = new FormData();
   body.append("file", file);
