@@ -492,7 +492,27 @@ public final class BudgetApiDtos {
 
     public record CategoriesResponse(
             List<CategoryGroupResponse> groups,
-            List<CategoryResponse> categories
+            List<CategoryResponse> categories,
+            List<CategoryRuleResponse> rules
+    ) {
+    }
+
+    public record CategoryRuleResponse(
+            String ruleId,
+            String matchType,
+            String pattern,
+            String categoryId,
+            int priority,
+            boolean enabled,
+            String source
+    ) {
+    }
+
+    public record RuleUpsertRequest(
+            String pattern,
+            String categoryId,
+            int priority,
+            boolean enabled
     ) {
     }
 

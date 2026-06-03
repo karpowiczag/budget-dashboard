@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { deleteGoal, deleteNetWorthLiability, fetchAnalytics, fetchCalendar, fetchCategories, fetchFireSettings, fetchFireSummary, fetchGoals, fetchNetWorth, fetchTransactions, saveCategory, saveCategoryGroup, saveGoal, saveNetWorthAccount, saveNetWorthLiability, updateFireSettings } from "./api/budgetApi.js";
+import { deleteCategoryRule, deleteGoal, deleteNetWorthLiability, fetchAnalytics, fetchCalendar, fetchCategories, fetchFireSettings, fetchFireSummary, fetchGoals, fetchNetWorth, fetchTransactions, saveCategory, saveCategoryGroup, saveCategoryRule, saveGoal, saveNetWorthAccount, saveNetWorthLiability, updateFireSettings } from "./api/budgetApi.js";
 import { budgetQueryKeys } from "./api/queryKeys.js";
 import { AppShell } from "./components/layout/AppShell.jsx";
 import { DashboardFooter } from "./components/layout/DashboardFooter.jsx";
@@ -212,6 +212,12 @@ export default function App() {
   });
   const categoryGroupMutation = useMutation({
     mutationFn: ({ id, group }) => saveCategoryGroup(id, group),
+  });
+  const ruleMutation = useMutation({
+    mutationFn: ({ id, rule }) => saveCategoryRule(id, rule),
+  });
+  const ruleDeleteMutation = useMutation({
+    mutationFn: (id) => deleteCategoryRule(id),
   });
   const inspectorQuery = useQuery({
     queryKey: budgetQueryKeys.transactions(year, inspectorFilters),
@@ -489,6 +495,37 @@ export default function App() {
     }
   }
 
+  async function handleSaveRule(id, rule) {
+    setCategoryStatus({ type: "info", message: "Zapisuję regułę..." });
+    try {
+      const saved = await ruleMutation.mutateAsync({ id, rule });
+      queryClient.setQueryData(budgetQueryKeys.categories, saved);
+      // Rules re-classify on the next analyze/import, so refresh those caches.
+      queryClient.invalidateQueries({ queryKey: ["budget", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "analytics"] });
+      setCategoryStatus({ type: "success", message: "Reguła zapisana. Zadziała po ponownej analizie." });
+      return saved;
+    } catch (error) {
+      setCategoryStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
+  async function handleDeleteRule(id) {
+    setCategoryStatus({ type: "info", message: "Usuwam regułę..." });
+    try {
+      const saved = await ruleDeleteMutation.mutateAsync(id);
+      queryClient.setQueryData(budgetQueryKeys.categories, saved);
+      queryClient.invalidateQueries({ queryKey: ["budget", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "analytics"] });
+      setCategoryStatus({ type: "success", message: "Reguła usunięta." });
+      return saved;
+    } catch (error) {
+      setCategoryStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
   async function handleSaveSettings() {
     const base = settingsDraft || budgetSettings || {};
     const allLimitRows = [...(model.parentPlanRows || []), ...(model.planRows || [])];
@@ -642,7 +679,9 @@ export default function App() {
           catalog={categoriesQuery.data}
           onSaveCategory={handleSaveCategory}
           onSaveGroup={handleSaveCategoryGroup}
-          saving={categoryMutation.isPending || categoryGroupMutation.isPending}
+          onSaveRule={handleSaveRule}
+          onDeleteRule={handleDeleteRule}
+          saving={categoryMutation.isPending || categoryGroupMutation.isPending || ruleMutation.isPending || ruleDeleteMutation.isPending}
           status={categoryStatus}
         />
       )}

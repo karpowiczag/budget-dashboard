@@ -534,6 +534,49 @@ paths:
                 $ref: "#/components/schemas/CategoriesResponse"
         "400":
           $ref: "#/components/responses/Problem"
+  /api/v1/categories/rules/{id}:
+    put:
+      operationId: updateCategoryRule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleUpsertRequest"
+      responses:
+        "200":
+          description: Categories after saving a rule.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteCategoryRule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "200":
+          description: Categories after deleting a rule.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
 components:
   parameters:
     Year:
@@ -2174,6 +2217,40 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Category"
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryRule"
+    CategoryRule:
+      type: object
+      required: [ruleId, matchType, pattern, categoryId, priority, enabled, source]
+      properties:
+        ruleId:
+          type: string
+        matchType:
+          type: string
+        pattern:
+          type: string
+        categoryId:
+          type: string
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+        source:
+          type: string
+    RuleUpsertRequest:
+      type: object
+      required: [pattern, categoryId]
+      properties:
+        pattern:
+          type: string
+        categoryId:
+          type: string
+        priority:
+          type: integer
+        enabled:
+          type: boolean
     CategoryGroup:
       type: object
       required: [groupId, label, sortOrder]

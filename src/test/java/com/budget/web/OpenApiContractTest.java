@@ -50,7 +50,9 @@ class OpenApiContractTest {
             Map.entry("listCategories", "listCategories"),
             Map.entry("updateCategory", "updateCategory"),
             Map.entry("updateCategoryGroup", "updateCategoryGroup"),
-            Map.entry("reorderCategories", "reorderCategories")
+            Map.entry("reorderCategories", "reorderCategories"),
+            Map.entry("updateCategoryRule", "updateCategoryRule"),
+            Map.entry("deleteCategoryRule", "deleteCategoryRule")
     );
     private static final Map<String, String> SUCCESS_SCHEMAS = Map.ofEntries(
             Map.entry("getSession", "SessionResponse"),
@@ -77,7 +79,9 @@ class OpenApiContractTest {
             Map.entry("listCategories", "CategoriesResponse"),
             Map.entry("updateCategory", "CategoriesResponse"),
             Map.entry("updateCategoryGroup", "CategoriesResponse"),
-            Map.entry("reorderCategories", "CategoriesResponse")
+            Map.entry("reorderCategories", "CategoriesResponse"),
+            Map.entry("updateCategoryRule", "CategoriesResponse"),
+            Map.entry("deleteCategoryRule", "CategoriesResponse")
     );
 
     @Autowired

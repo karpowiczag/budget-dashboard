@@ -1,8 +1,10 @@
 package com.budget.web.controller;
 
 import com.budget.application.categorization.CategoryCatalogService;
+import com.budget.application.categorization.CategoryRuleService;
 import com.budget.web.dto.BudgetApiDtos;
 import com.budget.web.dto.BudgetApiMapper;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,10 +22,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/categories")
 public class CategoryApiController {
     private final CategoryCatalogService service;
+    private final CategoryRuleService ruleService;
     private final BudgetApiMapper mapper;
 
-    public CategoryApiController(CategoryCatalogService service, BudgetApiMapper mapper) {
+    public CategoryApiController(CategoryCatalogService service, CategoryRuleService ruleService, BudgetApiMapper mapper) {
         this.service = service;
+        this.ruleService = ruleService;
         this.mapper = mapper;
     }
 
@@ -50,7 +54,19 @@ public class CategoryApiController {
         return current();
     }
 
+    @PutMapping("/rules/{id}")
+    BudgetApiDtos.CategoriesResponse updateCategoryRule(@PathVariable String id, @RequestBody BudgetApiDtos.RuleUpsertRequest request) {
+        ruleService.saveRule(mapper.toClassificationRule(id, request));
+        return current();
+    }
+
+    @DeleteMapping("/rules/{id}")
+    BudgetApiDtos.CategoriesResponse deleteCategoryRule(@PathVariable String id) {
+        ruleService.deleteRule(id);
+        return current();
+    }
+
     private BudgetApiDtos.CategoriesResponse current() {
-        return mapper.toCategories(service.groups(), service.categories());
+        return mapper.toCategories(service.groups(), service.categories(), ruleService.rules());
     }
 }

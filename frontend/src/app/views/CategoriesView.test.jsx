@@ -75,4 +75,28 @@ describe("CategoriesView", () => {
 
     expect(onSaveCategory).toHaveBeenCalledWith("subskrypcje", expect.objectContaining({ label: "Subskrypcje" }));
   });
+
+  it("creates a classification rule", async () => {
+    const onSaveRule = vi.fn();
+    render(<CategoriesView catalog={catalog()} onSaveCategory={vi.fn()} onSaveGroup={vi.fn()} onSaveRule={onSaveRule} onDeleteRule={vi.fn()} />);
+
+    await userEvent.type(screen.getByLabelText("Wzorzec nowej reguły"), "BIEDRONKA");
+    await userEvent.selectOptions(screen.getByLabelText("Kategoria nowej reguły"), "groceries");
+    await userEvent.click(screen.getByText("Dodaj regułę"));
+
+    expect(onSaveRule).toHaveBeenCalledWith("new", expect.objectContaining({ pattern: "BIEDRONKA", categoryId: "groceries" }));
+  });
+
+  it("edits an existing rule by id", async () => {
+    const onSaveRule = vi.fn();
+    const withRule = {
+      ...catalog(),
+      rules: [{ ruleId: "5", matchType: "title", pattern: "OLDPATTERN", categoryId: "groceries", priority: 100, enabled: true, source: "user" }],
+    };
+    render(<CategoriesView catalog={withRule} onSaveCategory={vi.fn()} onSaveGroup={vi.fn()} onSaveRule={onSaveRule} onDeleteRule={vi.fn()} />);
+
+    await userEvent.click(screen.getByLabelText("Zapisz regułę 5"));
+
+    expect(onSaveRule).toHaveBeenCalledWith("5", expect.objectContaining({ pattern: "OLDPATTERN", categoryId: "groceries" }));
+  });
 });

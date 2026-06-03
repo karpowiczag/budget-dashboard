@@ -12,6 +12,7 @@ import com.budget.application.reporting.YearSummary;
 import com.budget.application.settings.BudgetSettings;
 import com.budget.domain.category.Category;
 import com.budget.domain.category.CategoryGroup;
+import com.budget.domain.category.ClassificationRule;
 import com.budget.domain.goal.Goal;
 import com.budget.domain.importjob.ImportRun;
 import com.budget.domain.networth.Account;
@@ -150,10 +151,35 @@ public class BudgetApiMapper {
         );
     }
 
-    public BudgetApiDtos.CategoriesResponse toCategories(List<CategoryGroup> groups, List<Category> categories) {
+    public BudgetApiDtos.CategoriesResponse toCategories(List<CategoryGroup> groups, List<Category> categories, List<ClassificationRule> rules) {
         return new BudgetApiDtos.CategoriesResponse(
                 groups.stream().map(this::toCategoryGroup).toList(),
-                categories.stream().map(this::toCategoryResponse).toList()
+                categories.stream().map(this::toCategoryResponse).toList(),
+                rules.stream().map(this::toCategoryRule).toList()
+        );
+    }
+
+    public BudgetApiDtos.CategoryRuleResponse toCategoryRule(ClassificationRule rule) {
+        return new BudgetApiDtos.CategoryRuleResponse(
+                rule.ruleId(),
+                rule.matchType(),
+                rule.pattern(),
+                rule.categoryId(),
+                rule.priority(),
+                rule.enabled(),
+                rule.source()
+        );
+    }
+
+    public ClassificationRule toClassificationRule(String ruleId, BudgetApiDtos.RuleUpsertRequest request) {
+        return new ClassificationRule(
+                ruleId,
+                "title",
+                request.pattern(),
+                request.categoryId(),
+                request.priority(),
+                request.enabled(),
+                "user"
         );
     }
 

@@ -1136,5 +1136,22 @@ describe("selectCategoryCatalog", () => {
     expect(model.groups).toEqual([]);
     expect(model.archived).toEqual([]);
     expect(model.bucketOptions).toEqual([]);
+    expect(model.rules).toEqual([]);
+  });
+
+  it("surfaces classification rules sorted by priority and id-based category options", () => {
+    const model = selectCategoryCatalog({
+      groups: [{ groupId: "obligatoryVariable", label: "Obowiązkowe zmienne", sortOrder: 2 }],
+      categories: [
+        { categoryId: "groceries", label: "Żywność i chemia", groupId: "obligatoryVariable", budgetBucket: "Obowiązkowe zmienne", area: "Koszty codzienne", fixedness: "Zmienne konieczne", flowType: "livingExpense", archived: false, sortOrder: 1 },
+      ],
+      rules: [
+        { ruleId: "2", pattern: "LIDL", categoryId: "groceries", priority: 1000, enabled: true, source: "builtin" },
+        { ruleId: "1", pattern: "BIEDRONKA", categoryId: "groceries", priority: 5, enabled: true, source: "user" },
+      ],
+    });
+
+    expect(model.rules.map((rule) => rule.ruleId)).toEqual(["1", "2"]);
+    expect(model.categoryOptions).toEqual([{ id: "groceries", label: "Żywność i chemia" }]);
   });
 });

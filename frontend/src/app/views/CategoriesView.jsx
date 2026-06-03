@@ -233,7 +233,77 @@ function NewCategoryForm({ options, onSaveCategory, saving }) {
   );
 }
 
-export function CategoriesView({ catalog, onSaveCategory, onSaveGroup, saving = false, status }) {
+function RuleEditorRow({ rule, categoryOptions, onSaveRule, onDeleteRule, saving }) {
+  const [pattern, setPattern] = useState(rule.pattern || "");
+  const [categoryId, setCategoryId] = useState(rule.categoryId || "");
+  const [priority, setPriority] = useState(String(rule.priority ?? 100));
+  const [enabled, setEnabled] = useState(rule.enabled !== false);
+  const canSave = pattern.trim() !== "" && categoryId !== "" && !saving;
+  return (
+    <tr>
+      <td>
+        <input value={pattern} aria-label={`Wzorzec reguły ${rule.ruleId}`} onChange={(event) => setPattern(event.target.value)} />
+      </td>
+      <td>
+        <select value={categoryId} aria-label={`Kategoria reguły ${rule.ruleId}`} onChange={(event) => setCategoryId(event.target.value)}>
+          {categoryOptions.map((option) => (
+            <option key={option.id} value={option.id}>{option.label}</option>
+          ))}
+        </select>
+      </td>
+      <td className="num">
+        <input type="number" value={priority} aria-label={`Priorytet reguły ${rule.ruleId}`} onChange={(event) => setPriority(event.target.value)} />
+      </td>
+      <td>
+        <label className="nwInline"><input type="checkbox" checked={enabled} aria-label={`Aktywna reguła ${rule.ruleId}`} onChange={(event) => setEnabled(event.target.checked)} /> aktywna</label>
+      </td>
+      <td className="nwMuted">{rule.source}</td>
+      <td>
+        <button
+          type="button"
+          className="primaryButton"
+          disabled={!canSave}
+          aria-label={`Zapisz regułę ${rule.ruleId}`}
+          onClick={() => onSaveRule(rule.ruleId, { pattern: pattern.trim(), categoryId, priority: Number(priority) || 0, enabled })}
+        >
+          {saving ? "..." : "Zapisz"}
+        </button>
+        <button type="button" className="nwGhost" disabled={saving} aria-label={`Usuń regułę ${rule.ruleId}`} onClick={() => onDeleteRule(rule.ruleId)}>
+          Usuń
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+function NewRuleForm({ categoryOptions, onSaveRule, saving }) {
+  const [pattern, setPattern] = useState("");
+  const [categoryId, setCategoryId] = useState(categoryOptions[0]?.id || "");
+  const canAdd = pattern.trim() !== "" && categoryId !== "" && !saving;
+  return (
+    <div className="nwNewLiability">
+      <input value={pattern} placeholder="Wzorzec (regex po opisie transakcji)" aria-label="Wzorzec nowej reguły" onChange={(event) => setPattern(event.target.value)} />
+      <select value={categoryId} aria-label="Kategoria nowej reguły" onChange={(event) => setCategoryId(event.target.value)}>
+        {categoryOptions.map((option) => (
+          <option key={option.id} value={option.id}>{option.label}</option>
+        ))}
+      </select>
+      <button
+        type="button"
+        className="primaryButton"
+        disabled={!canAdd}
+        onClick={() => {
+          onSaveRule("new", { pattern: pattern.trim(), categoryId, priority: 100, enabled: true });
+          setPattern("");
+        }}
+      >
+        {saving ? "Dodaję..." : "Dodaj regułę"}
+      </button>
+    </div>
+  );
+}
+
+export function CategoriesView({ catalog, onSaveCategory, onSaveGroup, onSaveRule, onDeleteRule, saving = false, status }) {
   const model = selectCategoryCatalog(catalog);
   return (
     <Panel title="Kategorie i grupy">
@@ -275,6 +345,31 @@ export function CategoriesView({ catalog, onSaveCategory, onSaveGroup, saving = 
       ) : null}
       <h3 className="nwMuted">Nowa kategoria</h3>
       <NewCategoryForm options={model} onSaveCategory={onSaveCategory} saving={saving} />
+
+      <h3 className="nwMuted">Reguły klasyfikacji</h3>
+      <p className="nwMuted">Reguła dopasowuje opis transakcji (regex) do kategorii; niższy priorytet wygrywa. Zmiany działają po ponownej analizie / imporcie.</p>
+      {model.rules.length ? (
+        <div className="nwTableScroll">
+          <table className="nwTable">
+            <thead>
+              <tr>
+                <th>Wzorzec</th>
+                <th>Kategoria</th>
+                <th className="num">Priorytet</th>
+                <th>Aktywna</th>
+                <th>Źródło</th>
+                <th aria-label="Akcje" />
+              </tr>
+            </thead>
+            <tbody>
+              {model.rules.map((rule) => (
+                <RuleEditorRow key={rule.ruleId} rule={rule} categoryOptions={model.categoryOptions} onSaveRule={onSaveRule} onDeleteRule={onDeleteRule} saving={saving} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      <NewRuleForm categoryOptions={model.categoryOptions} onSaveRule={onSaveRule} saving={saving} />
     </Panel>
   );
 }

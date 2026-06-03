@@ -196,6 +196,26 @@ export async function reorderCategories(payload) {
   return readJson(response, "Nie mogę zmienić kolejności kategorii");
 }
 
+export async function saveCategoryRule(id, rule) {
+  const response = await fetch(`/api/v1/categories/rules/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(rule),
+  });
+  return readJson(response, "Nie mogę zapisać reguły");
+}
+
+export async function deleteCategoryRule(id) {
+  const response = await fetch(`/api/v1/categories/rules/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: csrfHeaders(),
+  });
+  return readJson(response, "Nie mogę usunąć reguły");
+}
+
 export async function uploadTransactions(file) {
   const body = new FormData();
   body.append("file", file);

@@ -148,10 +148,17 @@ export function selectCategoryCatalog(catalog) {
   archived.sort((a, b) => a.label.localeCompare(b.label, "pl"));
   const distinctValues = (field) =>
     Array.from(new Set(rawCategories.map((category) => category[field]).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pl"));
+  const rawRules = Array.isArray(catalog?.rules) ? catalog.rules : [];
+  const rules = [...rawRules].sort((a, b) => (a.priority - b.priority) || a.pattern.localeCompare(b.pattern, "pl"));
+  const categoryOptions = [...rawCategories]
+    .map((category) => ({ id: category.categoryId, label: category.label }))
+    .sort((a, b) => a.label.localeCompare(b.label, "pl"));
   return {
     groups: groupModels,
     ungrouped,
     archived,
+    rules,
+    categoryOptions,
     groupOptions: groups.map((group) => ({ id: group.groupId, label: group.label })),
     bucketOptions: distinctValues("budgetBucket"),
     areaOptions: distinctValues("area"),

@@ -128,4 +128,37 @@ class CategoryApiControllerTest {
                         .content(groceriesBody("Żywność i chemia", "Nieistniejący koszyk", false)))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void listReturnsSeededClassificationRules() throws Exception {
+        mockMvc.perform(get("/api/v1/categories"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rules.length()").value(org.hamcrest.Matchers.greaterThan(0)))
+                .andExpect(jsonPath("$.rules[?(@.source=='builtin')]").isNotEmpty());
+    }
+
+    @Test
+    void createsAUserRuleAndReturnsItInTheCatalog() throws Exception {
+        mockMvc.perform(put("/api/v1/categories/rules/new")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pattern\":\"MOJ ULUBIONY SKLEP\",\"categoryId\":\"groceries\",\"priority\":100,\"enabled\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rules[?(@.pattern=='MOJ ULUBIONY SKLEP')].categoryId").value(hasItem("groceries")));
+    }
+
+    @Test
+    void rejectsAnInvalidRegexRuleWithBadRequest() throws Exception {
+        mockMvc.perform(put("/api/v1/categories/rules/new")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pattern\":\"[unterminated\",\"categoryId\":\"groceries\",\"priority\":100,\"enabled\":true}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsARuleTargetingAnUnknownCategoryWithBadRequest() throws Exception {
+        mockMvc.perform(put("/api/v1/categories/rules/new")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pattern\":\"COKOLWIEK\",\"categoryId\":\"nieistniejaca\",\"priority\":100,\"enabled\":true}"))
+                .andExpect(status().isBadRequest());
+    }
 }
