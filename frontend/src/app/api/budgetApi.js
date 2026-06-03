@@ -155,6 +155,47 @@ export async function deleteGoal(id) {
   return readJson(response, "Nie mogę usunąć celu");
 }
 
+export async function fetchCategories() {
+  const response = await fetch("/api/v1/categories");
+  return readJson(response, "Nie mogę wczytać kategorii");
+}
+
+export async function saveCategory(id, category) {
+  const response = await fetch(`/api/v1/categories/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(category),
+  });
+  return readJson(response, "Nie mogę zapisać kategorii");
+}
+
+export async function saveCategoryGroup(id, group) {
+  const response = await fetch(`/api/v1/categories/groups/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(group),
+  });
+  return readJson(response, "Nie mogę zapisać grupy kategorii");
+}
+
+export async function reorderCategories(payload) {
+  const response = await fetch("/api/v1/categories/reorder", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(payload),
+  });
+  return readJson(response, "Nie mogę zmienić kolejności kategorii");
+}
+
 export async function uploadTransactions(file) {
   const body = new FormData();
   body.append("file", file);

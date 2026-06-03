@@ -82,6 +82,7 @@ export function buildSidebarNavigation(isHistorical) {
       views: [
         { id: "control", label: "Ten miesiąc" },
         { id: "plan", label: isHistorical ? "Symulacja" : "Limity" },
+        { id: "categories", label: "Kategorie" },
       ],
     },
     { id: "transactions", label: "Transakcje", description: "Księga", views: [{ id: "transactions", label: "Transakcje" }] },
@@ -111,6 +112,52 @@ export function buildSidebarNavigation(isHistorical) {
 // the active section and its sub-nav from the current leaf view).
 export function sectionForView(sections, view) {
   return (sections || []).find((section) => (section.views || []).some((entry) => entry.id === view)) || null;
+}
+
+// Phase 3b: shape the /categories payload for the Kategorie manager — groups with their
+// non-archived categories nested and ordered, an archived list, and the fixed-vocabulary option
+// lists derived from the catalog itself (so the editor's selects match backend validation).
+export function selectCategoryCatalog(catalog) {
+  const rawGroups = Array.isArray(catalog?.groups) ? catalog.groups : [];
+  const rawCategories = Array.isArray(catalog?.categories) ? catalog.categories : [];
+  const groups = [...rawGroups].sort((a, b) => (a.sortOrder - b.sortOrder) || a.label.localeCompare(b.label, "pl"));
+  const sortCategories = (list) => list.sort((a, b) => (a.sortOrder - b.sortOrder) || a.label.localeCompare(b.label, "pl"));
+  const byGroup = new Map();
+  const archived = [];
+  for (const category of rawCategories) {
+    if (category.archived) {
+      archived.push(category);
+      continue;
+    }
+    const key = category.groupId || "";
+    if (!byGroup.has(key)) byGroup.set(key, []);
+    byGroup.get(key).push(category);
+  }
+  const knownGroupIds = new Set(groups.map((group) => group.groupId));
+  const groupModels = groups.map((group) => ({
+    groupId: group.groupId,
+    label: group.label,
+    sortOrder: group.sortOrder,
+    categories: sortCategories(byGroup.get(group.groupId) || []),
+  }));
+  const ungrouped = [];
+  for (const [key, list] of byGroup.entries()) {
+    if (!knownGroupIds.has(key)) ungrouped.push(...list);
+  }
+  sortCategories(ungrouped);
+  archived.sort((a, b) => a.label.localeCompare(b.label, "pl"));
+  const distinctValues = (field) =>
+    Array.from(new Set(rawCategories.map((category) => category[field]).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pl"));
+  return {
+    groups: groupModels,
+    ungrouped,
+    archived,
+    groupOptions: groups.map((group) => ({ id: group.groupId, label: group.label })),
+    bucketOptions: distinctValues("budgetBucket"),
+    areaOptions: distinctValues("area"),
+    fixednessOptions: distinctValues("fixedness"),
+    flowOptions: distinctValues("flowType"),
+  };
 }
 
 export function selectLocalTimeScope({ calendarStats, time }) {
@@ -899,6 +946,12 @@ export function selectModuleHeader({
       eyebrow: "Zobowiązania",
       title: "Co wraca co miesiąc?",
       subtitle: "Stałe rachunki, raty, abonamenty i rezerwy, bez fałszywych cyklicznych zakupów.",
+      cards: [],
+    },
+    categories: {
+      eyebrow: "Ustawienia",
+      title: "Kategorie i grupy",
+      subtitle: "Dodawaj, zmieniaj nazwy, ukrywaj i porządkuj kategorie. Koszyk/obszar/typ pozostają stałym słownikiem.",
       cards: [],
     },
     transactions: {

@@ -3,6 +3,7 @@ import {
   buildSidebarNavigation,
   selectBudgetBurnDown,
   selectBuckets,
+  selectCategoryCatalog,
   selectCategoryLimitChart,
   selectCategoryExamples,
   selectCostMatrix,
@@ -57,7 +58,7 @@ describe("sidebar navigation IA", () => {
       "Import",
     ]);
     // Budget merges control+plan; analysis merges reports+recurring; wealth merges flows+FIRE.
-    expect(buildSidebarNavigation(false).find((s) => s.id === "budget").views.map((v) => v.id)).toEqual(["control", "plan"]);
+    expect(buildSidebarNavigation(false).find((s) => s.id === "budget").views.map((v) => v.id)).toEqual(["control", "plan", "categories"]);
     expect(buildSidebarNavigation(false).find((s) => s.id === "analysis").views.map((v) => v.id)).toEqual(["reports", "obligations"]);
     expect(buildSidebarNavigation(false).find((s) => s.id === "wealth").views.map((v) => v.id)).toEqual(["wealth", "fire"]);
     expect(buildSidebarNavigation(false).find((s) => s.id === "import").utility).toBe(true);
@@ -1104,5 +1105,36 @@ describe("selectLimitRollover", () => {
     expect(model.totalBuffer).toBe(1000);
     expect(model.totalOverspend).toBe(-750);
     expect(model.overspent[0].category).toBe("Jedzenie poza domem");
+  });
+});
+
+describe("selectCategoryCatalog", () => {
+  it("nests non-archived categories under sorted groups and keeps archived separately", () => {
+    const model = selectCategoryCatalog({
+      groups: [
+        { groupId: "discretionary", label: "Nieobowiązkowe", sortOrder: 3 },
+        { groupId: "obligatoryVariable", label: "Obowiązkowe zmienne", sortOrder: 2 },
+      ],
+      categories: [
+        { categoryId: "groceries", label: "Żywność i chemia", groupId: "obligatoryVariable", budgetBucket: "Obowiązkowe zmienne", area: "Koszty codzienne", fixedness: "Zmienne konieczne", flowType: "livingExpense", archived: false, sortOrder: 1 },
+        { categoryId: "diningOut", label: "Jedzenie poza domem", groupId: "discretionary", budgetBucket: "Nieobowiązkowe", area: "Styl życia", fixedness: "Uznaniowe", flowType: "livingExpense", archived: false, sortOrder: 1 },
+        { categoryId: "oldThing", label: "Stara kategoria", groupId: "discretionary", budgetBucket: "Nieobowiązkowe", area: "Styl życia", fixedness: "Uznaniowe", flowType: "livingExpense", archived: true, sortOrder: 9 },
+      ],
+    });
+
+    expect(model.groups.map((group) => group.groupId)).toEqual(["obligatoryVariable", "discretionary"]);
+    expect(model.groups[0].categories.map((category) => category.categoryId)).toEqual(["groceries"]);
+    expect(model.groups[1].categories.map((category) => category.categoryId)).toEqual(["diningOut"]);
+    expect(model.archived.map((category) => category.categoryId)).toEqual(["oldThing"]);
+    expect(model.bucketOptions).toEqual(["Nieobowiązkowe", "Obowiązkowe zmienne"]);
+    expect(model.flowOptions).toEqual(["livingExpense"]);
+    expect(model.groupOptions.map((group) => group.id)).toEqual(["obligatoryVariable", "discretionary"]);
+  });
+
+  it("returns empty structures for a null catalog", () => {
+    const model = selectCategoryCatalog(null);
+    expect(model.groups).toEqual([]);
+    expect(model.archived).toEqual([]);
+    expect(model.bucketOptions).toEqual([]);
   });
 });

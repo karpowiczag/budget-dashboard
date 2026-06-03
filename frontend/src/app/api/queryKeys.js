@@ -8,6 +8,7 @@ export const budgetQueryKeys = {
   importRuns: ["budget", "imports", "runs"],
   netWorth: ["budget", "networth"],
   goals: ["budget", "goals"],
+  categories: ["budget", "categories"],
   transactions: (year, filters) => ["budget", "transactions", String(year || ""), filters || {}],
   years: ["budget", "years"],
 };

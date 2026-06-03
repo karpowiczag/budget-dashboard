@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { deleteGoal, deleteNetWorthLiability, fetchAnalytics, fetchCalendar, fetchFireSettings, fetchFireSummary, fetchGoals, fetchNetWorth, fetchTransactions, saveGoal, saveNetWorthAccount, saveNetWorthLiability, updateFireSettings } from "./api/budgetApi.js";
+import { deleteGoal, deleteNetWorthLiability, fetchAnalytics, fetchCalendar, fetchCategories, fetchFireSettings, fetchFireSummary, fetchGoals, fetchNetWorth, fetchTransactions, saveCategory, saveCategoryGroup, saveGoal, saveNetWorthAccount, saveNetWorthLiability, updateFireSettings } from "./api/budgetApi.js";
 import { budgetQueryKeys } from "./api/queryKeys.js";
 import { AppShell } from "./components/layout/AppShell.jsx";
 import { DashboardFooter } from "./components/layout/DashboardFooter.jsx";
@@ -14,6 +14,7 @@ import { useDashboardModel } from "./hooks/useDashboardModel.js";
 import { applyTheme, getInitialTheme } from "./theme.js";
 import { Moon, Sun } from "lucide-react";
 import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel, sectionForView } from "./domain/budgetSelectors.js";
+import { CategoriesView } from "./views/CategoriesView.jsx";
 import { ImportView } from "./views/ImportView.jsx";
 import { FireView } from "./views/FireView.jsx";
 import { ForecastPanel } from "./views/ForecastPanel.jsx";
@@ -55,6 +56,7 @@ export default function App() {
   const [fireSettingsStatus, setFireSettingsStatus] = useState(null);
   const [netWorthStatus, setNetWorthStatus] = useState(null);
   const [goalStatus, setGoalStatus] = useState(null);
+  const [categoryStatus, setCategoryStatus] = useState(null);
   const [view, setView] = useState("overview");
   const [theme, setTheme] = useState(getInitialTheme);
   const [localTimes, setLocalTimes] = useState({
@@ -199,6 +201,17 @@ export default function App() {
   });
   const goalDeleteMutation = useMutation({
     mutationFn: (id) => deleteGoal(id),
+  });
+  const categoriesQuery = useQuery({
+    queryKey: budgetQueryKeys.categories,
+    queryFn: fetchCategories,
+    enabled: view === "categories",
+  });
+  const categoryMutation = useMutation({
+    mutationFn: ({ id, category }) => saveCategory(id, category),
+  });
+  const categoryGroupMutation = useMutation({
+    mutationFn: ({ id, group }) => saveCategoryGroup(id, group),
   });
   const inspectorQuery = useQuery({
     queryKey: budgetQueryKeys.transactions(year, inspectorFilters),
@@ -444,6 +457,38 @@ export default function App() {
     }
   }
 
+  async function handleSaveCategory(id, category) {
+    setCategoryStatus({ type: "info", message: "Zapisuję kategorię..." });
+    try {
+      const saved = await categoryMutation.mutateAsync({ id, category });
+      queryClient.setQueryData(budgetQueryKeys.categories, saved);
+      // A category edit re-buckets/re-groups historical analysis, so refresh the dashboard and
+      // analytics caches (the new label/bucket reflects after the next analyze/rebuild).
+      queryClient.invalidateQueries({ queryKey: ["budget", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "analytics"] });
+      setCategoryStatus({ type: "success", message: "Kategoria zapisana." });
+      return saved;
+    } catch (error) {
+      setCategoryStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
+  async function handleSaveCategoryGroup(id, group) {
+    setCategoryStatus({ type: "info", message: "Zapisuję grupę..." });
+    try {
+      const saved = await categoryGroupMutation.mutateAsync({ id, group });
+      queryClient.setQueryData(budgetQueryKeys.categories, saved);
+      queryClient.invalidateQueries({ queryKey: ["budget", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "analytics"] });
+      setCategoryStatus({ type: "success", message: "Grupa zapisana." });
+      return saved;
+    } catch (error) {
+      setCategoryStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
   async function handleSaveSettings() {
     const base = settingsDraft || budgetSettings || {};
     const allLimitRows = [...(model.parentPlanRows || []), ...(model.planRows || [])];
@@ -590,6 +635,16 @@ export default function App() {
           monthlySpend={Number(model.plan?.currentMonthlySpend || 0)}
         />
         </>
+      )}
+
+      {view === "categories" && (
+        <CategoriesView
+          catalog={categoriesQuery.data}
+          onSaveCategory={handleSaveCategory}
+          onSaveGroup={handleSaveCategoryGroup}
+          saving={categoryMutation.isPending || categoryGroupMutation.isPending}
+          status={categoryStatus}
+        />
       )}
 
       {view === "reports" && (
