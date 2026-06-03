@@ -23,10 +23,14 @@ public class CategoryCatalogService {
     private static final Set<String> VALID_FIXEDNESS = distinct(BudgetTaxonomy.CategoryDefinition::fixedness);
     private static final Set<String> VALID_FLOWS = distinct(BudgetTaxonomy.CategoryDefinition::flowType);
     // Hardcoded floor of ids that hardcoded matchers/analysis reproduce on rebuild — undeletable even
-    // if the builtin column were somehow wrong. The builtin flag is the primary guard.
+    // if the builtin column were somehow wrong. The builtin flag is the primary guard; this backstops
+    // the crash-on-rebuild producer ids specifically: salary (employer-income/bank-category matcher),
+    // refundCorrection (positive-flow catch-all), unknownReview (fallback), marketplaceOnline (enrich
+    // split), groceries/diningOut (hardcoded daily-paced set), plus the wealth ids used by analysis.
     private static final Set<String> STRUCTURAL_FLOOR = Stream.concat(
             BudgetTaxonomy.wealthCategoryIds().stream(),
-            Stream.of(BudgetTaxonomy.CATEGORY_UNKNOWN, BudgetTaxonomy.CATEGORY_MARKETPLACE)
+            Stream.of(BudgetTaxonomy.CATEGORY_UNKNOWN, BudgetTaxonomy.CATEGORY_MARKETPLACE,
+                    "salary", "refundCorrection", "groceries", "diningOut")
     ).collect(Collectors.toUnmodifiableSet());
 
     private final CategoryStore store;

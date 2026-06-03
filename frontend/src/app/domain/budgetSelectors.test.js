@@ -1126,6 +1126,8 @@ describe("selectCategoryCatalog", () => {
     expect(model.groups[0].categories.map((category) => category.categoryId)).toEqual(["groceries"]);
     expect(model.groups[1].categories.map((category) => category.categoryId)).toEqual(["diningOut"]);
     expect(model.archived.map((category) => category.categoryId)).toEqual(["oldThing"]);
+    // Picker options (merge target, rule target) exclude archived categories.
+    expect(model.categoryOptions.map((option) => option.id)).toEqual(["diningOut", "groceries"]);
     expect(model.bucketOptions).toEqual(["Nieobowiązkowe", "Obowiązkowe zmienne"]);
     expect(model.flowOptions).toEqual(["livingExpense"]);
     expect(model.groupOptions.map((group) => group.id)).toEqual(["obligatoryVariable", "discretionary"]);

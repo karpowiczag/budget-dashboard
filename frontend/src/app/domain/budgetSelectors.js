@@ -150,7 +150,8 @@ export function selectCategoryCatalog(catalog) {
     Array.from(new Set(rawCategories.map((category) => category[field]).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pl"));
   const rawRules = Array.isArray(catalog?.rules) ? catalog.rules : [];
   const rules = [...rawRules].sort((a, b) => (a.priority - b.priority) || a.pattern.localeCompare(b.pattern, "pl"));
-  const categoryOptions = [...rawCategories]
+  const categoryOptions = rawCategories
+    .filter((category) => !category.archived)
     .map((category) => ({ id: category.categoryId, label: category.label }))
     .sort((a, b) => a.label.localeCompare(b.label, "pl"));
   return {
