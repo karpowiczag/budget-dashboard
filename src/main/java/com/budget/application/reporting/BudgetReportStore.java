@@ -18,6 +18,11 @@ public interface BudgetReportStore {
 
     TransactionPage findTransactions(TransactionQuery query);
 
+    /** Resolve a transaction's identity by its surrogate id within a year (for manual recategorize). */
+    default java.util.Optional<TransactionRecord> findTransactionById(int year, long id) {
+        return java.util.Optional.empty();
+    }
+
     void recordImportRun(Integer year, String inputCsv, String status, String message, int duplicatesRemoved);
 
     List<ImportRun> findImportRuns();

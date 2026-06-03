@@ -90,6 +90,29 @@ public class CategoryClassifier {
         return enriched;
     }
 
+    /**
+     * A decision that forces a specific category id (manual recategorize override), resolving label,
+     * flow and group from the catalog so it works for user-created categories too. Marked ok with a
+     * {@code manual-override} pattern; the subcategory is re-derived for the chosen category.
+     */
+    public CategoryDecision overrideDecision(String categoryId, String description) {
+        var definition = catalog.definitionById(categoryId);
+        var subcategory = subcategoryClassifier.subcategory(categoryId, description);
+        return new CategoryDecision(
+                categoryId,
+                definition.label(),
+                subcategory.id(),
+                subcategory.label(),
+                definition.flowType(),
+                definition.budgetGroupId(),
+                BudgetTaxonomy.budgetGroupLabel(definition.budgetGroupId()),
+                BudgetTaxonomy.REVIEW_OK,
+                "",
+                "manual-override",
+                true
+        );
+    }
+
     public String budgetArea(String category) {
         return metadata(category).area();
     }

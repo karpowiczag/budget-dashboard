@@ -516,6 +516,18 @@ public final class BudgetApiDtos {
     ) {
     }
 
+    public record RecategorizeRequest(
+            String categoryId
+    ) {
+    }
+
+    public record RecategorizeResponse(
+            int year,
+            long transactionId,
+            String categoryId
+    ) {
+    }
+
     public record CategoryGroupResponse(
             String groupId,
             String label,

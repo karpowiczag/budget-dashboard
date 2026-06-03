@@ -1,27 +1,54 @@
 package com.budget.application.analysis;
 
 import com.budget.application.categorization.CategoryClassifier;
+import com.budget.application.categorization.TransactionOverrideStore;
 import com.budget.domain.transaction.BankTransaction;
 import com.budget.domain.transaction.NormalizedTransaction;
+import com.budget.domain.transaction.TransactionContentKey;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 public class TransactionNormalizer {
     private static final BigDecimal LARGE_MARKETPLACE_AMOUNT = BigDecimal.valueOf(500);
     private static final Pattern MERCHANT_SPLIT = Pattern.compile(" ZAKUP| BLIK| PRZELEW| PŁATNOŚĆ| PLATNOSC| WPŁATA| WPLATA| DATA ", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+    private static final TransactionOverrideStore NO_OVERRIDES = new TransactionOverrideStore() {
+        @Override
+        public Map<String, String> overridesByKey() {
+            return Map.of();
+        }
+
+        @Override
+        public void setOverride(String contentKey, String categoryId, LocalDate postedDate, String account, BigDecimal amount, String description) {
+        }
+
+        @Override
+        public void clearOverride(String contentKey) {
+        }
+    };
 
     private final CategoryClassifier classifier;
+    private final TransactionOverrideStore overrideStore;
 
     public TransactionNormalizer(CategoryClassifier classifier) {
+        this(classifier, NO_OVERRIDES);
+    }
+
+    @Autowired
+    public TransactionNormalizer(CategoryClassifier classifier, TransactionOverrideStore overrideStore) {
         this.classifier = classifier;
+        this.overrideStore = overrideStore;
     }
 
     public List<NormalizedTransaction> normalize(List<BankTransaction> bankTransactions) {
+        var overrides = overrideStore.overridesByKey();
         var normalized = new ArrayList<NormalizedTransaction>();
         int lp = 1;
         for (var row : bankTransactions) {
@@ -29,6 +56,12 @@ public class TransactionNormalizer {
             var description = clean(row.description());
             var bankCategory = clean(row.bankCategory());
             var decision = classifier.classifyDecision(bankCategory, description, value);
+            // A manual recategorize override (matched by stable content key) wins over the whole
+            // matcher chain and re-derives every dimension from the chosen category id.
+            var overrideCategoryId = overrides.get(TransactionContentKey.of(row.date(), row.account(), row.amount(), row.description()));
+            if (overrideCategoryId != null && !overrideCategoryId.isBlank()) {
+                decision = classifier.overrideDecision(overrideCategoryId, description);
+            }
             var categoryId = decision.categoryId();
             // Resolve metadata and the display label by stable id, not by the matcher's label, so a
             // category rename propagates and never leaves normalization with an unresolvable label.

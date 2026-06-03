@@ -295,6 +295,13 @@ public class BudgetReportRepository implements BudgetReportStore {
     }
 
     @Override
+    public java.util.Optional<TransactionRecord> findTransactionById(int year, long id) {
+        var rows = jdbc.query("SELECT * FROM budget_transactions WHERE report_year = :year AND id = :id",
+                params(year).addValue("id", id), this::mapTransaction);
+        return rows.stream().findFirst();
+    }
+
+    @Override
     public void recordImportRun(Integer year, String inputCsv, String status, String message, int duplicatesRemoved) {
         importRuns.save(new ImportRunEntity(null, year, inputCsv, status, message, Math.max(0, duplicatesRemoved), OffsetDateTime.now()));
     }

@@ -7,16 +7,15 @@ import com.budget.application.reporting.YearSummary;
 import com.budget.domain.report.BudgetInput;
 import com.budget.domain.report.BudgetAnalysisResult;
 import com.budget.domain.transaction.BankTransaction;
+import com.budget.domain.transaction.TransactionContentKey;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -162,6 +161,20 @@ public class BudgetImportService {
         var result = analysisService.analyze(input);
         repository.save(result);
         return result;
+    }
+
+    /**
+     * Re-run analysis for a year from its already-imported transactions and persist the result. Used
+     * after a manual recategorize so the override is applied during normalization and all report
+     * rollups refresh. {@code save()} deletes the year first, so this never double-inserts.
+     */
+    public BudgetAnalysisResult reanalyzeYear(int year) {
+        var existing = existingRawTransactions(year);
+        if (existing.isEmpty()) {
+            throw new IllegalArgumentException("No imported transactions for year " + year);
+        }
+        var input = new BudgetInput(year, "reanalyze-" + year + ".csv", existing);
+        return importBudgetInputInTransaction(input);
     }
 
     private PreparedInput prepareIncrementalUpload(BudgetInput upload) {
@@ -312,11 +325,12 @@ public class BudgetImportService {
     }
 
     private TransactionFingerprint fingerprint(BankTransaction transaction) {
+        // Same canonicalization as the manual-recategorize override, so dedup and override agree.
         return new TransactionFingerprint(
                 transaction.date(),
-                normalizeKey(transaction.account()),
-                money(transaction.amount()),
-                normalizeDescriptionKey(transaction.description())
+                TransactionContentKey.account(transaction.account()),
+                TransactionContentKey.amount(transaction.amount()),
+                TransactionContentKey.description(transaction.description())
         );
     }
 
@@ -330,21 +344,6 @@ public class BudgetImportService {
 
     private boolean isUnsettled(BankTransaction transaction) {
         return transaction.description() != null && UNSETTLED_CARD_MARKER.matcher(transaction.description()).find();
-    }
-
-    private String normalizeDescriptionKey(String value) {
-        return normalizeKey(UNSETTLED_CARD_MARKER.matcher(value == null ? "" : value).replaceAll(""));
-    }
-
-    private String normalizeKey(String value) {
-        return (value == null ? "" : value)
-                .replaceAll("\\s+", " ")
-                .trim()
-                .toUpperCase(Locale.ROOT);
-    }
-
-    private BigDecimal money(BigDecimal value) {
-        return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP);
     }
 
     private boolean blank(String value) {
