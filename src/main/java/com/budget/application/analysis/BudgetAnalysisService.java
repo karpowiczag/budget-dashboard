@@ -1,6 +1,5 @@
 package com.budget.application.analysis;
 
-import com.budget.application.categorization.BudgetTaxonomy;
 import com.budget.application.categorization.CategoryClassifier;
 import com.budget.application.settings.BudgetSettings;
 import com.budget.application.settings.BudgetSettingsService;
@@ -39,11 +38,6 @@ public class BudgetAnalysisService {
     private static final String BUCKET_SAVINGS_ACCOUNT = "Konto oszczędnościowe";
     private static final String BUCKET_LOAN_OVERPAYMENT = "Nadpłata kredytu";
     private static final Set<String> OBLIGATORY_BUCKETS = Set.of(BUCKET_FIXED_OBLIGATORY, BUCKET_VARIABLE_OBLIGATORY);
-    private static final Set<String> REAL_SAVING_CATEGORIES = BudgetTaxonomy.wealthCategoryLabels();
-    private static final Set<String> DAILY_PACED_CATEGORIES = Set.of(
-            "Żywność i chemia",
-            "Jedzenie poza domem"
-    );
     private static final Map<String, ConfiguredCategoryLimit> DEFAULT_CATEGORY_LIMITS = Map.ofEntries(
             Map.entry("Żywność i chemia", new ConfiguredCategoryLimit(2400, "Plan posiłków, większe zakupy z listą, mniej awaryjnych wizyt.")),
             Map.entry("Jedzenie poza domem", new ConfiguredCategoryLimit(600, "Limit na restauracje, kawę i dostawy; zostawić tylko celowe wyjścia.")),
@@ -104,8 +98,9 @@ public class BudgetAnalysisService {
         var excludedOutgoingTotal = sum(transactions, NormalizedTransaction::excludedOutgoing);
         var excludedIncomingTotal = sum(transactions, NormalizedTransaction::excludedIncoming);
         var excludedNetTotal = sum(transactions, NormalizedTransaction::excludedNet);
+        var wealthCategories = classifier.wealthCategoryLabels();
         var realSavingsOut = sum(transactions.stream()
-                .filter(tx -> REAL_SAVING_CATEGORIES.contains(tx.correctedCategory()))
+                .filter(tx -> wealthCategories.contains(tx.correctedCategory()))
                 .toList(), NormalizedTransaction::excludedOutgoing);
         var operatingSurplus = money(incomeTotal.subtract(spendTotal));
         var unassignedSurplus = money(incomeTotal.subtract(spendTotal).subtract(realSavingsOut));
@@ -248,13 +243,14 @@ public class BudgetAnalysisService {
 
     private List<BudgetSnapshot.MonthlySummary> monthlyRows(List<NormalizedTransaction> transactions, List<String> months, List<String> labels, LocalDate periodStart, LocalDate periodEnd) {
         var rows = new ArrayList<BudgetSnapshot.MonthlySummary>();
+        var wealthCategories = classifier.wealthCategoryLabels();
         for (var i = 0; i < months.size(); i++) {
             var month = months.get(i);
             var items = transactions.stream().filter(tx -> tx.month().equals(month)).toList();
             var income = sum(items, NormalizedTransaction::income);
             var spend = sum(items, NormalizedTransaction::analysisSpend);
             var excluded = sum(items, NormalizedTransaction::excluded);
-            var savings = sum(items.stream().filter(tx -> REAL_SAVING_CATEGORIES.contains(tx.correctedCategory())).toList(), NormalizedTransaction::excludedOutgoing);
+            var savings = sum(items.stream().filter(tx -> wealthCategories.contains(tx.correctedCategory())).toList(), NormalizedTransaction::excludedOutgoing);
             rows.add(new BudgetSnapshot.MonthlySummary(
                     labels.get(i),
                     month,
@@ -873,7 +869,7 @@ public class BudgetAnalysisService {
         if (current == null || current.signum() <= 0 || elapsedDays <= 0 || elapsedDays >= daysTotal) {
             return money(current);
         }
-        if (DAILY_PACED_CATEGORIES.contains(category)) {
+        if (classifier.isDailyPaced(category)) {
             return money(divide(current, elapsedDays).multiply(BigDecimal.valueOf(daysTotal)));
         }
         return money(current);

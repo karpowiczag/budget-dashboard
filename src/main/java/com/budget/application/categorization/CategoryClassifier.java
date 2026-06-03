@@ -3,6 +3,7 @@ package com.budget.application.categorization;
 import com.budget.domain.category.CategoryMatch;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +12,7 @@ public class CategoryClassifier {
     private final List<CategoryRuleMatcher> matchers;
     private final RegexCategoryRuleMatcher regexMatcher;
     private final SubcategoryClassifier subcategoryClassifier;
+    private final CategoryCatalog catalog;
 
     public CategoryClassifier() {
         this(PersonalCategoryRules.empty());
@@ -22,8 +24,13 @@ public class CategoryClassifier {
     }
 
     CategoryClassifier(RegexCategoryRuleMatcher regexMatcher, SubcategoryClassifier subcategoryClassifier) {
+        this(regexMatcher, subcategoryClassifier, new BudgetTaxonomyCatalog());
+    }
+
+    CategoryClassifier(RegexCategoryRuleMatcher regexMatcher, SubcategoryClassifier subcategoryClassifier, CategoryCatalog catalog) {
         this.regexMatcher = regexMatcher;
         this.subcategoryClassifier = subcategoryClassifier;
+        this.catalog = catalog;
         this.matchers = List.of(
                 new PositiveEmployerIncomeMatcher(),
                 new BankCategoryRuleMatcher(),
@@ -90,7 +97,7 @@ public class CategoryClassifier {
     }
 
     public String subcategory(String category, String description) {
-        return subcategoryClassifier.subcategory(BudgetTaxonomy.categoryIdByLabel(category), description).label();
+        return subcategoryClassifier.subcategory(catalog.categoryIdByLabel(category), description).label();
     }
 
     public boolean isDiscretionary(String category) {
@@ -105,7 +112,15 @@ public class CategoryClassifier {
         return metadata(category).realIncome();
     }
 
+    public boolean isDailyPaced(String category) {
+        return catalog.isDailyPaced(category);
+    }
+
+    public Set<String> wealthCategoryLabels() {
+        return catalog.wealthCategoryLabels();
+    }
+
     private BudgetTaxonomy.CategoryDefinition metadata(String category) {
-        return BudgetTaxonomy.category(BudgetTaxonomy.categoryIdByLabel(category));
+        return catalog.definitionByLabel(category);
     }
 }
