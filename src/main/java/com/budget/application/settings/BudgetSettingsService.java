@@ -15,6 +15,11 @@ public class BudgetSettingsService {
     private static final List<String> DEFAULT_SINKING_FUND_CATEGORIES = List.of(
             "Podróże i wyjazdy", "Ubezpieczenia", "Zwierzęta", "Paliwo i auto",
             "Elektronika", "Lekarz i apteka", "Uroda i kosmetyki");
+
+    /** Default sinking-fund category labels, exposed so the category DB seed reuses the exact set. */
+    public static List<String> defaultSinkingFundCategories() {
+        return DEFAULT_SINKING_FUND_CATEGORIES;
+    }
     private static final Set<String> LIMIT_SCOPES = Set.of("bucket", "area", "group", "category");
     private static final Set<String> BUCKET_OVERRIDES = Set.of(
             "Obowiązkowe stałe",

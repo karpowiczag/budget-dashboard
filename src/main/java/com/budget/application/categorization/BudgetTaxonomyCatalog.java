@@ -17,6 +17,11 @@ public class BudgetTaxonomyCatalog implements CategoryCatalog {
             "Jedzenie poza domem"
     );
 
+    /** Canonical daily-paced label set, exposed so the DB seed reuses the exact values. */
+    public static Set<String> dailyPacedLabels() {
+        return DAILY_PACED_LABELS;
+    }
+
     @Override
     public BudgetTaxonomy.CategoryDefinition definitionById(String categoryId) {
         return BudgetTaxonomy.category(categoryId);

@@ -1,6 +1,7 @@
 package com.budget.application.categorization;
 
 import com.budget.domain.category.CategoryRule;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -12,7 +13,7 @@ import java.util.stream.Collectors;
 public final class BudgetTaxonomy {
     static final String FLOW_INCOME = "income";
     static final String FLOW_LIVING_EXPENSE = "livingExpense";
-    static final String FLOW_WEALTH_TRANSFER = "wealthTransfer";
+    public static final String FLOW_WEALTH_TRANSFER = "wealthTransfer";
     static final String FLOW_TECHNICAL_TRANSFER = "technicalTransfer";
     static final String FLOW_REFUND_CORRECTION = "refundCorrection";
     static final String FLOW_REVIEW = "review";
@@ -160,6 +161,24 @@ public final class BudgetTaxonomy {
     }
 
     /**
+     * The default category catalog, in stable display order. Source for the first-boot DB seed
+     * (Phase 3b); after seeding the runtime catalog is the DB, not this map.
+     */
+    public static Collection<CategoryDefinition> categories() {
+        return CATEGORIES.values();
+    }
+
+    /** The default budget groups, in stable display order. Source for the first-boot DB seed. */
+    public static Collection<BudgetGroup> budgetGroups() {
+        return BUDGET_GROUPS.values();
+    }
+
+    /** Old category labels mapped to current ids, for backward-compatible label resolution. */
+    public static Map<String, String> legacyCategoryLabelAliases() {
+        return LEGACY_CATEGORY_LABEL_ALIASES;
+    }
+
+    /**
      * Canonical labels of the wealth-building categories (investments, savings
      * account, loan overpayment). Single source of truth so persistence,
      * analysis, and FIRE linkage cannot silently drift if a label is renamed.
@@ -216,10 +235,10 @@ public final class BudgetTaxonomy {
         return Collections.unmodifiableMap(map);
     }
 
-    record BudgetGroup(String id, String label) {
+    public record BudgetGroup(String id, String label) {
     }
 
-    record CategoryDefinition(
+    public record CategoryDefinition(
             String id,
             String label,
             String area,

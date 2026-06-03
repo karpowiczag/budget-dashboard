@@ -18,9 +18,13 @@ public class CategoryClassifier {
         this(PersonalCategoryRules.empty());
     }
 
-    @Autowired
     public CategoryClassifier(PersonalCategoryRules personalRules) {
-        this(new RegexCategoryRuleMatcher(personalRules), new SubcategoryClassifier());
+        this(personalRules, new BudgetTaxonomyCatalog());
+    }
+
+    @Autowired
+    public CategoryClassifier(PersonalCategoryRules personalRules, CategoryCatalog catalog) {
+        this(new RegexCategoryRuleMatcher(personalRules), new SubcategoryClassifier(), catalog);
     }
 
     CategoryClassifier(RegexCategoryRuleMatcher regexMatcher, SubcategoryClassifier subcategoryClassifier) {
