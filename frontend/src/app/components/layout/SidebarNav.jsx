@@ -1,26 +1,45 @@
 import {
   BarChart3,
-  CalendarCheck,
   ClipboardList,
   Database,
   Landmark,
+  LayoutDashboard,
   Moon,
   ReceiptText,
-  ShieldCheck,
   Sun,
 } from "lucide-react";
 
 const ICONS = {
-  control: CalendarCheck,
-  plan: ClipboardList,
-  reports: BarChart3,
-  wealth: Landmark,
-  obligations: ShieldCheck,
+  overview: LayoutDashboard,
+  budget: ClipboardList,
   transactions: ReceiptText,
+  analysis: BarChart3,
+  wealth: Landmark,
   import: Database,
 };
 
 export function SidebarNav({ activeView, data, onViewChange, onYearChange, onToggleTheme, theme = "light", views = [], year, years = [] }) {
+  const sections = views;
+  const mainSections = sections.filter((section) => !section.utility);
+  const utilitySections = sections.filter((section) => section.utility);
+  const isActive = (section) => (section.views || []).some((entry) => entry.id === activeView);
+
+  function renderSectionButton(section) {
+    const Icon = ICONS[section.id] || BarChart3;
+    return (
+      <button
+        type="button"
+        key={section.id}
+        className={isActive(section) ? "active" : ""}
+        onClick={() => onViewChange((section.views[0] || {}).id)}
+      >
+        <Icon size={18} />
+        <span>{section.label}</span>
+        {section.description && <em>{section.description}</em>}
+      </button>
+    );
+  }
+
   return (
     <aside className="sidebarNav">
       <div className="sidebarBrand">
@@ -29,23 +48,15 @@ export function SidebarNav({ activeView, data, onViewChange, onYearChange, onTog
         <span>{data?.period || "Import CSV"}</span>
       </div>
 
-      <nav aria-label="Moduły budżetu">
-        {views.map((item) => {
-          const Icon = ICONS[item.id] || BarChart3;
-          return (
-            <button
-              type="button"
-              key={item.id}
-              className={activeView === item.id ? "active" : ""}
-              onClick={() => onViewChange(item.id)}
-            >
-              <Icon size={18} />
-              <span>{item.label}</span>
-              {item.description && <em>{item.description}</em>}
-            </button>
-          );
-        })}
+      <nav aria-label="Sekcje budżetu">
+        {mainSections.map(renderSectionButton)}
       </nav>
+
+      {utilitySections.length > 0 && (
+        <div className="sidebarUtility" aria-label="Narzędzia">
+          {utilitySections.map(renderSectionButton)}
+        </div>
+      )}
 
       <div className="sidebarYears">
         <span>Rok</span>

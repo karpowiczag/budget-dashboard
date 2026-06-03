@@ -3,12 +3,23 @@ package com.budget.application.settings;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class BudgetSettingsService {
+    private static final BigDecimal DEFAULT_NET_INCOME_RATIO = new BigDecimal("0.75");
+    private static final List<String> DEFAULT_SINKING_FUND_CATEGORIES = List.of(
+            "Podróże i wyjazdy", "Ubezpieczenia", "Zwierzęta", "Paliwo i auto",
+            "Elektronika", "Lekarz i apteka", "Uroda i kosmetyki");
+
+    /** Default sinking-fund category labels, exposed so the category DB seed reuses the exact set. */
+    public static List<String> defaultSinkingFundCategories() {
+        return DEFAULT_SINKING_FUND_CATEGORIES;
+    }
     private static final Set<String> LIMIT_SCOPES = Set.of("bucket", "area", "group", "category");
     private static final Set<String> BUCKET_OVERRIDES = Set.of(
             "Obowiązkowe stałe",
@@ -44,8 +55,29 @@ public class BudgetSettingsService {
                 positiveOrDefault(settings.aggressiveMonthlySpend(), defaults.aggressiveMonthlySpend()),
                 positiveOrDefault(settings.emergencyFundMinMonths(), defaults.emergencyFundMinMonths()),
                 positiveOrDefault(settings.emergencyFundComfortMonths(), defaults.emergencyFundComfortMonths()),
+                netIncomeRatioOrDefault(settings.netIncomeRatio()),
+                sinkingFundCategoriesOrDefault(settings.sinkingFundCategories()),
                 settings.categoryLimits()
         );
+    }
+
+    private BigDecimal netIncomeRatioOrDefault(BigDecimal ratio) {
+        return ratio != null && ratio.signum() > 0 && ratio.compareTo(BigDecimal.ONE) <= 0
+                ? ratio.setScale(4, RoundingMode.HALF_UP)
+                : DEFAULT_NET_INCOME_RATIO;
+    }
+
+    private List<String> sinkingFundCategoriesOrDefault(List<String> categories) {
+        if (categories == null || categories.isEmpty()) {
+            return DEFAULT_SINKING_FUND_CATEGORIES;
+        }
+        var seen = new LinkedHashSet<String>();
+        for (var category : categories) {
+            if (category != null && !category.isBlank()) {
+                seen.add(category.trim());
+            }
+        }
+        return seen.isEmpty() ? DEFAULT_SINKING_FUND_CATEGORIES : List.copyOf(seen);
     }
 
     private BudgetSettings validate(BudgetSettings settings) {
@@ -88,6 +120,8 @@ public class BudgetSettingsService {
                 money(normalized.aggressiveMonthlySpend()),
                 normalized.emergencyFundMinMonths(),
                 normalized.emergencyFundComfortMonths(),
+                normalized.netIncomeRatio(),
+                normalized.sinkingFundCategories(),
                 java.util.List.copyOf(limitsByKey.values())
         );
     }

@@ -42,6 +42,28 @@ class FireProjectionTest {
     }
 
     @Test
+    void monteCarloIsDeterministicAndBounded() {
+        var first = FireProjection.monteCarloSuccessRate(new BigDecimal("100000"), new BigDecimal("3000"), new BigDecimal("0.04"), new BigDecimal("0.13"), 120, new BigDecimal("500000"), 500, 42L);
+        var second = FireProjection.monteCarloSuccessRate(new BigDecimal("100000"), new BigDecimal("3000"), new BigDecimal("0.04"), new BigDecimal("0.13"), 120, new BigDecimal("500000"), 500, 42L);
+        assertThat(first).isEqualTo(second);
+        assertThat(first).isBetween(0.0, 1.0);
+    }
+
+    @Test
+    void monteCarloIsNearCertainForEasyTargetAndZeroForImpossible() {
+        var easy = FireProjection.monteCarloSuccessRate(new BigDecimal("100000"), new BigDecimal("5000"), new BigDecimal("0.04"), new BigDecimal("0.12"), 120, new BigDecimal("50000"), 1000, 7L);
+        assertThat(easy).isGreaterThanOrEqualTo(0.9);
+        var impossible = FireProjection.monteCarloSuccessRate(new BigDecimal("1000"), BigDecimal.ZERO, new BigDecimal("0.04"), new BigDecimal("0.12"), 120, new BigDecimal("10000000"), 1000, 7L);
+        assertThat(impossible).isEqualTo(0.0);
+    }
+
+    @Test
+    void monteCarloZeroHorizonComparesPrincipalToTarget() {
+        assertThat(FireProjection.monteCarloSuccessRate(new BigDecimal("5000"), BigDecimal.ZERO, new BigDecimal("0.04"), new BigDecimal("0.12"), 0, new BigDecimal("4000"), 100, 1L)).isEqualTo(1.0);
+        assertThat(FireProjection.monteCarloSuccessRate(new BigDecimal("3000"), BigDecimal.ZERO, new BigDecimal("0.04"), new BigDecimal("0.12"), 0, new BigDecimal("4000"), 100, 1L)).isEqualTo(0.0);
+    }
+
+    @Test
     void nonPositiveHorizonShortCircuits() {
         assertThat(FireProjection.futureValue(new BigDecimal("5000"), new BigDecimal("100"), ONE_PERCENT, 0))
                 .isEqualByComparingTo("5000");

@@ -35,12 +35,19 @@ public class JdbcBudgetSettingsRepository implements BudgetSettingsStore {
                 WHERE settings_key = :settingsKey
                 ORDER BY limit_scope, limit_name, category
                 """, params(), this::mapLimit);
+        var sinkingFundCategories = jdbc.query("""
+                SELECT category FROM budget_sinking_fund_categories
+                WHERE settings_key = :settingsKey
+                ORDER BY category
+                """, params(), (rs, rowNum) -> rs.getString("category"));
         var profile = profiles.getFirst();
         return Optional.of(new BudgetSettings(
                 profile.targetMonthlySpend(),
                 profile.aggressiveMonthlySpend(),
                 profile.emergencyFundMinMonths(),
                 profile.emergencyFundComfortMonths(),
+                profile.netIncomeRatio(),
+                sinkingFundCategories,
                 limits
         ));
     }
@@ -52,16 +59,17 @@ public class JdbcBudgetSettingsRepository implements BudgetSettingsStore {
         jdbc.update("""
                 INSERT INTO budget_settings_profiles (
                     settings_key, target_monthly_spend, aggressive_monthly_spend,
-                    emergency_fund_min_months, emergency_fund_comfort_months, updated_at
+                    emergency_fund_min_months, emergency_fund_comfort_months, net_income_ratio, updated_at
                 ) VALUES (
                     :settingsKey, :targetMonthlySpend, :aggressiveMonthlySpend,
-                    :emergencyFundMinMonths, :emergencyFundComfortMonths, :updatedAt
+                    :emergencyFundMinMonths, :emergencyFundComfortMonths, :netIncomeRatio, :updatedAt
                 )
                 """, params()
                 .addValue("targetMonthlySpend", settings.targetMonthlySpend())
                 .addValue("aggressiveMonthlySpend", settings.aggressiveMonthlySpend())
                 .addValue("emergencyFundMinMonths", settings.emergencyFundMinMonths())
                 .addValue("emergencyFundComfortMonths", settings.emergencyFundComfortMonths())
+                .addValue("netIncomeRatio", settings.netIncomeRatio())
                 .addValue("updatedAt", OffsetDateTime.now()));
 
         for (var limit : settings.categoryLimits()) {
@@ -79,6 +87,13 @@ public class JdbcBudgetSettingsRepository implements BudgetSettingsStore {
                     .addValue("action", limit.action())
                     .addValue("bucketOverride", limit.bucketOverride()));
         }
+
+        for (var category : settings.sinkingFundCategories()) {
+            jdbc.update("""
+                    INSERT INTO budget_sinking_fund_categories (settings_key, category)
+                    VALUES (:settingsKey, :category)
+                    """, params().addValue("category", category));
+        }
         return findDefaultSettings().orElseThrow();
     }
 
@@ -87,7 +102,8 @@ public class JdbcBudgetSettingsRepository implements BudgetSettingsStore {
                 rs.getBigDecimal("target_monthly_spend"),
                 rs.getBigDecimal("aggressive_monthly_spend"),
                 rs.getInt("emergency_fund_min_months"),
-                rs.getInt("emergency_fund_comfort_months")
+                rs.getInt("emergency_fund_comfort_months"),
+                rs.getBigDecimal("net_income_ratio")
         );
     }
 
@@ -114,7 +130,8 @@ public class JdbcBudgetSettingsRepository implements BudgetSettingsStore {
             java.math.BigDecimal targetMonthlySpend,
             java.math.BigDecimal aggressiveMonthlySpend,
             int emergencyFundMinMonths,
-            int emergencyFundComfortMonths
+            int emergencyFundComfortMonths,
+            java.math.BigDecimal netIncomeRatio
     ) {
     }
 }

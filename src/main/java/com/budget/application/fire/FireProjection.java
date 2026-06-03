@@ -24,6 +24,39 @@ final class FireProjection {
         return BigDecimal.valueOf(principal.doubleValue() * factor + monthlyContribution.doubleValue() * contributionFactor);
     }
 
+    /**
+     * Monte-Carlo success probability: the fraction of simulated paths whose terminal value
+     * reaches {@code target}. Each month draws a normally-distributed real return from the
+     * annual mean/volatility. Seeded for deterministic, testable results.
+     */
+    static double monteCarloSuccessRate(BigDecimal principal, BigDecimal monthlyContribution, BigDecimal expectedAnnualReturn,
+            BigDecimal annualVolatility, int months, BigDecimal target, int paths, long seed) {
+        if (paths <= 0) {
+            return 0.0;
+        }
+        if (months <= 0) {
+            return principal.doubleValue() >= target.doubleValue() ? 1.0 : 0.0;
+        }
+        var monthlyMean = expectedAnnualReturn.doubleValue() / 12.0;
+        var monthlyVol = annualVolatility.doubleValue() / Math.sqrt(12.0);
+        var start = principal.doubleValue();
+        var contribution = monthlyContribution.doubleValue();
+        var goal = target.doubleValue();
+        var random = new java.util.Random(seed);
+        var successes = 0;
+        for (var path = 0; path < paths; path++) {
+            var value = start;
+            for (var month = 0; month < months; month++) {
+                var monthlyReturn = monthlyMean + monthlyVol * random.nextGaussian();
+                value = value * (1 + monthlyReturn) + contribution;
+            }
+            if (value >= goal) {
+                successes++;
+            }
+        }
+        return (double) successes / paths;
+    }
+
     static BigDecimal requiredMonthlyContribution(BigDecimal principal, BigDecimal target, BigDecimal monthlyReturn, int months) {
         if (months <= 0) {
             return BigDecimal.ZERO;

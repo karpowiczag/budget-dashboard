@@ -62,21 +62,110 @@ const BUCKET_LIMIT_ALIASES = {
 };
 export const BUDGET_BUCKET_OPTIONS = ["Obowiązkowe stałe", "Obowiązkowe zmienne", "Do rozbicia", "Nieobowiązkowe", "Nieregularne", "Inwestycje", "Konto oszczędnościowe", "Nadpłata kredytu"];
 
-export function buildDashboardViews(isHistorical) {
-  return buildSidebarNavigation(isHistorical);
-}
+// Approximate net-of-gross income ratio for PL (~25% effective tax + contributions).
+// The 50/30/20 rule is defined on NET income, but the income we track is gross salary
+// ("Pensja"). Applying this ratio keeps the benchmark honest instead of overstating the
+// safe allowance by ~20%. Phase 2 makes this a per-household setting. See planning review.
+export const NET_INCOME_RATIO = 0.75;
 
+
+// Grouped, config-driven information architecture. Each top-level section maps
+// to one or more leaf views; sections with >1 view render an in-section sub-nav.
+// Import is a low-frequency utility, separated from the daily destinations.
 export function buildSidebarNavigation(isHistorical) {
   return [
-    { id: "control", label: "Kontrola", description: "Ten miesiąc" },
-    { id: "plan", label: isHistorical ? "Symulacja" : "Plan" },
-    { id: "reports", label: "Raporty" },
-    { id: "wealth", label: "Majątek" },
-    { id: "fire", label: "FIRE" },
-    { id: "obligations", label: "Zobowiązania" },
-    { id: "transactions", label: "Transakcje" },
-    { id: "import", label: "Import" },
+    { id: "overview", label: "Przegląd", description: "Start", views: [{ id: "overview", label: "Przegląd" }] },
+    {
+      id: "budget",
+      label: "Budżet",
+      description: "Limity i kontrola",
+      views: [
+        { id: "control", label: "Ten miesiąc" },
+        { id: "plan", label: isHistorical ? "Symulacja" : "Limity" },
+        { id: "categories", label: "Kategorie" },
+      ],
+    },
+    { id: "transactions", label: "Transakcje", description: "Księga", views: [{ id: "transactions", label: "Transakcje" }] },
+    {
+      id: "analysis",
+      label: "Analiza",
+      description: "Raporty i cykle",
+      views: [
+        { id: "reports", label: "Raporty" },
+        { id: "obligations", label: "Cykliczne" },
+      ],
+    },
+    {
+      id: "wealth",
+      label: "Majątek",
+      description: "Przepływy i FIRE",
+      views: [
+        { id: "wealth", label: "Przepływy" },
+        { id: "fire", label: "FIRE" },
+      ],
+    },
+    { id: "import", label: "Import", utility: true, views: [{ id: "import", label: "Import" }] },
   ];
+}
+
+// Flattened leaf-view -> section lookup helpers (used by the shell to resolve
+// the active section and its sub-nav from the current leaf view).
+export function sectionForView(sections, view) {
+  return (sections || []).find((section) => (section.views || []).some((entry) => entry.id === view)) || null;
+}
+
+// Phase 3b: shape the /categories payload for the Kategorie manager — groups with their
+// non-archived categories nested and ordered, an archived list, and the fixed-vocabulary option
+// lists derived from the catalog itself (so the editor's selects match backend validation).
+export function selectCategoryCatalog(catalog) {
+  const rawGroups = Array.isArray(catalog?.groups) ? catalog.groups : [];
+  const rawCategories = Array.isArray(catalog?.categories) ? catalog.categories : [];
+  const groups = [...rawGroups].sort((a, b) => (a.sortOrder - b.sortOrder) || a.label.localeCompare(b.label, "pl"));
+  const sortCategories = (list) => list.sort((a, b) => (a.sortOrder - b.sortOrder) || a.label.localeCompare(b.label, "pl"));
+  const byGroup = new Map();
+  const archived = [];
+  for (const category of rawCategories) {
+    if (category.archived) {
+      archived.push(category);
+      continue;
+    }
+    const key = category.groupId || "";
+    if (!byGroup.has(key)) byGroup.set(key, []);
+    byGroup.get(key).push(category);
+  }
+  const knownGroupIds = new Set(groups.map((group) => group.groupId));
+  const groupModels = groups.map((group) => ({
+    groupId: group.groupId,
+    label: group.label,
+    sortOrder: group.sortOrder,
+    categories: sortCategories(byGroup.get(group.groupId) || []),
+  }));
+  const ungrouped = [];
+  for (const [key, list] of byGroup.entries()) {
+    if (!knownGroupIds.has(key)) ungrouped.push(...list);
+  }
+  sortCategories(ungrouped);
+  archived.sort((a, b) => a.label.localeCompare(b.label, "pl"));
+  const distinctValues = (field) =>
+    Array.from(new Set(rawCategories.map((category) => category[field]).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pl"));
+  const rawRules = Array.isArray(catalog?.rules) ? catalog.rules : [];
+  const rules = [...rawRules].sort((a, b) => (a.priority - b.priority) || a.pattern.localeCompare(b.pattern, "pl"));
+  const categoryOptions = rawCategories
+    .filter((category) => !category.archived)
+    .map((category) => ({ id: category.categoryId, label: category.label }))
+    .sort((a, b) => a.label.localeCompare(b.label, "pl"));
+  return {
+    groups: groupModels,
+    ungrouped,
+    archived,
+    rules,
+    categoryOptions,
+    groupOptions: groups.map((group) => ({ id: group.groupId, label: group.label })),
+    bucketOptions: distinctValues("budgetBucket"),
+    areaOptions: distinctValues("area"),
+    fixednessOptions: distinctValues("fixedness"),
+    flowOptions: distinctValues("flowType"),
+  };
 }
 
 export function selectLocalTimeScope({ calendarStats, time }) {
@@ -466,7 +555,7 @@ export function selectDailyCalendarHeatmap(calendar) {
     .filter((row) => row.date);
 }
 
-export function selectMonthDashboard({ bucketOverrides = {}, calendarStats, financialFlowTotal = 0, isHistorical = false, monthControl, primaryPlanRows = [] }) {
+export function selectMonthDashboard({ bucketOverrides = {}, calendarStats, financialFlowTotal = 0, isHistorical = false, monthControl, planWarnings = [], primaryPlanRows = [], safeToSpend = null }) {
   if (!monthControl) {
     return {
       title: "Miesiąc",
@@ -496,9 +585,11 @@ export function selectMonthDashboard({ bucketOverrides = {}, calendarStats, fina
       },
       {
         label: isHistorical ? "Różnica do targetu" : "Do wydania",
-        value: monthControl.remainingBudget,
-        detail: isHistorical ? "po faktycznych wydatkach" : `${monthControl.dailyAllowed} dziennie`,
-        tone: Number(monthControl.remainingBudget || 0) < 0 ? "warn" : "neutral",
+        value: safeToSpend ? safeToSpend.safeToSpend : monthControl.remainingBudget,
+        detail: isHistorical
+          ? "po faktycznych wydatkach"
+          : `${Math.round(Number((safeToSpend ? safeToSpend.dailyAllowed : monthControl.dailyAllowed) || 0))} dziennie`,
+        tone: Number((safeToSpend ? safeToSpend.safeToSpend : monthControl.remainingBudget) || 0) < 0 ? "warn" : "neutral",
         filter: { flow: "spend" },
       },
       {
@@ -514,7 +605,8 @@ export function selectMonthDashboard({ bucketOverrides = {}, calendarStats, fina
         filter: { flow: "financial" },
       },
     ],
-    alerts: monthControl.alerts || [],
+    alerts: [...(planWarnings || []), ...(monthControl.alerts || [])],
+    safeToSpend,
     categoryStatus: selectLimitRiskRows(limitStatus),
     savingsFocus: selectSavingsFocus({ planRows: limitStatus }),
     burnDown: selectBudgetBurnDown({ calendar: calendarStats?.rawCalendar, monthControl }),
@@ -530,27 +622,110 @@ export function selectMonthDashboard({ bucketOverrides = {}, calendarStats, fina
   };
 }
 
-export function selectSpendingPlanSections({ financialFlowTotal = 0, monthControl, parentStatus = [] }) {
+// Envelope-correct "safe to spend". The backend's remainingBudget is a flat residual
+// (target − spent) that overstates discretionary money because it ignores (a) recurring
+// bills due later this month that have not posted yet and (b) the monthly set-aside for
+// irregular (sinking) costs. This pure selector reserves both, reusing the sinking funds
+// and recurring obligations already present in the snapshot. The unposted-recurring part
+// is an estimate (avgDay heuristic); the sinking-fund deduction is exact.
+export function selectSafeToSpend({ monthControl, recurring = [] }) {
+  if (!monthControl) return null;
+  const remainingBudget = Number(monthControl.remainingBudget || 0);
+  const remainingDays = Number(monthControl.remainingDays || 0);
+  const elapsedDays = Number(monthControl.elapsedDays || 0);
+  const sinkingReserve = (monthControl.sinkingFunds || [])
+    .reduce((sum, fund) => sum + Number(fund.monthlySetAside || 0), 0);
+  const committedUnposted = selectRecurringObligations(recurring || [])
+    .filter((row) => Number(row.avgDay || 0) > elapsedDays)
+    .reduce((sum, row) => sum + Number(row.monthlyAverage || 0), 0);
+  const safeToSpend = remainingBudget - sinkingReserve - committedUnposted;
+  const dailyAllowed = remainingDays > 0 ? Math.max(0, safeToSpend) / remainingDays : 0;
+  return {
+    remainingBudget,
+    sinkingReserve,
+    committedUnposted,
+    safeToSpend,
+    dailyAllowed,
+    remainingDays,
+    hasReservations: sinkingReserve > 0 || committedUnposted > 0,
+  };
+}
+
+// Feasibility guardrails the backend cannot enforce at settings-save time (it lacks the
+// transaction-derived core cost). Returned in the Alert shape so they render in the
+// existing alert list. A target below obligatory costs is impossible; a target that eats
+// the whole income leaves nothing for the emergency fund or investing.
+export function selectPlanFeasibilityWarnings({ plan } = {}) {
+  if (!plan) return [];
+  const warnings = [];
+  const core = Number(plan.coreMonthlyCost || 0);
+  const target = Number(plan.targetMonthlySpend || 0);
+  const income = Number(plan.currentMonthlyIncome || 0);
+  if (core > 0 && target > 0 && target < core) {
+    warnings.push({
+      type: "Cel wydatków poniżej kosztów stałych",
+      severity: "Wysoki",
+      message: `Target ${Math.round(target)} zł jest poniżej obowiązkowych kosztów ${Math.round(core)} zł — niewykonalny bez ich obniżenia.`,
+    });
+  }
+  if (income > 0 && target > 0 && target >= income) {
+    warnings.push({
+      type: "Brak marginesu na oszczędności",
+      severity: "Średni",
+      message: `Target ${Math.round(target)} zł nie zostawia nadwyżki przy dochodzie ${Math.round(income)} zł — nie ma z czego budować funduszu awaryjnego ani inwestować.`,
+    });
+  }
+  return warnings;
+}
+
+export function selectSpendingPlanSections({ financialFlowTotal = 0, monthControl, parentStatus = [], safeToSpend = null }) {
   if (!monthControl) return [];
   const valueFor = (name) => parentStatus.find((row) => (row.name || row.category) === name)?.currentMonthSpend || 0;
   const obligatoryFixed = valueFor("Obowiązkowe stałe");
   const obligatoryVariable = valueFor("Obowiązkowe zmienne");
   const review = valueFor("Do rozbicia");
   const flexible = valueFor("Nieobowiązkowe");
-  return [
+  const rows = [
     { label: "Dochód", value: Number(monthControl.incomeToDate || 0), detail: "rozpoznane wpływy miesiąca", filter: { flow: "income" }, tone: "good" },
     { label: "Rachunki i zobowiązania", value: Number(obligatoryFixed || 0), detail: "stałe płatności i raty", filter: { bucket: "Obowiązkowe stałe" } },
     { label: "Planowane zmienne", value: Number(obligatoryVariable || 0) + Number(review || 0), detail: "potrzeby oraz kategorie do rozbicia", filter: { bucket: "Obowiązkowe zmienne" } },
     { label: "Elastyczne wydatki", value: Number(flexible || 0), detail: "nieobowiązkowe i kontrolowalne", filter: { bucket: "Nieobowiązkowe" }, tone: "warn" },
     { label: "Oszczędności i nadpłaty", value: Number(financialFlowTotal || 0), detail: "poza kosztem życia", filter: { flow: "financial" }, tone: "good" },
-    {
+  ];
+  if (!safeToSpend) {
+    rows.push({
       label: "Zostaje w miesiącu",
       value: Number(monthControl.remainingBudget || 0),
       detail: `${Number(monthControl.dailyAllowed || 0)} dziennie`,
       filter: { flow: "spend" },
       tone: Number(monthControl.remainingBudget || 0) < 0 ? "warn" : "good",
-    },
-  ];
+    });
+    return rows;
+  }
+  if (Number(safeToSpend.committedUnposted || 0) > 0) {
+    rows.push({
+      label: "Niezapłacone rachunki (do końca mies.)",
+      value: Number(safeToSpend.committedUnposted || 0),
+      detail: "cykliczne zobowiązania jeszcze przed nami",
+      tone: "neutral",
+    });
+  }
+  if (Number(safeToSpend.sinkingReserve || 0) > 0) {
+    rows.push({
+      label: "Rezerwa na koszty nieregularne",
+      value: Number(safeToSpend.sinkingReserve || 0),
+      detail: "miesięczny odkład na fundusze celowe",
+      tone: "neutral",
+    });
+  }
+  rows.push({
+    label: "Można bezpiecznie wydać",
+    value: Number(safeToSpend.safeToSpend || 0),
+    detail: `${Math.round(Number(safeToSpend.dailyAllowed || 0))} dziennie`,
+    filter: { flow: "spend" },
+    tone: Number(safeToSpend.safeToSpend || 0) < 0 ? "warn" : "good",
+  });
+  return rows;
 }
 
 export function selectReportsSections({
@@ -564,6 +739,7 @@ export function selectReportsSections({
   needs,
   mixedNeeds,
   oneoffs,
+  needsTarget,
   savingsTarget,
   scopedStats,
   yearStats,
@@ -599,9 +775,9 @@ export function selectReportsSections({
       { label: "Oszczędności/nadpłaty", value: financialFlowTotal, detail: `${financialFlowCount} transakcji poza kosztem życia`, filter: { flow: "financial" } },
     ],
     benchmarkCards: [
-      { label: "Obowiązkowe", value: Number(needs || 0) + Number(mixedNeeds || 0), detail: `punkt odniesienia 50%: ${Number(kpis?.income || 0) * 0.5}` },
-      { label: "Nieobowiązkowe", value: wants || 0, detail: `punkt odniesienia 30%: ${wantsTarget || 0}` },
-      { label: "Oszczędzanie operacyjne", value: kpis?.operatingSurplus || 0, detail: `minimum 20%: ${savingsTarget || 0}` },
+      { label: "Obowiązkowe", value: Number(needs || 0) + Number(mixedNeeds || 0), detail: `cel 50% dochodu netto: ${Math.round(Number(needsTarget ?? Number(kpis?.income || 0) * NET_INCOME_RATIO * 0.5))}` },
+      { label: "Nieobowiązkowe", value: wants || 0, detail: `cel 30% dochodu netto: ${Math.round(Number(wantsTarget || 0))}` },
+      { label: "Oszczędzanie operacyjne", value: kpis?.operatingSurplus || 0, detail: `cel 20% dochodu netto: ${Math.round(Number(savingsTarget || 0))}` },
       { label: "Nadwyżka po inwestycjach", value: kpis?.unassignedSurplus || 0, detail: "do decyzji lub dalszego inwestowania" },
     ],
     cashflowSeries: selectMonthlyCashflowSeries(monthly || []),
@@ -722,7 +898,7 @@ export function selectModuleHeader({
       title: "Ile możemy bezpiecznie wydać?",
       subtitle: "Najpierw decyzje na dziś: limit, ryzyka, transakcje do sprawdzenia.",
       cards: [
-        { label: "Zostaje", value: Number(data?.monthControl?.remainingBudget || 0), detail: `${Number(data?.monthControl?.dailyAllowed || 0)} dziennie`, tone: Number(data?.monthControl?.remainingBudget || 0) < 0 ? "warn" : "good" },
+        { label: "Zostaje", value: Number(monthDashboard?.safeToSpend?.safeToSpend ?? data?.monthControl?.remainingBudget ?? 0), detail: `${Math.round(Number(monthDashboard?.safeToSpend?.dailyAllowed ?? data?.monthControl?.dailyAllowed ?? 0))} dziennie`, tone: Number(monthDashboard?.safeToSpend?.safeToSpend ?? data?.monthControl?.remainingBudget ?? 0) < 0 ? "warn" : "good" },
         { label: "Wydane", value: Number(data?.monthControl?.spendToDate || 0), detail: activeTimeLabel || data?.monthControl?.month },
         { label: "Ryzyka limitów", value: controlRisks, detail: "główne limity ponad plan", number: true, tone: controlRisks ? "warn" : "good" },
         { label: "Do sprawdzenia", value: toCheckAmount, detail: `${Number(data?.kpis?.toCheck || 0)} transakcji`, tone: toCheckAmount ? "warn" : "good" },
@@ -780,6 +956,12 @@ export function selectModuleHeader({
       subtitle: "Stałe rachunki, raty, abonamenty i rezerwy, bez fałszywych cyklicznych zakupów.",
       cards: [],
     },
+    categories: {
+      eyebrow: "Ustawienia",
+      title: "Kategorie i grupy",
+      subtitle: "Dodawaj, zmieniaj nazwy, ukrywaj i porządkuj kategorie. Koszyk/obszar/typ pozostają stałym słownikiem.",
+      cards: [],
+    },
     transactions: {
       eyebrow: "Audyt danych",
       title: "Transakcje i kategoryzacja",
@@ -798,7 +980,304 @@ export function selectModuleHeader({
       cards: importHealth?.cards || [],
     },
   };
+  // Overview renders its own hero, so it has no module header (avoids a duplicate
+  // title). Unknown views still fall back to the control header.
+  if (view === "overview") return null;
   return headers[view] || headers.control;
+}
+
+// Phase 2a net worth: shape the /networth payload (derived liquid balances + emergency
+// fund coverage) for the Majątek view — a progress bar plus an accounts editor.
+export function selectNetWorth(netWorth) {
+  if (!netWorth) return null;
+  const liquidTotal = Number(netWorth.liquidTotal || 0);
+  const emergencyFundMin = Number(netWorth.emergencyFundMin || 0);
+  const emergencyFundComfort = Number(netWorth.emergencyFundComfort || 0);
+  const progress = Number(netWorth.emergencyProgressComfort || 0);
+  const accounts = (netWorth.accounts || []).map((account) => ({
+    accountKey: account.accountKey,
+    name: account.name || account.accountKey,
+    kind: account.kind || "CHECKING",
+    liquid: account.liquid !== false,
+    excludeFromNetWorth: !!account.excludeFromNetWorth,
+    configured: !!account.configured,
+    anchorBalance: account.anchorBalance != null ? Number(account.anchorBalance) : null,
+    anchorDate: account.anchorDate || "",
+    derivedBalance: account.configured ? Number(account.derivedBalance || 0) : null,
+    statementBalance: account.statementBalance != null ? Number(account.statementBalance) : null,
+    statementDate: account.statementDate || "",
+    reconciledBalance: account.reconciledBalance != null ? Number(account.reconciledBalance) : null,
+    drift: account.drift != null ? Number(account.drift) : null,
+    reconciled: account.reconciled == null ? null : !!account.reconciled,
+    statusLabel: account.configured ? "saldo wyliczone z przepływów" : "ustaw saldo początkowe",
+  }));
+  const progressPercent = Math.round(progress * 100);
+  const liabilities = (netWorth.liabilities || []).map((liability) => ({
+    liabilityKey: liability.liabilityKey,
+    name: liability.name || liability.liabilityKey,
+    kind: liability.kind || "OTHER",
+    currentPrincipal: Number(liability.currentPrincipal || 0),
+    annualInterestRate: liability.annualInterestRate != null ? Number(liability.annualInterestRate) : null,
+    monthlyPayment: liability.monthlyPayment != null ? Number(liability.monthlyPayment) : null,
+    asOf: liability.asOf || "",
+  }));
+  return {
+    accounts,
+    liabilities,
+    configuredCount: accounts.filter((account) => account.configured).length,
+    liquidTotal,
+    investedAssets: Number(netWorth.investedAssets || 0),
+    totalAssets: Number(netWorth.totalAssets || 0),
+    totalLiabilities: Number(netWorth.totalLiabilities || 0),
+    netWorth: Number(netWorth.netWorth || 0),
+    emergencyFundMin,
+    emergencyFundComfort,
+    progressPercent,
+    progressWidth: Math.max(0, Math.min(100, progressPercent)),
+    minReached: emergencyFundComfort > 0 && liquidTotal >= emergencyFundMin,
+    comfortReached: emergencyFundComfort > 0 && liquidTotal >= emergencyFundComfort,
+  };
+}
+
+// Phase 2d debt payoff. Pure amortization over the liabilities already in the net-worth
+// payload — no backend needed. Compares avalanche (highest rate first) vs snowball
+// (smallest balance first) under a fixed monthly budget = sum of minimum payments + extra,
+// rolling freed minimums into the next target. Also flags overpay-vs-invest per debt.
+const DEBT_MAX_MONTHS = 1200;
+export const INVEST_REFERENCE_RETURN = 0.07; // nominal long-run reference for overpay-vs-invest
+
+function simulatePayoff(debts, order, monthlyBudget) {
+  const rateOf = new Map(debts.map((debt) => [debt.key, debt.rate]));
+  const minOf = new Map(debts.map((debt) => [debt.key, debt.minPayment]));
+  const balances = new Map(debts.map((debt) => [debt.key, debt.principal]));
+  const remaining = order.map((debt) => debt.key);
+  const payoffOrder = [];
+  let months = 0;
+  let totalInterest = 0;
+  while (remaining.length > 0 && months < DEBT_MAX_MONTHS) {
+    months += 1;
+    for (const key of remaining) {
+      const interest = balances.get(key) * rateOf.get(key) / 12;
+      totalInterest += interest;
+      balances.set(key, balances.get(key) + interest);
+    }
+    let budget = monthlyBudget;
+    for (const key of remaining) {
+      const pay = Math.min(minOf.get(key), balances.get(key), Math.max(0, budget));
+      balances.set(key, balances.get(key) - pay);
+      budget -= pay;
+    }
+    for (const key of remaining) {
+      if (budget <= 0) break;
+      const pay = Math.min(balances.get(key), budget);
+      balances.set(key, balances.get(key) - pay);
+      budget -= pay;
+    }
+    for (let i = remaining.length - 1; i >= 0; i -= 1) {
+      if (balances.get(remaining[i]) <= 0.005) {
+        payoffOrder.push(remaining[i]);
+        remaining.splice(i, 1);
+      }
+    }
+  }
+  const feasible = remaining.length === 0;
+  return { feasible, months: feasible ? months : null, totalInterest: Math.round(totalInterest), payoffOrder };
+}
+
+export function selectDebtPayoff({ liabilities = [], extraMonthly = 0 } = {}) {
+  const debts = (liabilities || [])
+    .map((liability) => ({
+      key: liability.liabilityKey,
+      name: liability.name,
+      principal: Number(liability.currentPrincipal || 0),
+      rate: Number(liability.annualInterestRate || 0),
+      minPayment: Number(liability.monthlyPayment || 0),
+    }))
+    .filter((debt) => debt.principal > 0);
+  if (debts.length === 0) return null;
+  const nameOf = new Map(debts.map((debt) => [debt.key, debt.name]));
+  const totalPrincipal = debts.reduce((sum, debt) => sum + debt.principal, 0);
+  const totalMin = debts.reduce((sum, debt) => sum + debt.minPayment, 0);
+  const monthlyBudget = totalMin + Math.max(0, Number(extraMonthly || 0));
+  const avalancheOrder = [...debts].sort((a, b) => b.rate - a.rate || a.principal - b.principal);
+  const snowballOrder = [...debts].sort((a, b) => a.principal - b.principal || b.rate - a.rate);
+  const avalanche = simulatePayoff(debts, avalancheOrder, monthlyBudget);
+  const snowball = simulatePayoff(debts, snowballOrder, monthlyBudget);
+  const interestSaved = avalanche.feasible && snowball.feasible
+    ? Math.max(0, snowball.totalInterest - avalanche.totalInterest)
+    : 0;
+  const overpayVsInvest = [...debts]
+    .sort((a, b) => b.rate - a.rate)
+    .map((debt) => ({
+      name: debt.name,
+      rate: debt.rate,
+      verdict: debt.rate > INVEST_REFERENCE_RETURN ? "overpay" : "invest",
+    }));
+  return {
+    totalPrincipal: Math.round(totalPrincipal),
+    totalMinPayment: Math.round(totalMin),
+    monthlyBudget: Math.round(monthlyBudget),
+    feasible: avalanche.feasible,
+    recommended: interestSaved > 0 ? "avalanche" : "snowball",
+    interestSaved,
+    referenceReturn: INVEST_REFERENCE_RETURN,
+    avalanche: { ...avalanche, order: avalancheOrder.map((debt) => debt.name) },
+    snowball: { ...snowball, order: snowballOrder.map((debt) => debt.name) },
+    overpayVsInvest,
+    missingPayments: debts.filter((debt) => debt.minPayment <= 0).map((debt) => nameOf.get(debt.key)),
+  };
+}
+
+// Goals: derive months-left, required monthly contribution and progress from the goal list
+// and "today" (passed in for testability). currentAmount is user-maintained for now.
+export function selectGoals(goals = [], asOf) {
+  const todayMs = asOf ? Date.parse(asOf) : null;
+  const shaped = (goals || []).map((goal) => {
+    const target = Number(goal.targetAmount || 0);
+    const current = Number(goal.currentAmount || 0);
+    const remaining = Math.max(0, target - current);
+    let monthsLeft = null;
+    if (goal.targetDate && todayMs != null) {
+      const diffMs = Date.parse(goal.targetDate) - todayMs;
+      monthsLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24 * 30.44)));
+    }
+    const achieved = target > 0 && current >= target;
+    const monthlyNeed = remaining <= 0
+      ? 0
+      : monthsLeft && monthsLeft > 0
+        ? Math.ceil(remaining / monthsLeft)
+        : remaining;
+    return {
+      goalId: goal.goalId,
+      name: goal.name || goal.goalId,
+      targetAmount: target,
+      currentAmount: current,
+      targetDate: goal.targetDate || "",
+      note: goal.note || "",
+      remaining,
+      monthsLeft,
+      monthlyNeed,
+      progressPercent: target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0,
+      achieved,
+      overdue: !achieved && !!goal.targetDate && monthsLeft === 0,
+    };
+  });
+  return {
+    goals: shaped,
+    totalTarget: shaped.reduce((sum, goal) => sum + goal.targetAmount, 0),
+    totalCurrent: shaped.reduce((sum, goal) => sum + goal.currentAmount, 0),
+    totalMonthlyNeed: shaped.reduce((sum, goal) => sum + goal.monthlyNeed, 0),
+  };
+}
+
+// Forward cashflow forecast: project the liquid balance over a horizon from a monthly net
+// (income − spend), with optional scenario adjustments. Pure math, like debt payoff.
+export function selectForecast({ startingLiquid = 0, monthlyIncome = 0, monthlySpend = 0, months = 12, incomeAdjustmentPct = 0, expenseAdjustmentPct = 0 } = {}) {
+  const income = Math.max(0, Number(monthlyIncome || 0) * (1 + Number(incomeAdjustmentPct || 0) / 100));
+  const spend = Math.max(0, Number(monthlySpend || 0) * (1 + Number(expenseAdjustmentPct || 0) / 100));
+  const monthlyNet = Math.round(income - spend);
+  const start = Number(startingLiquid || 0);
+  const horizon = Math.max(1, Math.round(months || 12));
+  const rows = [];
+  for (let month = 1; month <= horizon; month += 1) {
+    rows.push({ month, balance: Math.round(start + monthlyNet * month), cumulativeNet: monthlyNet * month });
+  }
+  let runwayMonths = null;
+  if (monthlyNet < 0 && start > 0) {
+    runwayMonths = Math.floor(start / Math.abs(monthlyNet));
+  }
+  const checkpointAt = (month) => {
+    const row = rows.find((entry) => entry.month === month);
+    return row ? row.balance : Math.round(start + monthlyNet * month);
+  };
+  return {
+    monthlyNet,
+    adjustedIncome: Math.round(income),
+    adjustedSpend: Math.round(spend),
+    startingLiquid: Math.round(start),
+    horizon,
+    endingBalance: rows.length ? rows[rows.length - 1].balance : Math.round(start),
+    rows,
+    checkpoints: { m3: checkpointAt(3), m6: checkpointAt(6), m12: checkpointAt(12) },
+    runwayMonths,
+    negative: monthlyNet < 0,
+  };
+}
+
+// YNAB-style limit rollover (envelope balance). Over the tracked months, the cumulative
+// budget is limit × months and cumulative spend is average × months, so the carried balance
+// is months × (limit − average): positive = a buffer built by underspending, negative = an
+// overspend drawn down. Pure frontend math from data already present (limit, average, months).
+export function selectLimitRollover(planRows = [], activeMonths = 0) {
+  const months = Math.max(0, Math.round(Number(activeMonths) || 0));
+  const rows = (planRows || [])
+    .filter((row) => Number(row.limit || 0) > 0)
+    .map((row) => {
+      const limit = Number(row.limit || 0);
+      const average = Number(row.currentMonthly || 0);
+      const carryover = Math.round(months * (limit - average));
+      return {
+        category: row.name || row.category,
+        limit,
+        monthlyAverage: average,
+        months,
+        carryover,
+        availableThisMonth: Math.round(limit + carryover),
+        status: carryover >= 0 ? "buffer" : "over",
+      };
+    });
+  const overspent = rows.filter((row) => row.carryover < 0).sort((a, b) => a.carryover - b.carryover);
+  const buffered = rows.filter((row) => row.carryover > 0).sort((a, b) => b.carryover - a.carryover);
+  return {
+    months,
+    rows,
+    overspent,
+    buffered,
+    totalBuffer: buffered.reduce((sum, row) => sum + row.carryover, 0),
+    totalOverspend: overspent.reduce((sum, row) => sum + row.carryover, 0),
+  };
+}
+
+// Flexible limits manager: every category grouped under its (effective) budget bucket, with
+// the bucket-level limit, so the user can set/edit a limit and reassign the bucket for ANY
+// category in one place (not just the top buckets). Pure shaping of plan rows already present.
+export function selectLimitManager(planRows = [], parentPlanRows = []) {
+  const bucketLimits = new Map(
+    (parentPlanRows || []).filter((row) => row.scope === "bucket").map((row) => [row.name, row]),
+  );
+  const byBucket = new Map();
+  (planRows || []).forEach((row) => {
+    const bucket = row.bucket || "Inne";
+    if (!byBucket.has(bucket)) byBucket.set(bucket, []);
+    byBucket.get(bucket).push({
+      category: row.category,
+      name: row.name || row.category,
+      bucket,
+      originalBucket: row.originalBucket || bucket,
+      currentMonthly: Number(row.currentMonthly || 0),
+      limit: Number(row.limit || 0),
+      potentialMonthly: Number(row.potentialMonthly || 0),
+    });
+  });
+  const order = BUDGET_BUCKET_OPTIONS;
+  const orderIndex = (bucket) => {
+    const index = order.indexOf(bucket);
+    return index < 0 ? order.length : index;
+  };
+  return Array.from(byBucket.keys())
+    .sort((a, b) => orderIndex(a) - orderIndex(b) || a.localeCompare(b, "pl"))
+    .map((bucket) => {
+      const categories = byBucket.get(bucket)
+        .sort((a, b) => b.currentMonthly - a.currentMonthly || a.name.localeCompare(b.name, "pl"));
+      const parent = bucketLimits.get(bucket);
+      return {
+        bucket,
+        bucketLimit: parent ? Number(parent.limit || 0) : null,
+        currentMonthly: categories.reduce((sum, category) => sum + category.currentMonthly, 0),
+        potentialMonthly: categories.reduce((sum, category) => sum + category.potentialMonthly, 0),
+        categories,
+      };
+    });
 }
 
 export function selectRecurringSummary({ monthControl, recurring, recurringCalendar }) {

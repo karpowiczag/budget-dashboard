@@ -1,6 +1,7 @@
 package com.budget.web.controller;
 
 import com.budget.application.importing.BudgetImportService;
+import com.budget.application.importing.RecategorizeService;
 import com.budget.application.importing.TransactionImportFile;
 import com.budget.application.reporting.BudgetQueryService;
 import com.budget.application.reporting.TransactionQuery;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,17 +33,20 @@ public class BudgetApiController {
     private final BudgetQueryService queryService;
     private final BudgetImportService importService;
     private final BudgetSettingsService settingsService;
+    private final RecategorizeService recategorizeService;
     private final BudgetApiMapper mapper;
 
     public BudgetApiController(
             BudgetQueryService queryService,
             BudgetImportService importService,
             BudgetSettingsService settingsService,
+            RecategorizeService recategorizeService,
             BudgetApiMapper mapper
     ) {
         this.queryService = queryService;
         this.importService = importService;
         this.settingsService = settingsService;
+        this.recategorizeService = recategorizeService;
         this.mapper = mapper;
     }
 
@@ -119,6 +124,16 @@ public class BudgetApiController {
                 confidence,
                 reviewStatus
         )));
+    }
+
+    @PostMapping("/reports/{year}/transactions/{id}/recategorize")
+    BudgetApiDtos.RecategorizeResponse recategorizeTransaction(
+            @PathVariable @Min(2000) @Max(2100) int year,
+            @PathVariable long id,
+            @RequestBody BudgetApiDtos.RecategorizeRequest request
+    ) {
+        recategorizeService.recategorize(year, id, request.categoryId());
+        return new BudgetApiDtos.RecategorizeResponse(year, id, request.categoryId());
     }
 
     @PostMapping(path = "/imports/uploads", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

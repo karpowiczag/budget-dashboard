@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildDashboardViews,
   buildSidebarNavigation,
   selectBudgetBurnDown,
   selectBuckets,
+  selectCategoryCatalog,
   selectCategoryLimitChart,
   selectCategoryExamples,
   selectCostMatrix,
@@ -11,8 +11,13 @@ import {
   selectCategorySubcategories,
   selectCashflowSankey,
   selectDataQualityChart,
+  selectDebtPayoff,
   selectDailyCalendarHeatmap,
   selectFinancialFlows,
+  selectForecast,
+  selectGoals,
+  selectLimitManager,
+  selectLimitRollover,
   selectFixednessChart,
   selectHierarchySunburst,
   selectImportHealth,
@@ -20,15 +25,18 @@ import {
   selectMerchantShare,
   selectMonthDashboard,
   selectMonthFinancialFlow,
+  selectNetWorth,
   selectMonthlyParentLimitStatus,
   selectMonthlyDimensionTrends,
   selectModuleHeader,
   selectParentPlanRows,
+  selectPlanFeasibilityWarnings,
   selectPlanRows,
   selectRecurringSummary,
   selectRecommendedCuts,
   selectReportsSections,
   selectReportsWorkspace,
+  selectSafeToSpend,
   selectSavingsFocus,
   selectSavingsRadar,
   selectSpendingPlanSections,
@@ -39,33 +47,26 @@ import {
   selectWealthDashboard,
 } from "./budgetSelectors.js";
 
-describe("buildDashboardViews", () => {
-  it("builds the sidebar order around current month control and removes the old summary tab", () => {
-    expect(buildDashboardViews(false).map((view) => view.id)).toEqual([
-      "control",
-      "plan",
-      "reports",
-      "wealth",
-      "fire",
-      "obligations",
-      "transactions",
-      "import",
-    ]);
+describe("sidebar navigation IA", () => {
+  it("groups leaf views into top-level sections with Import as a utility", () => {
     expect(buildSidebarNavigation(false).map((view) => view.label)).toEqual([
-      "Kontrola",
-      "Plan",
-      "Raporty",
-      "Majątek",
-      "FIRE",
-      "Zobowiązania",
+      "Przegląd",
+      "Budżet",
       "Transakcje",
+      "Analiza",
+      "Majątek",
       "Import",
     ]);
-    expect(buildDashboardViews(false).map((view) => view.label)).not.toContain("Podsumowanie");
+    // Budget merges control+plan; analysis merges reports+recurring; wealth merges flows+FIRE.
+    expect(buildSidebarNavigation(false).find((s) => s.id === "budget").views.map((v) => v.id)).toEqual(["control", "plan", "categories"]);
+    expect(buildSidebarNavigation(false).find((s) => s.id === "analysis").views.map((v) => v.id)).toEqual(["reports", "obligations"]);
+    expect(buildSidebarNavigation(false).find((s) => s.id === "wealth").views.map((v) => v.id)).toEqual(["wealth", "fire"]);
+    expect(buildSidebarNavigation(false).find((s) => s.id === "import").utility).toBe(true);
   });
 
-  it("labels a closed year plan as a simulation", () => {
-    expect(buildDashboardViews(true).find((view) => view.id === "plan")).toMatchObject({ label: "Symulacja" });
+  it("labels a closed year's plan sub-view as a simulation", () => {
+    const budget = buildSidebarNavigation(true).find((s) => s.id === "budget");
+    expect(budget.views.find((v) => v.id === "plan")).toMatchObject({ label: "Symulacja" });
   });
 });
 
@@ -830,5 +831,329 @@ describe("selectTransactionFilterOptions", () => {
       ],
       fixedness: ["Wszystkie", "Zmienne konieczne"],
     });
+  });
+});
+
+describe("selectSafeToSpend", () => {
+  it("reserves sinking funds and unposted recurring obligations from the residual", () => {
+    const result = selectSafeToSpend({
+      monthControl: {
+        remainingBudget: 8000,
+        remainingDays: 16,
+        elapsedDays: 15,
+        sinkingFunds: [{ monthlySetAside: 400 }, { monthlySetAside: 300 }],
+      },
+      recurring: [
+        // obligatory, due day 20 (after today=15) → reserved
+        { merchant: "Wynajem", category: "Czynsz i wynajem", months: 3, monthlyAverage: 1000, avgDay: 20 },
+        // obligatory but already posted (day 5) → not reserved
+        { merchant: "Tauron", category: "Prąd", months: 3, monthlyAverage: 200, avgDay: 5 },
+        // recurring-looking groceries are a false positive → never an obligation
+        { merchant: "Biedronka", category: "Żywność i chemia", months: 6, monthlyAverage: 1500, avgDay: 25 },
+      ],
+    });
+    expect(result).toMatchObject({
+      remainingBudget: 8000,
+      sinkingReserve: 700,
+      committedUnposted: 1000,
+      safeToSpend: 6300,
+      hasReservations: true,
+    });
+    expect(result.dailyAllowed).toBeCloseTo(393.75, 2);
+  });
+
+  it("falls back to the flat residual when there is nothing to reserve", () => {
+    expect(selectSafeToSpend({
+      monthControl: { remainingBudget: 5000, remainingDays: 10, elapsedDays: 20, sinkingFunds: [] },
+      recurring: [],
+    })).toMatchObject({ safeToSpend: 5000, dailyAllowed: 500, hasReservations: false });
+  });
+
+  it("returns null without a month control snapshot", () => {
+    expect(selectSafeToSpend({ monthControl: null })).toBeNull();
+  });
+});
+
+describe("selectPlanFeasibilityWarnings", () => {
+  it("flags a target below obligatory costs", () => {
+    const warnings = selectPlanFeasibilityWarnings({ plan: { coreMonthlyCost: 8000, targetMonthlySpend: 6000, currentMonthlyIncome: 20000 } });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({ type: "Cel wydatków poniżej kosztów stałych", severity: "Wysoki" });
+  });
+
+  it("flags a target that leaves no margin to save", () => {
+    const warnings = selectPlanFeasibilityWarnings({ plan: { coreMonthlyCost: 5000, targetMonthlySpend: 21000, currentMonthlyIncome: 20000 } });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({ type: "Brak marginesu na oszczędności", severity: "Średni" });
+  });
+
+  it("stays silent for a feasible plan", () => {
+    expect(selectPlanFeasibilityWarnings({ plan: { coreMonthlyCost: 5000, targetMonthlySpend: 13000, currentMonthlyIncome: 20000 } })).toEqual([]);
+    expect(selectPlanFeasibilityWarnings({})).toEqual([]);
+  });
+});
+
+describe("envelope-aware spending plan and net benchmarks", () => {
+  it("decomposes the residual into committed, sinking and safe-to-spend rows", () => {
+    const sections = selectSpendingPlanSections({
+      financialFlowTotal: 700,
+      monthControl: { incomeToDate: 5000, remainingBudget: 1200, dailyAllowed: 60 },
+      parentStatus: [
+        { name: "Obowiązkowe stałe", currentMonthSpend: 1000 },
+        { name: "Nieobowiązkowe", currentMonthSpend: 600 },
+      ],
+      safeToSpend: { committedUnposted: 200, sinkingReserve: 300, safeToSpend: 700, dailyAllowed: 44 },
+    });
+    expect(sections).toHaveLength(8);
+    expect(sections).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "Niezapłacone rachunki (do końca mies.)", value: 200 }),
+      expect.objectContaining({ label: "Rezerwa na koszty nieregularne", value: 300 }),
+      expect.objectContaining({ label: "Można bezpiecznie wydać", value: 700, detail: "44 dziennie" }),
+    ]));
+    expect(sections.some((row) => row.label === "Zostaje w miesiącu")).toBe(false);
+  });
+
+  it("bases the 50/30/20 benchmark detail on net income", () => {
+    const sections = selectReportsSections({
+      kpis: { income: 10000 },
+      needs: 0,
+      mixedNeeds: 0,
+      wants: 0,
+      needsTarget: 3750,
+      wantsTarget: 2250,
+      savingsTarget: 1500,
+    });
+    expect(sections.benchmarkCards[0].detail).toContain("netto");
+    expect(sections.benchmarkCards[0].detail).toContain("3750");
+    expect(sections.benchmarkCards[2].detail).toContain("1500");
+  });
+});
+
+describe("selectNetWorth", () => {
+  it("shapes accounts, derived balances and emergency-fund progress", () => {
+    const model = selectNetWorth({
+      liquidTotal: 24500,
+      investedAssets: 100000,
+      totalAssets: 124500,
+      totalLiabilities: 30000,
+      netWorth: 94500,
+      emergencyFundMin: 27000,
+      emergencyFundComfort: 54000,
+      emergencyProgressComfort: 0.4537,
+      accounts: [
+        { accountKey: "Osobiste", name: "Osobiste", kind: "CHECKING", liquid: true, excludeFromNetWorth: false, configured: true, anchorBalance: 1000, anchorDate: "2026-01-01", derivedBalance: 1500, statementBalance: 1500, statementDate: "2026-03-31", reconciledBalance: 1500, drift: 0, reconciled: true },
+        { accountKey: "Maklerskie", name: "Maklerskie", kind: "OTHER", liquid: true, excludeFromNetWorth: false, configured: false, derivedBalance: null },
+      ],
+      liabilities: [
+        { liabilityKey: "mortgage", name: "Hipoteka", kind: "MORTGAGE", currentPrincipal: 30000, annualInterestRate: 0.072, monthlyPayment: 1500, asOf: "2026-01-01" },
+      ],
+    });
+    expect(model.configuredCount).toBe(1);
+    expect(model.liquidTotal).toBe(24500);
+    expect(model.investedAssets).toBe(100000);
+    expect(model.totalLiabilities).toBe(30000);
+    expect(model.netWorth).toBe(94500);
+    expect(model.progressPercent).toBe(45);
+    expect(model.progressWidth).toBe(45);
+    expect(model.comfortReached).toBe(false);
+    expect(model.accounts[1]).toMatchObject({ configured: false, derivedBalance: null, statusLabel: "ustaw saldo początkowe" });
+    expect(model.accounts[0]).toMatchObject({ reconciled: true, drift: 0, reconciledBalance: 1500 });
+    expect(model.accounts[1].reconciled).toBeNull();
+    expect(model.liabilities).toHaveLength(1);
+    expect(model.liabilities[0]).toMatchObject({ liabilityKey: "mortgage", currentPrincipal: 30000, annualInterestRate: 0.072 });
+  });
+
+  it("returns null without a payload", () => {
+    expect(selectNetWorth(null)).toBeNull();
+  });
+});
+
+describe("selectDebtPayoff", () => {
+  const debts = [
+    { liabilityKey: "consumer", name: "Pożyczka", currentPrincipal: 5000, annualInterestRate: 0.2, monthlyPayment: 100 },
+    { liabilityKey: "card", name: "Karta", currentPrincipal: 1000, annualInterestRate: 0.05, monthlyPayment: 100 },
+  ];
+
+  it("prefers avalanche when high-rate debt dominates, ordering and verdicts follow rate/size", () => {
+    const plan = selectDebtPayoff({ liabilities: debts, extraMonthly: 300 });
+    expect(plan.monthlyBudget).toBe(500);
+    expect(plan.avalanche.feasible).toBe(true);
+    expect(plan.snowball.feasible).toBe(true);
+    expect(plan.avalanche.order).toEqual(["Pożyczka", "Karta"]); // 20% first
+    expect(plan.snowball.order).toEqual(["Karta", "Pożyczka"]); // smallest balance first
+    expect(plan.avalanche.totalInterest).toBeLessThanOrEqual(plan.snowball.totalInterest);
+    expect(plan.interestSaved).toBeGreaterThan(0);
+    expect(plan.recommended).toBe("avalanche");
+    expect(plan.overpayVsInvest).toEqual([
+      { name: "Pożyczka", rate: 0.2, verdict: "overpay" },
+      { name: "Karta", rate: 0.05, verdict: "invest" },
+    ]);
+  });
+
+  it("flags an infeasible plan when payments cannot cover interest", () => {
+    const plan = selectDebtPayoff({
+      liabilities: [{ liabilityKey: "x", name: "Drogi", currentPrincipal: 10000, annualInterestRate: 0.3, monthlyPayment: 50 }],
+      extraMonthly: 0,
+    });
+    expect(plan.avalanche.feasible).toBe(false);
+    expect(plan.avalanche.months).toBeNull();
+  });
+
+  it("lists liabilities missing a monthly payment", () => {
+    const plan = selectDebtPayoff({
+      liabilities: [{ liabilityKey: "m", name: "Hipoteka", currentPrincipal: 4000, annualInterestRate: 0.07, monthlyPayment: null }],
+      extraMonthly: 500,
+    });
+    expect(plan.missingPayments).toEqual(["Hipoteka"]);
+  });
+
+  it("returns null when there is nothing to pay off", () => {
+    expect(selectDebtPayoff({ liabilities: [] })).toBeNull();
+    expect(selectDebtPayoff({ liabilities: [{ liabilityKey: "z", name: "Zero", currentPrincipal: 0 }] })).toBeNull();
+  });
+});
+
+describe("selectGoals", () => {
+  it("computes months-left, monthly need and progress from today", () => {
+    const model = selectGoals([
+      { goalId: "house", name: "Mieszkanie", targetAmount: 100000, currentAmount: 20000, targetDate: "2026-12-01" },
+      { goalId: "done", name: "Gotowe", targetAmount: 5000, currentAmount: 5000, targetDate: "2026-12-01" },
+    ], "2026-06-02");
+    const house = model.goals.find((goal) => goal.goalId === "house");
+    expect(house.remaining).toBe(80000);
+    expect(house.monthsLeft).toBe(6);
+    expect(house.monthlyNeed).toBe(Math.ceil(80000 / 6));
+    expect(house.progressPercent).toBe(20);
+    expect(house.achieved).toBe(false);
+    const done = model.goals.find((goal) => goal.goalId === "done");
+    expect(done.achieved).toBe(true);
+    expect(done.monthlyNeed).toBe(0);
+    expect(model.totalTarget).toBe(105000);
+    expect(model.totalCurrent).toBe(25000);
+  });
+
+  it("flags overdue goals and handles missing dates", () => {
+    const model = selectGoals([
+      { goalId: "late", name: "Spóźniony", targetAmount: 1000, currentAmount: 100, targetDate: "2026-01-01" },
+      { goalId: "nodate", name: "Bez terminu", targetAmount: 1000, currentAmount: 0 },
+    ], "2026-06-02");
+    expect(model.goals.find((goal) => goal.goalId === "late").overdue).toBe(true);
+    expect(model.goals.find((goal) => goal.goalId === "nodate").monthsLeft).toBeNull();
+  });
+
+  it("returns empty totals for no goals", () => {
+    expect(selectGoals([], "2026-06-02")).toMatchObject({ goals: [], totalTarget: 0, totalMonthlyNeed: 0 });
+  });
+});
+
+describe("selectForecast", () => {
+  it("projects liquid balance forward at the monthly net", () => {
+    const forecast = selectForecast({ startingLiquid: 10000, monthlyIncome: 8000, monthlySpend: 6000 });
+    expect(forecast.monthlyNet).toBe(2000);
+    expect(forecast.horizon).toBe(12);
+    expect(forecast.endingBalance).toBe(34000);
+    expect(forecast.checkpoints.m3).toBe(16000);
+    expect(forecast.checkpoints.m6).toBe(22000);
+    expect(forecast.negative).toBe(false);
+    expect(forecast.runwayMonths).toBeNull();
+  });
+
+  it("applies scenario adjustments and flags negative runway", () => {
+    const flat = selectForecast({ startingLiquid: 9000, monthlyIncome: 8000, monthlySpend: 6000, incomeAdjustmentPct: -25 });
+    expect(flat.adjustedIncome).toBe(6000);
+    expect(flat.monthlyNet).toBe(0);
+
+    const drop = selectForecast({ startingLiquid: 9000, monthlyIncome: 8000, monthlySpend: 6000, incomeAdjustmentPct: -50 });
+    expect(drop.monthlyNet).toBe(-2000);
+    expect(drop.negative).toBe(true);
+    expect(drop.runwayMonths).toBe(4);
+  });
+});
+
+describe("selectLimitManager", () => {
+  it("groups every category under its bucket with the bucket limit, ordered by bucket", () => {
+    const groups = selectLimitManager([
+      { category: "Żywność i chemia", bucket: "Obowiązkowe zmienne", originalBucket: "Obowiązkowe zmienne", currentMonthly: 2200, limit: 2400, potentialMonthly: 0 },
+      { category: "Jedzenie poza domem", bucket: "Nieobowiązkowe", originalBucket: "Nieobowiązkowe", currentMonthly: 750, limit: 600, potentialMonthly: 150 },
+      { category: "Restauracje premium", bucket: "Nieobowiązkowe", originalBucket: "Nieobowiązkowe", currentMonthly: 300, limit: 0, potentialMonthly: 300 },
+    ], [
+      { scope: "bucket", name: "Nieobowiązkowe", limit: 1000 },
+    ]);
+    expect(groups.map((group) => group.bucket)).toEqual(["Obowiązkowe zmienne", "Nieobowiązkowe"]);
+    const flexible = groups.find((group) => group.bucket === "Nieobowiązkowe");
+    expect(flexible.bucketLimit).toBe(1000);
+    expect(flexible.currentMonthly).toBe(1050);
+    expect(flexible.categories.map((category) => category.category)).toEqual(["Jedzenie poza domem", "Restauracje premium"]);
+    expect(groups.find((group) => group.bucket === "Obowiązkowe zmienne").bucketLimit).toBeNull();
+  });
+});
+
+describe("selectLimitRollover", () => {
+  it("computes the cumulative envelope balance per limited category", () => {
+    const model = selectLimitRollover([
+      { category: "Jedzenie poza domem", limit: 600, currentMonthly: 750 },
+      { category: "Żywność i chemia", limit: 2400, currentMonthly: 2200 },
+      { category: "Bez limitu", limit: 0, currentMonthly: 100 },
+    ], 5);
+    expect(model.months).toBe(5);
+    expect(model.rows).toHaveLength(2);
+    const food = model.rows.find((row) => row.category === "Jedzenie poza domem");
+    expect(food.carryover).toBe(-750);
+    expect(food.status).toBe("over");
+    expect(food.availableThisMonth).toBe(-150);
+    expect(model.rows.find((row) => row.category === "Żywność i chemia").carryover).toBe(1000);
+    expect(model.totalBuffer).toBe(1000);
+    expect(model.totalOverspend).toBe(-750);
+    expect(model.overspent[0].category).toBe("Jedzenie poza domem");
+  });
+});
+
+describe("selectCategoryCatalog", () => {
+  it("nests non-archived categories under sorted groups and keeps archived separately", () => {
+    const model = selectCategoryCatalog({
+      groups: [
+        { groupId: "discretionary", label: "Nieobowiązkowe", sortOrder: 3 },
+        { groupId: "obligatoryVariable", label: "Obowiązkowe zmienne", sortOrder: 2 },
+      ],
+      categories: [
+        { categoryId: "groceries", label: "Żywność i chemia", groupId: "obligatoryVariable", budgetBucket: "Obowiązkowe zmienne", area: "Koszty codzienne", fixedness: "Zmienne konieczne", flowType: "livingExpense", archived: false, sortOrder: 1 },
+        { categoryId: "diningOut", label: "Jedzenie poza domem", groupId: "discretionary", budgetBucket: "Nieobowiązkowe", area: "Styl życia", fixedness: "Uznaniowe", flowType: "livingExpense", archived: false, sortOrder: 1 },
+        { categoryId: "oldThing", label: "Stara kategoria", groupId: "discretionary", budgetBucket: "Nieobowiązkowe", area: "Styl życia", fixedness: "Uznaniowe", flowType: "livingExpense", archived: true, sortOrder: 9 },
+      ],
+    });
+
+    expect(model.groups.map((group) => group.groupId)).toEqual(["obligatoryVariable", "discretionary"]);
+    expect(model.groups[0].categories.map((category) => category.categoryId)).toEqual(["groceries"]);
+    expect(model.groups[1].categories.map((category) => category.categoryId)).toEqual(["diningOut"]);
+    expect(model.archived.map((category) => category.categoryId)).toEqual(["oldThing"]);
+    // Picker options (merge target, rule target) exclude archived categories.
+    expect(model.categoryOptions.map((option) => option.id)).toEqual(["diningOut", "groceries"]);
+    expect(model.bucketOptions).toEqual(["Nieobowiązkowe", "Obowiązkowe zmienne"]);
+    expect(model.flowOptions).toEqual(["livingExpense"]);
+    expect(model.groupOptions.map((group) => group.id)).toEqual(["obligatoryVariable", "discretionary"]);
+  });
+
+  it("returns empty structures for a null catalog", () => {
+    const model = selectCategoryCatalog(null);
+    expect(model.groups).toEqual([]);
+    expect(model.archived).toEqual([]);
+    expect(model.bucketOptions).toEqual([]);
+    expect(model.rules).toEqual([]);
+  });
+
+  it("surfaces classification rules sorted by priority and id-based category options", () => {
+    const model = selectCategoryCatalog({
+      groups: [{ groupId: "obligatoryVariable", label: "Obowiązkowe zmienne", sortOrder: 2 }],
+      categories: [
+        { categoryId: "groceries", label: "Żywność i chemia", groupId: "obligatoryVariable", budgetBucket: "Obowiązkowe zmienne", area: "Koszty codzienne", fixedness: "Zmienne konieczne", flowType: "livingExpense", archived: false, sortOrder: 1 },
+      ],
+      rules: [
+        { ruleId: "2", pattern: "LIDL", categoryId: "groceries", priority: 1000, enabled: true, source: "builtin" },
+        { ruleId: "1", pattern: "BIEDRONKA", categoryId: "groceries", priority: 5, enabled: true, source: "user" },
+      ],
+    });
+
+    expect(model.rules.map((rule) => rule.ruleId)).toEqual(["1", "2"]);
+    expect(model.categoryOptions).toEqual([{ id: "groceries", label: "Żywność i chemia" }]);
   });
 });

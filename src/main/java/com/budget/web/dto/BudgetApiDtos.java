@@ -396,11 +396,195 @@ public final class BudgetApiDtos {
             BigDecimal aggressiveMonthlySpend,
             int emergencyFundMinMonths,
             int emergencyFundComfortMonths,
+            BigDecimal netIncomeRatio,
+            List<String> sinkingFundCategories,
             List<CategoryLimitSettingDto> categoryLimits
     ) {
     }
 
     public record CategoryLimitSettingDto(String scope, String name, String category, BigDecimal limit, String action, String bucketOverride) {
+    }
+
+    public record NetWorthResponse(
+            List<NetWorthAccountResponse> accounts,
+            List<LiabilityResponse> liabilities,
+            BigDecimal liquidTotal,
+            BigDecimal investedAssets,
+            BigDecimal totalAssets,
+            BigDecimal totalLiabilities,
+            BigDecimal netWorth,
+            BigDecimal emergencyFundMin,
+            BigDecimal emergencyFundComfort,
+            BigDecimal emergencyProgressComfort
+    ) {
+    }
+
+    public record NetWorthAccountResponse(
+            String accountKey,
+            String name,
+            String kind,
+            boolean liquid,
+            boolean excludeFromNetWorth,
+            boolean configured,
+            BigDecimal anchorBalance,
+            LocalDate anchorDate,
+            BigDecimal netFlowSinceAnchor,
+            BigDecimal derivedBalance,
+            BigDecimal statementBalance,
+            LocalDate statementDate,
+            BigDecimal reconciledBalance,
+            BigDecimal drift,
+            Boolean reconciled
+    ) {
+    }
+
+    public record AccountUpsertRequest(
+            String name,
+            String kind,
+            boolean liquid,
+            boolean excludeFromNetWorth,
+            BigDecimal anchorBalance,
+            LocalDate anchorDate,
+            BigDecimal statementBalance,
+            LocalDate statementDate
+    ) {
+    }
+
+    public record LiabilityResponse(
+            String liabilityKey,
+            String name,
+            String kind,
+            BigDecimal currentPrincipal,
+            BigDecimal annualInterestRate,
+            BigDecimal monthlyPayment,
+            LocalDate asOf
+    ) {
+    }
+
+    public record LiabilityUpsertRequest(
+            String name,
+            String kind,
+            BigDecimal currentPrincipal,
+            BigDecimal annualInterestRate,
+            BigDecimal monthlyPayment,
+            LocalDate asOf
+    ) {
+    }
+
+    public record GoalResponse(
+            String goalId,
+            String name,
+            BigDecimal targetAmount,
+            BigDecimal currentAmount,
+            LocalDate targetDate,
+            String note
+    ) {
+    }
+
+    public record GoalUpsertRequest(
+            String name,
+            BigDecimal targetAmount,
+            BigDecimal currentAmount,
+            LocalDate targetDate,
+            String note
+    ) {
+    }
+
+    public record CategoriesResponse(
+            List<CategoryGroupResponse> groups,
+            List<CategoryResponse> categories,
+            List<CategoryRuleResponse> rules
+    ) {
+    }
+
+    public record CategoryRuleResponse(
+            String ruleId,
+            String matchType,
+            String pattern,
+            String categoryId,
+            int priority,
+            boolean enabled,
+            String source
+    ) {
+    }
+
+    public record RuleUpsertRequest(
+            String pattern,
+            String categoryId,
+            int priority,
+            boolean enabled
+    ) {
+    }
+
+    public record RecategorizeRequest(
+            String categoryId
+    ) {
+    }
+
+    public record RecategorizeResponse(
+            int year,
+            long transactionId,
+            String categoryId
+    ) {
+    }
+
+    public record CategoryGroupResponse(
+            String groupId,
+            String label,
+            int sortOrder
+    ) {
+    }
+
+    public record CategoryResponse(
+            String categoryId,
+            String label,
+            String area,
+            String analyticsGroup,
+            String groupId,
+            String budgetBucket,
+            String fixedness,
+            String flowType,
+            boolean discretionary,
+            boolean excluded,
+            boolean realIncome,
+            boolean dailyPaced,
+            boolean protectedFlag,
+            boolean sinkingFundEligible,
+            boolean archived,
+            int sortOrder,
+            boolean builtin
+    ) {
+    }
+
+    public record CategoryUpsertRequest(
+            String label,
+            String area,
+            String analyticsGroup,
+            String groupId,
+            String budgetBucket,
+            String fixedness,
+            String flowType,
+            boolean discretionary,
+            boolean excluded,
+            boolean realIncome,
+            boolean dailyPaced,
+            boolean protectedFlag,
+            boolean sinkingFundEligible,
+            boolean archived,
+            int sortOrder
+    ) {
+    }
+
+    public record CategoryGroupUpsertRequest(
+            String label,
+            int sortOrder
+    ) {
+    }
+
+    public record CategoryReorderRequest(
+            List<String> groupIds,
+            List<String> categoryIds
+    ) {
     }
 
     public record FireSummaryResponse(
@@ -434,6 +618,11 @@ public final class BudgetApiDtos {
             BigDecimal taxableUnrealizedGain,
             BigDecimal estimatedCapitalGainsTax,
             BigDecimal currentMonthlyWealthContribution,
+            BigDecimal assumedInflation,
+            BigDecimal fireNumberNominalAtTarget,
+            BigDecimal suggestedEquityShare,
+            BigDecimal monteCarloSuccessRate,
+            String ppkRecommendation,
             FireBudgetLinkResponse budgetLink,
             FireContributionPlanResponse contributionPlan,
             FireWithdrawalPlanResponse withdrawalPlan,

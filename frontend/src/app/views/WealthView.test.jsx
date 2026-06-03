@@ -42,8 +42,9 @@ describe("WealthView", () => {
       />
     );
 
-    expect(screen.getByText("Transakcyjnie, nie saldo kont")).toBeInTheDocument();
-    expect(screen.getByText("Ten widok pokazuje sumę importowanych ruchów pieniędzy. Realne saldo/net worth wymaga osobnego modelu stanów kont.")).toBeInTheDocument();
+    expect(screen.getByText("Wartość netto")).toBeInTheDocument();
+    expect(screen.getByText("Fundusz awaryjny i salda kont")).toBeInTheDocument();
+    expect(screen.getByText("Salda i inwestycje liczone osobno")).toBeInTheDocument();
     expect(screen.getByText("Inwestycje")).toBeInTheDocument();
     expect(screen.getAllByText("Konto oszczędnościowe").length).toBeGreaterThan(0);
     expect(screen.getByText("Nadpłata kredytu")).toBeInTheDocument();

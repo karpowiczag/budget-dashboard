@@ -1,6 +1,7 @@
 package com.budget.application.categorization;
 
 import com.budget.domain.category.CategoryRule;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -12,7 +13,7 @@ import java.util.stream.Collectors;
 public final class BudgetTaxonomy {
     static final String FLOW_INCOME = "income";
     static final String FLOW_LIVING_EXPENSE = "livingExpense";
-    static final String FLOW_WEALTH_TRANSFER = "wealthTransfer";
+    public static final String FLOW_WEALTH_TRANSFER = "wealthTransfer";
     static final String FLOW_TECHNICAL_TRANSFER = "technicalTransfer";
     static final String FLOW_REFUND_CORRECTION = "refundCorrection";
     static final String FLOW_REVIEW = "review";
@@ -32,9 +33,9 @@ public final class BudgetTaxonomy {
 
     static final String CATEGORY_UNKNOWN = "unknownReview";
     static final String CATEGORY_MARKETPLACE = "marketplaceOnline";
-    static final String CATEGORY_SAVINGS_ACCOUNT = "savingsAccount";
-    static final String CATEGORY_INVESTMENTS = "investments";
-    static final String CATEGORY_LOAN_OVERPAYMENT = "loanOverpayment";
+    public static final String CATEGORY_SAVINGS_ACCOUNT = "savingsAccount";
+    public static final String CATEGORY_INVESTMENTS = "investments";
+    public static final String CATEGORY_LOAN_OVERPAYMENT = "loanOverpayment";
 
     static final Map<String, BudgetGroup> BUDGET_GROUPS = orderedMap(List.of(
             new BudgetGroup(GROUP_INCOME, "Przychody"),
@@ -160,12 +161,40 @@ public final class BudgetTaxonomy {
     }
 
     /**
+     * The default category catalog, in stable display order. Source for the first-boot DB seed
+     * (Phase 3b); after seeding the runtime catalog is the DB, not this map.
+     */
+    public static Collection<CategoryDefinition> categories() {
+        return CATEGORIES.values();
+    }
+
+    /** The default budget groups, in stable display order. Source for the first-boot DB seed. */
+    public static Collection<BudgetGroup> budgetGroups() {
+        return BUDGET_GROUPS.values();
+    }
+
+    /** Old category labels mapped to current ids, for backward-compatible label resolution. */
+    public static Map<String, String> legacyCategoryLabelAliases() {
+        return LEGACY_CATEGORY_LABEL_ALIASES;
+    }
+
+    /** The default classification rules, in declared (precedence) order. Source for the rule DB seed. */
+    public static List<CategoryRule> rules() {
+        return RULES;
+    }
+
+    /**
      * Canonical labels of the wealth-building categories (investments, savings
      * account, loan overpayment). Single source of truth so persistence,
      * analysis, and FIRE linkage cannot silently drift if a label is renamed.
      */
     public static Set<String> wealthCategoryLabels() {
         return WEALTH_CATEGORY_LABELS;
+    }
+
+    /** Stable ids of the wealth-building categories (investments, savings account, loan overpayment). */
+    public static Set<String> wealthCategoryIds() {
+        return WEALTH_CATEGORY_IDS;
     }
 
     public static String categoryIdByLabel(String label) {
@@ -216,10 +245,10 @@ public final class BudgetTaxonomy {
         return Collections.unmodifiableMap(map);
     }
 
-    record BudgetGroup(String id, String label) {
+    public record BudgetGroup(String id, String label) {
     }
 
-    record CategoryDefinition(
+    public record CategoryDefinition(
             String id,
             String label,
             String area,

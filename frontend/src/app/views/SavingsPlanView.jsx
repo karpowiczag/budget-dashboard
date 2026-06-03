@@ -1,9 +1,10 @@
+import { useState } from "react";
 import { Info } from "lucide-react";
 import { SavingsRadarChart } from "../components/charts/SavingsRadarChart.jsx";
 import { SavingsWaterfallChart } from "../components/charts/SavingsWaterfallChart.jsx";
 import { ReportDataTable } from "../components/tables/ReportDataTable.jsx";
 import { Panel } from "../components/ui/Panel.jsx";
-import { bucketAliasesForLimit } from "../domain/budgetSelectors.js";
+import { bucketAliasesForLimit, selectLimitManager, selectLimitRollover } from "../domain/budgetSelectors.js";
 import { money } from "../domain/formatters.js";
 
 export function SavingsPlanView({
@@ -26,6 +27,7 @@ export function SavingsPlanView({
   settings,
   settingsStatus,
   bucketOptions = [],
+  categoryOptions = [],
   onBucketOverrideChange,
   onLimitChange,
   onSaveSettings,
@@ -124,6 +126,20 @@ export function SavingsPlanView({
             <p>{minMonths} mies.: {money(coreMonthlyCost * minMonths)} · komfort: {money(coreMonthlyCost * comfortMonths)}</p>
           </div>
           <div>
+            <span>Dochód netto (do 50/30/20)</span>
+            <input
+              className="planNumberInput"
+              type="number"
+              min="1"
+              max="100"
+              step="1"
+              value={Math.round((Number(settings?.netIncomeRatio) > 0 ? Number(settings.netIncomeRatio) : 0.75) * 100)}
+              onChange={(event) => onSettingChange("netIncomeRatio", Math.min(1, Math.max(0.01, Number(event.target.value || 0) / 100)))}
+              aria-label="Dochód netto jako procent brutto"
+            />
+            <p>% dochodu brutto — punkt odniesienia 50/30/20</p>
+          </div>
+          <div>
             <span>Przepływy majątkowe</span>
             <strong>{money(financialFlows.total || 0)}</strong>
             <p>szczegóły są w module Majątek, tutaj liczy się tylko cel planu</p>
@@ -131,7 +147,15 @@ export function SavingsPlanView({
         </div>
         {settingsStatus && <div className={`inlineStatus ${settingsStatus.type}`}>{settingsStatus.message}</div>}
 
+        <SinkingFundEditor
+          categories={settings?.sinkingFundCategories || []}
+          options={categoryOptions}
+          onChange={(list) => onSettingChange("sinkingFundCategories", list)}
+        />
+
         <RecommendedCutsSummary recommendedCuts={recommendedCuts} isHistorical={isHistorical} />
+
+        <LimitRolloverSection planRows={planRows} activeMonths={data?.activeMonths || 0} />
 
         <div className="planTable">
           <h3>Główne limity</h3>
@@ -146,6 +170,13 @@ export function SavingsPlanView({
             onLimitChange={onLimitChange}
           />
         </div>
+
+        <LimitsManager
+          groups={selectLimitManager(planRows, parentPlanRows)}
+          bucketOptions={bucketOptions}
+          onLimitChange={onLimitChange}
+          onBucketOverrideChange={onBucketOverrideChange}
+        />
 
         <details className="planChartsDisclosure">
           <summary>Wizualizacja scenariusza</summary>
@@ -162,6 +193,148 @@ export function SavingsPlanView({
         </details>
       </div>
     </Panel>
+  );
+}
+
+function LimitsManager({ groups = [], bucketOptions = [], onLimitChange, onBucketOverrideChange }) {
+  const [query, setQuery] = useState("");
+  const filter = query.trim().toLowerCase();
+  return (
+    <details className="planChartsDisclosure" open>
+      <summary>Wszystkie limity — pełna kontrola</summary>
+      <p className="nwMuted">Ustaw lub zmień limit dowolnej kategorii i koszyka, przenieś kategorię do innego koszyka. Wszystko w jednym miejscu.</p>
+      <input
+        className="limitSearch"
+        type="search"
+        placeholder="Szukaj kategorii…"
+        value={query}
+        aria-label="Szukaj kategorii"
+        onChange={(event) => setQuery(event.target.value)}
+      />
+      {groups.map((group) => {
+        const categories = group.categories.filter((category) => !filter || category.name.toLowerCase().includes(filter));
+        if (filter && !categories.length) return null;
+        return (
+          <div className="limitGroup" key={group.bucket}>
+            <div className="limitGroupHead">
+              <span className="limitGroupName">{group.bucket}</span>
+              <span className="nwMuted">średnia {money(group.currentMonthly)}</span>
+              <label className="limitGroupLimit">
+                Limit koszyka
+                <input
+                  type="number"
+                  min="0"
+                  step="100"
+                  value={group.bucketLimit ?? ""}
+                  placeholder="brak"
+                  aria-label={`Limit koszyka ${group.bucket}`}
+                  onChange={(event) => onLimitChange("bucket", group.bucket, Number(event.target.value || 0))}
+                />
+              </label>
+            </div>
+            <table className="nwTable">
+              <thead>
+                <tr>
+                  <th>Kategoria</th>
+                  <th className="num">Średnia / mies.</th>
+                  <th className="num">Limit</th>
+                  <th>Koszyk</th>
+                  <th className="num">Potencjał</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map((category) => (
+                  <tr key={category.category}>
+                    <td>{category.name}</td>
+                    <td className="num">{money(category.currentMonthly)}</td>
+                    <td className="num">
+                      <input
+                        type="number"
+                        min="0"
+                        step="50"
+                        value={Math.round(category.limit)}
+                        aria-label={`Limit kategorii ${category.name}`}
+                        onChange={(event) => onLimitChange("category", category.category, Number(event.target.value || 0))}
+                      />
+                    </td>
+                    <td>
+                      <select
+                        value={category.bucket}
+                        aria-label={`Koszyk kategorii ${category.name}`}
+                        onChange={(event) => onBucketOverrideChange(category.category, event.target.value === category.originalBucket ? "" : event.target.value)}
+                      >
+                        {bucketOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </td>
+                    <td className="num">{money(category.potentialMonthly)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+    </details>
+  );
+}
+
+function LimitRolloverSection({ planRows = [], activeMonths = 0 }) {
+  const rollover = selectLimitRollover(planRows, activeMonths);
+  if (!rollover.rows.length || rollover.months < 2) return null;
+  const highlights = [...rollover.overspent.slice(0, 5), ...rollover.buffered.slice(0, 5)];
+  return (
+    <details className="planChartsDisclosure">
+      <summary>Rollover limitów ({rollover.months} mies.) — bufor i przekroczenia</summary>
+      <div className="recommendedCuts">
+        <div>
+          <span>Łączny bufor</span>
+          <strong className="good">{money(rollover.totalBuffer)}</strong>
+          <p>oszczędności narastająco w kategoriach pod limitem</p>
+        </div>
+        <div>
+          <span>Łączne przekroczenia</span>
+          <strong className="warn">{money(rollover.totalOverspend)}</strong>
+          <p>narastające przekroczenia limitów</p>
+        </div>
+      </div>
+      <div className="rolloverList">
+        {highlights.map((row) => (
+          <div className="rolloverRow" key={row.category}>
+            <span className="rolloverName">{row.category}</span>
+            <strong className={row.status === "over" ? "warn" : "good"}>{money(row.carryover)}</strong>
+            <span className="nwMuted">limit {money(row.limit)} · średnia {money(row.monthlyAverage)}</span>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function SinkingFundEditor({ categories = [], options = [], onChange }) {
+  const available = options.filter((option) => !categories.includes(option));
+  return (
+    <div className="sinkingFundEditor">
+      <h3>Fundusze celowe (kategorie nieregularne)</h3>
+      <p className="nwMuted">Te kategorie są rezerwowane miesięcznie (średnia historyczna) i odejmowane od „ile można bezpiecznie wydać".</p>
+      <div className="sinkingChips">
+        {categories.length ? categories.map((category) => (
+          <span className="sinkingChip" key={category}>
+            {category}
+            <button type="button" aria-label={`Usuń ${category}`} onClick={() => onChange(categories.filter((item) => item !== category))}>×</button>
+          </span>
+        )) : <span className="nwMuted">Brak — używany jest zestaw domyślny.</span>}
+      </div>
+      {available.length ? (
+        <select
+          value=""
+          aria-label="Dodaj kategorię funduszu celowego"
+          onChange={(event) => { if (event.target.value) onChange([...categories, event.target.value]); }}
+        >
+          <option value="">+ dodaj kategorię…</option>
+          {available.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+      ) : null}
+    </div>
   );
 }
 

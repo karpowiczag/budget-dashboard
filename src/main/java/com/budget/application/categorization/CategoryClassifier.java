@@ -3,6 +3,7 @@ package com.budget.application.categorization;
 import com.budget.domain.category.CategoryMatch;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -11,19 +12,35 @@ public class CategoryClassifier {
     private final List<CategoryRuleMatcher> matchers;
     private final RegexCategoryRuleMatcher regexMatcher;
     private final SubcategoryClassifier subcategoryClassifier;
+    private final CategoryCatalog catalog;
 
     public CategoryClassifier() {
         this(PersonalCategoryRules.empty());
     }
 
-    @Autowired
     public CategoryClassifier(PersonalCategoryRules personalRules) {
-        this(new RegexCategoryRuleMatcher(personalRules), new SubcategoryClassifier());
+        this(personalRules, new BudgetTaxonomyCatalog());
+    }
+
+    // Test convenience: explicit catalog (e.g. a renaming stub) with rules from the taxonomy + the
+    // supplied personal rules.
+    public CategoryClassifier(PersonalCategoryRules personalRules, CategoryCatalog catalog) {
+        this(new RegexCategoryRuleMatcher(personalRules), new SubcategoryClassifier(), catalog);
+    }
+
+    @Autowired
+    public CategoryClassifier(CategoryCatalog catalog, ClassificationRuleStore ruleStore) {
+        this(new RegexCategoryRuleMatcher(ruleStore), new SubcategoryClassifier(), catalog);
     }
 
     CategoryClassifier(RegexCategoryRuleMatcher regexMatcher, SubcategoryClassifier subcategoryClassifier) {
+        this(regexMatcher, subcategoryClassifier, new BudgetTaxonomyCatalog());
+    }
+
+    CategoryClassifier(RegexCategoryRuleMatcher regexMatcher, SubcategoryClassifier subcategoryClassifier, CategoryCatalog catalog) {
         this.regexMatcher = regexMatcher;
         this.subcategoryClassifier = subcategoryClassifier;
+        this.catalog = catalog;
         this.matchers = List.of(
                 new PositiveEmployerIncomeMatcher(),
                 new BankCategoryRuleMatcher(),
@@ -73,6 +90,29 @@ public class CategoryClassifier {
         return enriched;
     }
 
+    /**
+     * A decision that forces a specific category id (manual recategorize override), resolving label,
+     * flow and group from the catalog so it works for user-created categories too. Marked ok with a
+     * {@code manual-override} pattern; the subcategory is re-derived for the chosen category.
+     */
+    public CategoryDecision overrideDecision(String categoryId, String description) {
+        var definition = catalog.definitionById(categoryId);
+        var subcategory = subcategoryClassifier.subcategory(categoryId, description);
+        return new CategoryDecision(
+                categoryId,
+                definition.label(),
+                subcategory.id(),
+                subcategory.label(),
+                definition.flowType(),
+                definition.budgetGroupId(),
+                BudgetTaxonomy.budgetGroupLabel(definition.budgetGroupId()),
+                BudgetTaxonomy.REVIEW_OK,
+                "",
+                "manual-override",
+                true
+        );
+    }
+
     public String budgetArea(String category) {
         return metadata(category).area();
     }
@@ -90,7 +130,7 @@ public class CategoryClassifier {
     }
 
     public String subcategory(String category, String description) {
-        return subcategoryClassifier.subcategory(BudgetTaxonomy.categoryIdByLabel(category), description).label();
+        return subcategoryClassifier.subcategory(catalog.categoryIdByLabel(category), description).label();
     }
 
     public boolean isDiscretionary(String category) {
@@ -105,7 +145,62 @@ public class CategoryClassifier {
         return metadata(category).realIncome();
     }
 
+    public boolean isDailyPaced(String category) {
+        return catalog.isDailyPaced(category);
+    }
+
+    public Set<String> wealthCategoryLabels() {
+        return catalog.wealthCategoryLabels();
+    }
+
+    // --- Stable-id lookups (rename-safe). Analysis groups by category id and resolves the
+    // current display label through these, so a rename never splits a category. ---
+
+    public String labelForId(String categoryId) {
+        return catalog.definitionById(categoryId).label();
+    }
+
+    public String categoryIdByLabel(String category) {
+        return catalog.categoryIdByLabel(category);
+    }
+
+    public String budgetAreaById(String categoryId) {
+        return catalog.definitionById(categoryId).area();
+    }
+
+    public String groupById(String categoryId) {
+        return catalog.definitionById(categoryId).analyticsGroup();
+    }
+
+    public String budgetBucketById(String categoryId) {
+        return catalog.definitionById(categoryId).budgetBucketLabel();
+    }
+
+    public String fixednessById(String categoryId) {
+        return catalog.definitionById(categoryId).fixedness();
+    }
+
+    public boolean isDiscretionaryById(String categoryId) {
+        return catalog.definitionById(categoryId).discretionary();
+    }
+
+    public boolean isExcludedById(String categoryId) {
+        return catalog.definitionById(categoryId).excluded();
+    }
+
+    public boolean isRealIncomeById(String categoryId) {
+        return catalog.definitionById(categoryId).realIncome();
+    }
+
+    public boolean isDailyPacedById(String categoryId) {
+        return catalog.isDailyPacedById(categoryId);
+    }
+
+    public Set<String> wealthCategoryIds() {
+        return catalog.wealthCategoryIds();
+    }
+
     private BudgetTaxonomy.CategoryDefinition metadata(String category) {
-        return BudgetTaxonomy.category(BudgetTaxonomy.categoryIdByLabel(category));
+        return catalog.definitionByLabel(category);
     }
 }

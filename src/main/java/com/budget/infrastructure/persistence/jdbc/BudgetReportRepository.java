@@ -1,5 +1,6 @@
 package com.budget.infrastructure.persistence.jdbc;
 
+import com.budget.application.categorization.CategoryCatalog;
 import com.budget.application.reporting.AnalyticsReport;
 import com.budget.application.reporting.BudgetReportStore;
 import com.budget.application.reporting.CalendarReport;
@@ -34,26 +35,44 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class BudgetReportRepository implements BudgetReportStore {
-    private static final java.util.Set<String> FINANCIAL_FLOW_CATEGORIES = com.budget.application.categorization.BudgetTaxonomy.wealthCategoryLabels();
-
     private final ReportDataJdbcRepository reports;
     private final BudgetTransactionDataJdbcRepository transactions;
     private final ImportRunDataJdbcRepository importRuns;
     private final JdbcAggregateTemplate aggregateTemplate;
     private final NamedParameterJdbcTemplate jdbc;
+    private final CategoryCatalog catalog;
 
     public BudgetReportRepository(
             ReportDataJdbcRepository reports,
             BudgetTransactionDataJdbcRepository transactions,
             ImportRunDataJdbcRepository importRuns,
             JdbcAggregateTemplate aggregateTemplate,
-            NamedParameterJdbcTemplate jdbc
+            NamedParameterJdbcTemplate jdbc,
+            CategoryCatalog catalog
     ) {
         this.reports = reports;
         this.transactions = transactions;
         this.importRuns = importRuns;
         this.aggregateTemplate = aggregateTemplate;
         this.jdbc = jdbc;
+        this.catalog = catalog;
+    }
+
+    /**
+     * Current display label for a transaction's category id (rename-safe), falling back to the
+     * stored label when the id is no longer in the catalog. Grouping analytics by this value keeps
+     * a renamed category as a single row.
+     */
+    private String categoryLabel(TransactionRecord row) {
+        var id = row.categoryId();
+        if (id == null || id.isBlank()) {
+            return row.correctedCategory();
+        }
+        try {
+            return catalog.definitionById(id).label();
+        } catch (IllegalArgumentException e) {
+            return row.correctedCategory();
+        }
     }
 
     @Override
@@ -138,7 +157,7 @@ public class BudgetReportRepository implements BudgetReportStore {
                 SELECT COALESCE(SUM(excluded_outgoing), 0)
                 FROM budget_transactions
                 WHERE report_year = :year
-                  AND corrected_category = 'Konto oszczędnościowe'
+                  AND category_id = 'savingsAccount'
                 """, params(year));
         return new BudgetSnapshot.Kpis(
                 row.income(),
@@ -190,13 +209,13 @@ public class BudgetReportRepository implements BudgetReportStore {
                         SELECT COALESCE(SUM(excluded_outgoing), 0)
                         FROM budget_transactions
                         WHERE report_year = :year
-                          AND corrected_category = 'Konto oszczędnościowe'
+                          AND category_id = 'savingsAccount'
                         """, params(year))
                 : decimal("""
                         SELECT COALESCE(SUM(excluded_outgoing), 0)
                         FROM budget_transactions
                         WHERE report_year = :year
-                          AND corrected_category = 'Konto oszczędnościowe'
+                          AND category_id = 'savingsAccount'
                           AND posted_date > :latestSavingsAccountDate
                         """, params(year).addValue("latestSavingsAccountDate", latestSavingsAccountDate));
         var inflows = accountInflows.add(pendingDeposits);
@@ -251,7 +270,7 @@ public class BudgetReportRepository implements BudgetReportStore {
                 rows.size(),
                 aggregate(rows, TransactionRecord::area, AnalyticsReport.AreaSpend::new),
                 aggregate(rows, TransactionRecord::group, AnalyticsReport.GroupSpend::new),
-                aggregate(rows, TransactionRecord::correctedCategory, AnalyticsReport.CategorySpend::new),
+                aggregate(rows, this::categoryLabel, AnalyticsReport.CategorySpend::new),
                 aggregateSubcategories(rows),
                 aggregateHierarchy(rows),
                 financialFlows(rows),
@@ -273,6 +292,13 @@ public class BudgetReportRepository implements BudgetReportStore {
         var total = countTransactions(query);
         var rows = findTransactionRows(query, true);
         return TransactionPage.of(rows, query, total);
+    }
+
+    @Override
+    public java.util.Optional<TransactionRecord> findTransactionById(int year, long id) {
+        var rows = jdbc.query("SELECT * FROM budget_transactions WHERE report_year = :year AND id = :id",
+                params(year).addValue("id", id), this::mapTransaction);
+        return rows.stream().findFirst();
     }
 
     @Override
@@ -749,12 +775,27 @@ public class BudgetReportRepository implements BudgetReportStore {
             params.addValue("group", query.group());
         }
         if (query.category() != null) {
-            clauses.add("corrected_category = :category");
+            // The UI sends the displayed (current) label; match by stable id so a renamed category
+            // still resolves its historical rows, and keep the stored-label match for compatibility.
+            clauses.add("(category_id = :categoryId OR corrected_category = :category)");
+            params.addValue("categoryId", catalog.categoryIdByLabel(query.category()));
             params.addValue("category", query.category());
         }
         if (query.subcategory() != null) {
-            clauses.add("(subcategory = :subcategory OR corrected_category || ' · ' || subcategory = :subcategory)");
-            params.addValue("subcategory", query.subcategory());
+            var subcategory = query.subcategory();
+            params.addValue("subcategory", subcategory);
+            var separator = " · ";
+            var separatorIndex = subcategory.indexOf(separator);
+            if (separatorIndex > 0) {
+                // Composite "<category> · <subcategory>" from the analytics drill-in: also match by
+                // the category's stable id so a rename does not lose the drill-in rows.
+                clauses.add("(subcategory = :subcategory OR corrected_category || ' · ' || subcategory = :subcategory"
+                        + " OR (category_id = :subcatCategoryId AND subcategory = :subcatBare))");
+                params.addValue("subcatCategoryId", catalog.categoryIdByLabel(subcategory.substring(0, separatorIndex)));
+                params.addValue("subcatBare", subcategory.substring(separatorIndex + separator.length()));
+            } else {
+                clauses.add("(subcategory = :subcategory OR corrected_category || ' · ' || subcategory = :subcategory)");
+            }
         }
         if (query.fixedness() != null) {
             clauses.add("fixedness = :fixedness");
@@ -1127,8 +1168,9 @@ public class BudgetReportRepository implements BudgetReportStore {
             if (row.subcategory() == null || row.subcategory().isBlank()) {
                 continue;
             }
-            var key = row.correctedCategory() + " · " + row.subcategory();
-            var agg = totals.computeIfAbsent(key, ignored -> new SubcategoryAggregate(row.correctedCategory(), row.subcategory()));
+            var category = categoryLabel(row);
+            var key = category + " · " + row.subcategory();
+            var agg = totals.computeIfAbsent(key, ignored -> new SubcategoryAggregate(category, row.subcategory()));
             agg.spend = agg.spend.add(row.spend());
             agg.count++;
         }
@@ -1145,8 +1187,8 @@ public class BudgetReportRepository implements BudgetReportStore {
             if (row.spend().signum() <= 0) {
                 continue;
             }
-            var key = row.area() + "\u001F" + row.group() + "\u001F" + row.correctedCategory() + "\u001F" + row.subcategory();
-            var agg = totals.computeIfAbsent(key, ignored -> new HierarchyAggregate(row.area(), row.group(), row.correctedCategory(), row.subcategory()));
+            var key = row.area() + "\u001F" + row.group() + "\u001F" + categoryLabel(row) + "\u001F" + row.subcategory();
+            var agg = totals.computeIfAbsent(key, ignored -> new HierarchyAggregate(row.area(), row.group(), categoryLabel(row), row.subcategory()));
             agg.spend = agg.spend.add(row.spend());
             agg.count++;
         }
@@ -1160,10 +1202,10 @@ public class BudgetReportRepository implements BudgetReportStore {
     private List<AnalyticsReport.FinancialFlow> financialFlows(List<TransactionRecord> rows) {
         var totals = new LinkedHashMap<String, FinancialFlowAggregate>();
         for (var row : rows) {
-            if (!FINANCIAL_FLOW_CATEGORIES.contains(row.correctedCategory()) || row.excludedOutgoing().signum() <= 0) {
+            if (!catalog.wealthCategoryIds().contains(row.categoryId()) || row.excludedOutgoing().signum() <= 0) {
                 continue;
             }
-            var agg = totals.computeIfAbsent(row.correctedCategory(), ignored -> new FinancialFlowAggregate());
+            var agg = totals.computeIfAbsent(categoryLabel(row), ignored -> new FinancialFlowAggregate());
             agg.outgoing = agg.outgoing.add(row.excludedOutgoing());
             agg.count++;
         }
@@ -1179,7 +1221,7 @@ public class BudgetReportRepository implements BudgetReportStore {
             if (row.spend().signum() <= 0) {
                 continue;
             }
-            var category = normalizedLabel(row.correctedCategory());
+            var category = normalizedLabel(categoryLabel(row));
             var key = row.month() + "\u001F" + category;
             var agg = totals.computeIfAbsent(key, ignored -> new MonthlyDimensionAggregate(row.month(), category));
             agg.spend = agg.spend.add(row.spend());
@@ -1200,7 +1242,7 @@ public class BudgetReportRepository implements BudgetReportStore {
             }
             var area = normalizedLabel(row.area());
             var group = normalizedLabel(row.group());
-            var category = normalizedLabel(row.correctedCategory());
+            var category = normalizedLabel(categoryLabel(row));
             var subcategory = visibleSubcategory(row.subcategory());
             var key = row.month() + "\u001F" + area + "\u001F" + group + "\u001F" + category + "\u001F" + subcategory;
             var agg = totals.computeIfAbsent(key, ignored -> new MonthlyHierarchyAggregate(row.month(), area, group, category, subcategory));

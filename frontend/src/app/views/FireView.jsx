@@ -104,6 +104,12 @@ export function FireView({ fireSettings, fireSummary, loading = false, onSaveSet
             targetAge={summary.targetAge}
           />
           <ScenarioStrip scenarios={summary.scenarios || []} />
+          <div className="fireMiniMetrics">
+            <Metric label="Szansa sukcesu (Monte-Carlo)" value={hasSpendTarget ? percent(summary.monteCarloSuccessRate) : "Ustaw cel"} detail="dojście do celu w symulacji" warn={hasSpendTarget && Number(summary.monteCarloSuccessRate || 0) < 0.7} />
+            <Metric label="Sugerowane akcje (glidepath)" value={percent(summary.suggestedEquityShare)} detail="de-risking przy zbliżaniu do celu" />
+            <Metric label="Cel FIRE nominalnie" value={hasSpendTarget ? money(summary.fireNumberNominalAtTarget) : "Ustaw cel"} detail={`ceny roku celu · infl. ${percent(summary.assumedInflation)}`} />
+          </div>
+          {summary.ppkRecommendation ? <p className="mutedText">PPK: {summary.ppkRecommendation}</p> : null}
         </Panel>
         <Panel title="Pomost 50-60/65">
           <div className="fireMiniMetrics">

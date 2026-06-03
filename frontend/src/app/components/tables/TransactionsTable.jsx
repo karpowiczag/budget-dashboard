@@ -59,11 +59,14 @@ const columns = [
   },
 ];
 
-export function TransactionsTable({ transactions, sort, onSort, exportName = "transakcje" }) {
+export function TransactionsTable({ transactions, sort, onSort, exportName = "transakcje", categoryOptions, onRecategorize }) {
+  const tableColumns = onRecategorize
+    ? [...columns, recategorizeColumn(categoryOptions || [], onRecategorize)]
+    : columns;
   return (
     <DataTable
       className="transactions"
-      columns={columns}
+      columns={tableColumns}
       data={transactions}
       emptyMessage="Brak transakcji dla bieżących filtrów."
       exportName={exportName}
@@ -71,6 +74,32 @@ export function TransactionsTable({ transactions, sort, onSort, exportName = "tr
       sort={sort}
     />
   );
+}
+
+function recategorizeColumn(categoryOptions, onRecategorize) {
+  return {
+    id: "recategorize",
+    header: "Akcje",
+    enableSorting: false,
+    cell: ({ row }) => (
+      <select
+        className="recategorizeSelect"
+        aria-label={`Zmień kategorię: ${row.original.merchant || row.original.correctedCategory || row.original.id}`}
+        value=""
+        onChange={(event) => {
+          if (event.target.value) {
+            onRecategorize(row.original.id, event.target.value);
+          }
+        }}
+      >
+        <option value="">Zmień kategorię…</option>
+        {categoryOptions.map((option) => (
+          <option key={option.id} value={option.id}>{option.label}</option>
+        ))}
+      </select>
+    ),
+    meta: { disableCsv: true },
+  };
 }
 
 function reviewLabel(value) {

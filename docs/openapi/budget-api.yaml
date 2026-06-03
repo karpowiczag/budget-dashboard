@@ -193,6 +193,34 @@ paths:
           $ref: "#/components/responses/Problem"
         "404":
           $ref: "#/components/responses/Problem"
+  /api/v1/reports/{year}/transactions/{id}/recategorize:
+    post:
+      operationId: recategorizeTransaction
+      parameters:
+        - $ref: "#/components/parameters/Year"
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecategorizeRequest"
+      responses:
+        "200":
+          description: Recategorize acknowledgement; the year is re-analyzed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecategorizeResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
   /api/v1/imports/uploads:
     post:
       operationId: uploadImportCsv
@@ -311,6 +339,294 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FireSettings"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/networth:
+    get:
+      operationId: getNetWorth
+      responses:
+        "200":
+          description: Liquid account balances (derived from anchor + transaction flows) and emergency-fund coverage.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetWorthResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/networth/accounts/{key}:
+    put:
+      operationId: updateNetWorthAccount
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 190
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountUpsertRequest"
+      responses:
+        "200":
+          description: Net-worth overview after saving the account configuration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetWorthResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/networth/liabilities/{key}:
+    put:
+      operationId: updateNetWorthLiability
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 190
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LiabilityUpsertRequest"
+      responses:
+        "200":
+          description: Net-worth overview after saving the liability.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetWorthResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteNetWorthLiability
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 190
+      responses:
+        "200":
+          description: Net-worth overview after removing the liability.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetWorthResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/goals:
+    get:
+      operationId: listGoals
+      responses:
+        "200":
+          description: Financial goals.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Goal"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/goals/{id}:
+    put:
+      operationId: updateGoal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 190
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoalUpsertRequest"
+      responses:
+        "200":
+          description: Goals after saving.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Goal"
+        "400":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteGoal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 190
+      responses:
+        "200":
+          description: Goals after removing.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Goal"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/categories:
+    get:
+      operationId: listCategories
+      responses:
+        "200":
+          description: User-owned categories and groups.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/categories/{id}:
+    put:
+      operationId: updateCategory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 80
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryUpsertRequest"
+      responses:
+        "200":
+          description: Categories after saving.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteCategory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 80
+        - name: reassignTo
+          in: query
+          description: Target category id to reassign rules/transactions/overrides onto (required to delete).
+          schema:
+            type: string
+            maxLength: 80
+      responses:
+        "200":
+          description: Categories after deleting/merging.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/categories/groups/{id}:
+    put:
+      operationId: updateCategoryGroup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryGroupUpsertRequest"
+      responses:
+        "200":
+          description: Categories after renaming a group.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/categories/reorder:
+    post:
+      operationId: reorderCategories
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryReorderRequest"
+      responses:
+        "200":
+          description: Categories after reordering.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/v1/categories/rules/{id}:
+    put:
+      operationId: updateCategoryRule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleUpsertRequest"
+      responses:
+        "200":
+          description: Categories after saving a rule.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteCategoryRule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "200":
+          description: Categories after deleting a rule.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
         "400":
           $ref: "#/components/responses/Problem"
 components:
@@ -1240,6 +1556,14 @@ components:
         emergencyFundComfortMonths:
           type: integer
           minimum: 1
+        netIncomeRatio:
+          description: Net-of-gross income ratio used for the 50/30/20 benchmark (e.g. 0.75). Defaults to 0.75 when unset.
+          $ref: "#/components/schemas/Ratio"
+        sinkingFundCategories:
+          description: Categories treated as sinking funds (monthly reserve = their historical average). Defaults to a built-in set when empty.
+          type: array
+          items:
+            type: string
         categoryLimits:
           type: array
           items:
@@ -1330,6 +1654,19 @@ components:
           $ref: "#/components/schemas/Money"
         currentMonthlyWealthContribution:
           $ref: "#/components/schemas/Money"
+        assumedInflation:
+          $ref: "#/components/schemas/Ratio"
+        fireNumberNominalAtTarget:
+          description: FIRE number in nominal PLN at the target age (today's number inflated by assumedInflation).
+          $ref: "#/components/schemas/Money"
+        suggestedEquityShare:
+          description: Glidepath-suggested equity allocation that de-risks approaching the target age.
+          $ref: "#/components/schemas/Ratio"
+        monteCarloSuccessRate:
+          description: Probability (0-1) of reaching the FIRE number by the target age under simulated returns.
+          $ref: "#/components/schemas/Ratio"
+        ppkRecommendation:
+          type: string
         budgetLink:
           $ref: "#/components/schemas/FireBudgetLink"
         contributionPlan:
@@ -1758,6 +2095,332 @@ components:
           $ref: "#/components/schemas/Ratio"
         rebalanceBand:
           $ref: "#/components/schemas/Ratio"
+    NetWorthResponse:
+      type: object
+      required: [accounts, liabilities, liquidTotal, investedAssets, totalAssets, totalLiabilities, netWorth, emergencyFundMin, emergencyFundComfort, emergencyProgressComfort]
+      properties:
+        accounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetWorthAccount"
+        liabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/Liability"
+        liquidTotal:
+          $ref: "#/components/schemas/Money"
+        investedAssets:
+          description: Invested capital (MyFund portfolio value); zero when no portfolio data is loaded.
+          $ref: "#/components/schemas/Money"
+        totalAssets:
+          $ref: "#/components/schemas/Money"
+        totalLiabilities:
+          $ref: "#/components/schemas/Money"
+        netWorth:
+          description: totalAssets − totalLiabilities.
+          $ref: "#/components/schemas/Money"
+        emergencyFundMin:
+          $ref: "#/components/schemas/Money"
+        emergencyFundComfort:
+          $ref: "#/components/schemas/Money"
+        emergencyProgressComfort:
+          $ref: "#/components/schemas/Ratio"
+    NetWorthAccount:
+      type: object
+      required: [accountKey, name, kind, liquid, excludeFromNetWorth, configured]
+      properties:
+        accountKey:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+        liquid:
+          type: boolean
+        excludeFromNetWorth:
+          type: boolean
+        configured:
+          type: boolean
+        anchorBalance:
+          description: Known balance at anchorDate; absent until an opening balance is set.
+          $ref: "#/components/schemas/Money"
+        anchorDate:
+          type: string
+          format: date
+        netFlowSinceAnchor:
+          description: Net of signed transaction amounts posted after anchorDate.
+          $ref: "#/components/schemas/Money"
+        derivedBalance:
+          description: anchorBalance + netFlowSinceAnchor; absent until configured.
+          $ref: "#/components/schemas/Money"
+        statementBalance:
+          description: Optional later observed balance (e.g. from a statement) used for reconciliation.
+          $ref: "#/components/schemas/Money"
+        statementDate:
+          type: string
+          format: date
+        reconciledBalance:
+          description: Derived balance at statementDate; absent unless a statement is set.
+          $ref: "#/components/schemas/Money"
+        drift:
+          description: reconciledBalance − statementBalance; absent unless a statement is set.
+          $ref: "#/components/schemas/Money"
+        reconciled:
+          type: boolean
+    AccountUpsertRequest:
+      type: object
+      required: [name, kind, liquid, excludeFromNetWorth]
+      properties:
+        name:
+          type: string
+        kind:
+          type: string
+        liquid:
+          type: boolean
+        excludeFromNetWorth:
+          type: boolean
+        anchorBalance:
+          $ref: "#/components/schemas/Money"
+        anchorDate:
+          type: string
+          format: date
+        statementBalance:
+          $ref: "#/components/schemas/Money"
+        statementDate:
+          type: string
+          format: date
+    Liability:
+      type: object
+      required: [liabilityKey, name, kind, currentPrincipal]
+      properties:
+        liabilityKey:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+        currentPrincipal:
+          $ref: "#/components/schemas/Money"
+        annualInterestRate:
+          $ref: "#/components/schemas/Ratio"
+        monthlyPayment:
+          $ref: "#/components/schemas/Money"
+        asOf:
+          type: string
+          format: date
+    LiabilityUpsertRequest:
+      type: object
+      required: [name, kind, currentPrincipal]
+      properties:
+        name:
+          type: string
+        kind:
+          type: string
+        currentPrincipal:
+          $ref: "#/components/schemas/Money"
+        annualInterestRate:
+          $ref: "#/components/schemas/Ratio"
+        monthlyPayment:
+          $ref: "#/components/schemas/Money"
+        asOf:
+          type: string
+          format: date
+    Goal:
+      type: object
+      required: [goalId, name, targetAmount, currentAmount]
+      properties:
+        goalId:
+          type: string
+        name:
+          type: string
+        targetAmount:
+          $ref: "#/components/schemas/Money"
+        currentAmount:
+          $ref: "#/components/schemas/Money"
+        targetDate:
+          type: string
+          format: date
+        note:
+          type: string
+    GoalUpsertRequest:
+      type: object
+      required: [name, targetAmount]
+      properties:
+        name:
+          type: string
+        targetAmount:
+          $ref: "#/components/schemas/Money"
+        currentAmount:
+          $ref: "#/components/schemas/Money"
+        targetDate:
+          type: string
+          format: date
+        note:
+          type: string
+    CategoriesResponse:
+      type: object
+      required: [groups, categories]
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryGroup"
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryRule"
+    CategoryRule:
+      type: object
+      required: [ruleId, matchType, pattern, categoryId, priority, enabled, source]
+      properties:
+        ruleId:
+          type: string
+        matchType:
+          type: string
+        pattern:
+          type: string
+        categoryId:
+          type: string
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+        source:
+          type: string
+    RuleUpsertRequest:
+      type: object
+      required: [pattern, categoryId]
+      properties:
+        pattern:
+          type: string
+        categoryId:
+          type: string
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+    CategoryGroup:
+      type: object
+      required: [groupId, label, sortOrder]
+      properties:
+        groupId:
+          type: string
+        label:
+          type: string
+        sortOrder:
+          type: integer
+    Category:
+      type: object
+      required: [categoryId, label, area, analyticsGroup, budgetBucket, fixedness, flowType, discretionary, excluded, realIncome, dailyPaced, protectedFlag, sinkingFundEligible, archived, sortOrder]
+      properties:
+        categoryId:
+          type: string
+        label:
+          type: string
+        area:
+          type: string
+        analyticsGroup:
+          type: string
+        groupId:
+          type: string
+        budgetBucket:
+          type: string
+        fixedness:
+          type: string
+        flowType:
+          type: string
+        discretionary:
+          type: boolean
+        excluded:
+          type: boolean
+        realIncome:
+          type: boolean
+        dailyPaced:
+          type: boolean
+        protectedFlag:
+          type: boolean
+        sinkingFundEligible:
+          type: boolean
+        archived:
+          type: boolean
+        sortOrder:
+          type: integer
+        builtin:
+          type: boolean
+    CategoryUpsertRequest:
+      type: object
+      required: [label, area, budgetBucket, fixedness, flowType]
+      properties:
+        label:
+          type: string
+        area:
+          type: string
+        analyticsGroup:
+          type: string
+        groupId:
+          type: string
+        budgetBucket:
+          type: string
+        fixedness:
+          type: string
+        flowType:
+          type: string
+        discretionary:
+          type: boolean
+        excluded:
+          type: boolean
+        realIncome:
+          type: boolean
+        dailyPaced:
+          type: boolean
+        protectedFlag:
+          type: boolean
+        sinkingFundEligible:
+          type: boolean
+        archived:
+          type: boolean
+        sortOrder:
+          type: integer
+    CategoryGroupUpsertRequest:
+      type: object
+      required: [label]
+      properties:
+        label:
+          type: string
+        sortOrder:
+          type: integer
+    CategoryReorderRequest:
+      type: object
+      properties:
+        groupIds:
+          type: array
+          items:
+            type: string
+        categoryIds:
+          type: array
+          items:
+            type: string
+    RecategorizeRequest:
+      type: object
+      required: [categoryId]
+      properties:
+        categoryId:
+          type: string
+    RecategorizeResponse:
+      type: object
+      required: [year, transactionId, categoryId]
+      properties:
+        year:
+          type: integer
+        transactionId:
+          type: integer
+          format: int64
+        categoryId:
+          type: string
     ProblemDetail:
       type: object
       properties:

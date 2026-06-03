@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchAnalytics, fetchCalendar, fetchFireSettings, fetchFireSummary, fetchTransactions, updateFireSettings } from "./api/budgetApi.js";
+import { deleteCategory, deleteCategoryRule, deleteGoal, deleteNetWorthLiability, fetchAnalytics, fetchCalendar, fetchCategories, fetchFireSettings, fetchFireSummary, fetchGoals, fetchNetWorth, fetchTransactions, recategorizeTransaction, saveCategory, saveCategoryGroup, saveCategoryRule, saveGoal, saveNetWorthAccount, saveNetWorthLiability, updateFireSettings } from "./api/budgetApi.js";
 import { budgetQueryKeys } from "./api/queryKeys.js";
 import { AppShell } from "./components/layout/AppShell.jsx";
 import { DashboardFooter } from "./components/layout/DashboardFooter.jsx";
@@ -13,10 +13,14 @@ import { useBudgetData } from "./hooks/useBudgetData.js";
 import { useDashboardModel } from "./hooks/useDashboardModel.js";
 import { applyTheme, getInitialTheme } from "./theme.js";
 import { Moon, Sun } from "lucide-react";
-import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel } from "./domain/budgetSelectors.js";
+import { BUDGET_BUCKET_OPTIONS, limitKey, monthKeyFromLabel, sectionForView, selectCategoryCatalog } from "./domain/budgetSelectors.js";
+import { CategoriesView } from "./views/CategoriesView.jsx";
 import { ImportView } from "./views/ImportView.jsx";
 import { FireView } from "./views/FireView.jsx";
+import { ForecastPanel } from "./views/ForecastPanel.jsx";
+import { GoalsPanel } from "./views/GoalsPanel.jsx";
 import { MonthControlView } from "./views/MonthControlView.jsx";
+import { OverviewView } from "./views/OverviewView.jsx";
 import { RecurringView } from "./views/RecurringView.jsx";
 import { ReportsView } from "./views/ReportsView.jsx";
 import { SavingsPlanView } from "./views/SavingsPlanView.jsx";
@@ -50,7 +54,10 @@ export default function App() {
   const [categoryBucketOverrides, setCategoryBucketOverrides] = useState({});
   const [settingsDraft, setSettingsDraft] = useState(null);
   const [fireSettingsStatus, setFireSettingsStatus] = useState(null);
-  const [view, setView] = useState("control");
+  const [netWorthStatus, setNetWorthStatus] = useState(null);
+  const [goalStatus, setGoalStatus] = useState(null);
+  const [categoryStatus, setCategoryStatus] = useState(null);
+  const [view, setView] = useState("overview");
   const [theme, setTheme] = useState(getInitialTheme);
   const [localTimes, setLocalTimes] = useState({
     control: { scope: "month", month: "", day: "", drillFilter: null },
@@ -170,6 +177,55 @@ export default function App() {
   const fireSettingsMutation = useMutation({
     mutationFn: updateFireSettings,
   });
+  const netWorthQuery = useQuery({
+    queryKey: budgetQueryKeys.netWorth,
+    queryFn: fetchNetWorth,
+    enabled: !!data && (view === "wealth" || view === "plan"),
+  });
+  const netWorthMutation = useMutation({
+    mutationFn: ({ key, account }) => saveNetWorthAccount(key, account),
+  });
+  const netWorthLiabilityMutation = useMutation({
+    mutationFn: ({ key, liability }) => saveNetWorthLiability(key, liability),
+  });
+  const netWorthLiabilityDeleteMutation = useMutation({
+    mutationFn: (key) => deleteNetWorthLiability(key),
+  });
+  const goalsQuery = useQuery({
+    queryKey: budgetQueryKeys.goals,
+    queryFn: fetchGoals,
+    enabled: view === "plan",
+  });
+  const goalMutation = useMutation({
+    mutationFn: ({ id, goal }) => saveGoal(id, goal),
+  });
+  const goalDeleteMutation = useMutation({
+    mutationFn: (id) => deleteGoal(id),
+  });
+  const categoriesQuery = useQuery({
+    queryKey: budgetQueryKeys.categories,
+    queryFn: fetchCategories,
+    // Also loaded on the transactions view to populate the per-row recategorize picker.
+    enabled: view === "categories" || view === "transactions",
+  });
+  const categoryMutation = useMutation({
+    mutationFn: ({ id, category }) => saveCategory(id, category),
+  });
+  const categoryGroupMutation = useMutation({
+    mutationFn: ({ id, group }) => saveCategoryGroup(id, group),
+  });
+  const categoryDeleteMutation = useMutation({
+    mutationFn: ({ id, reassignTo }) => deleteCategory(id, reassignTo),
+  });
+  const ruleMutation = useMutation({
+    mutationFn: ({ id, rule }) => saveCategoryRule(id, rule),
+  });
+  const ruleDeleteMutation = useMutation({
+    mutationFn: (id) => deleteCategoryRule(id),
+  });
+  const recategorizeMutation = useMutation({
+    mutationFn: ({ id, categoryId }) => recategorizeTransaction(year, id, categoryId),
+  });
   const inspectorQuery = useQuery({
     queryKey: budgetQueryKeys.transactions(year, inspectorFilters),
     queryFn: () => fetchTransactions(year, inspectorFilters),
@@ -192,6 +248,7 @@ export default function App() {
     bucketOverrides: categoryBucketOverrides,
     importRuns,
     fireSummary: fireQuery.data || null,
+    budgetSettings: settingsDraft || budgetSettings,
   });
 
   if (status === "loading") {
@@ -348,6 +405,164 @@ export default function App() {
     }
   }
 
+  async function handleSaveNetWorthAccount(key, account) {
+    setNetWorthStatus({ type: "info", message: "Zapisuję konto..." });
+    try {
+      const saved = await netWorthMutation.mutateAsync({ key, account });
+      queryClient.setQueryData(budgetQueryKeys.netWorth, saved);
+      setNetWorthStatus({ type: "success", message: "Saldo zapisane i przeliczone." });
+      return saved;
+    } catch (error) {
+      setNetWorthStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
+  async function handleSaveNetWorthLiability(key, liability) {
+    setNetWorthStatus({ type: "info", message: "Zapisuję zobowiązanie..." });
+    try {
+      const saved = await netWorthLiabilityMutation.mutateAsync({ key, liability });
+      queryClient.setQueryData(budgetQueryKeys.netWorth, saved);
+      setNetWorthStatus({ type: "success", message: "Zobowiązanie zapisane i przeliczone." });
+      return saved;
+    } catch (error) {
+      setNetWorthStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
+  async function handleDeleteNetWorthLiability(key) {
+    setNetWorthStatus({ type: "info", message: "Usuwam zobowiązanie..." });
+    try {
+      const saved = await netWorthLiabilityDeleteMutation.mutateAsync(key);
+      queryClient.setQueryData(budgetQueryKeys.netWorth, saved);
+      setNetWorthStatus({ type: "success", message: "Zobowiązanie usunięte." });
+      return saved;
+    } catch (error) {
+      setNetWorthStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
+  async function handleSaveGoal(id, goal) {
+    setGoalStatus({ type: "info", message: "Zapisuję cel..." });
+    try {
+      const saved = await goalMutation.mutateAsync({ id, goal });
+      queryClient.setQueryData(budgetQueryKeys.goals, saved);
+      setGoalStatus({ type: "success", message: "Cel zapisany." });
+      return saved;
+    } catch (error) {
+      setGoalStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
+  async function handleDeleteGoal(id) {
+    setGoalStatus({ type: "info", message: "Usuwam cel..." });
+    try {
+      const saved = await goalDeleteMutation.mutateAsync(id);
+      queryClient.setQueryData(budgetQueryKeys.goals, saved);
+      setGoalStatus({ type: "success", message: "Cel usunięty." });
+      return saved;
+    } catch (error) {
+      setGoalStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
+  async function handleSaveCategory(id, category) {
+    setCategoryStatus({ type: "info", message: "Zapisuję kategorię..." });
+    try {
+      const saved = await categoryMutation.mutateAsync({ id, category });
+      queryClient.setQueryData(budgetQueryKeys.categories, saved);
+      // A category edit re-buckets/re-groups historical analysis, so refresh the dashboard and
+      // analytics caches (the new label/bucket reflects after the next analyze/rebuild).
+      queryClient.invalidateQueries({ queryKey: ["budget", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "analytics"] });
+      setCategoryStatus({ type: "success", message: "Kategoria zapisana." });
+      return saved;
+    } catch (error) {
+      setCategoryStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
+  async function handleDeleteCategory(id, reassignTo) {
+    setCategoryStatus({ type: "info", message: "Usuwam / scalam kategorię..." });
+    try {
+      const saved = await categoryDeleteMutation.mutateAsync({ id, reassignTo });
+      queryClient.setQueryData(budgetQueryKeys.categories, saved);
+      // A delete re-tags persisted transactions and re-analyzes the year, so refresh those too.
+      queryClient.invalidateQueries({ queryKey: ["budget", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "transactions"] });
+      setCategoryStatus({ type: "success", message: "Kategoria usunięta i scalona." });
+      return saved;
+    } catch (error) {
+      setCategoryStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
+  async function handleSaveCategoryGroup(id, group) {
+    setCategoryStatus({ type: "info", message: "Zapisuję grupę..." });
+    try {
+      const saved = await categoryGroupMutation.mutateAsync({ id, group });
+      queryClient.setQueryData(budgetQueryKeys.categories, saved);
+      queryClient.invalidateQueries({ queryKey: ["budget", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "analytics"] });
+      setCategoryStatus({ type: "success", message: "Grupa zapisana." });
+      return saved;
+    } catch (error) {
+      setCategoryStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
+  async function handleSaveRule(id, rule) {
+    setCategoryStatus({ type: "info", message: "Zapisuję regułę..." });
+    try {
+      const saved = await ruleMutation.mutateAsync({ id, rule });
+      queryClient.setQueryData(budgetQueryKeys.categories, saved);
+      // Rules re-classify on the next analyze/import, so refresh those caches.
+      queryClient.invalidateQueries({ queryKey: ["budget", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "analytics"] });
+      setCategoryStatus({ type: "success", message: "Reguła zapisana. Zadziała po ponownej analizie." });
+      return saved;
+    } catch (error) {
+      setCategoryStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
+  async function handleDeleteRule(id) {
+    setCategoryStatus({ type: "info", message: "Usuwam regułę..." });
+    try {
+      const saved = await ruleDeleteMutation.mutateAsync(id);
+      queryClient.setQueryData(budgetQueryKeys.categories, saved);
+      queryClient.invalidateQueries({ queryKey: ["budget", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "analytics"] });
+      setCategoryStatus({ type: "success", message: "Reguła usunięta." });
+      return saved;
+    } catch (error) {
+      setCategoryStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
+  async function handleRecategorize(transactionId, categoryId) {
+    try {
+      await recategorizeMutation.mutateAsync({ id: transactionId, categoryId });
+      // A recategorize re-analyzes the whole year, so refresh every dependent read.
+      queryClient.invalidateQueries({ queryKey: ["budget", "transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "calendar"] });
+    } catch (error) {
+      // The mutation tracks the error; the category simply stays unchanged on refresh.
+    }
+  }
+
   async function handleSaveSettings() {
     const base = settingsDraft || budgetSettings || {};
     const allLimitRows = [...(model.parentPlanRows || []), ...(model.planRows || [])];
@@ -383,6 +598,8 @@ export default function App() {
       aggressiveMonthlySpend: Number(base.aggressiveMonthlySpend || data.savingsPlan.aggressiveMonthlySpend),
       emergencyFundMinMonths: Number(base.emergencyFundMinMonths || 3),
       emergencyFundComfortMonths: Number(base.emergencyFundComfortMonths || 6),
+      netIncomeRatio: Number(base.netIncomeRatio) > 0 ? Number(base.netIncomeRatio) : 0.75,
+      sinkingFundCategories: Array.isArray(base.sinkingFundCategories) ? base.sinkingFundCategories : [],
       categoryLimits,
     };
     try {
@@ -391,6 +608,8 @@ export default function App() {
       // Status is already surfaced by the data hook.
     }
   }
+
+  const activeSection = sectionForView(model.views, view);
 
   return (
     <AppShell
@@ -408,7 +627,35 @@ export default function App() {
         />
       }
     >
+      {activeSection && activeSection.views.length > 1 && (
+        <nav className="sectionSubnav" aria-label={activeSection.label}>
+          <div className="segmented compact">
+            {activeSection.views.map((entry) => (
+              <button
+                type="button"
+                key={entry.id}
+                className={view === entry.id ? "active" : ""}
+                onClick={() => setView(entry.id)}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
+
       <ModuleHeader header={model.moduleHeader} action={moduleTimeControl(view, model, localTimes, updateLocalTime, clearLocalDrill)} />
+
+      {view === "overview" && (
+        <OverviewView
+          data={data}
+          financialFlows={model.financialFlows}
+          fireSummary={fireQuery.data || model.fireSummary}
+          onNavigate={setView}
+          onInspect={openTransactionInspector}
+          safeToSpend={model.safeToSpend}
+        />
+      )}
 
       {view === "control" && (
         <MonthControlView
@@ -420,6 +667,7 @@ export default function App() {
       )}
 
       {view === "plan" && (
+        <>
         <SavingsPlanView
           data={data}
           financialFlows={model.financialFlows}
@@ -441,10 +689,38 @@ export default function App() {
           settingsStatus={settingsStatus}
           saving={settingsSaving}
           bucketOptions={BUDGET_BUCKET_OPTIONS}
+          categoryOptions={Array.from(new Set((model.planRows || []).map((row) => row.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pl"))}
           onSaveSettings={handleSaveSettings}
           onSettingChange={handleSettingChange}
           onLimitChange={handleLimitChange}
           onBucketOverrideChange={handleBucketOverrideChange}
+        />
+        <GoalsPanel
+          goals={goalsQuery.data}
+          asOf={new Date().toISOString().slice(0, 10)}
+          onSaveGoal={handleSaveGoal}
+          onDeleteGoal={handleDeleteGoal}
+          savingGoal={goalMutation.isPending || goalDeleteMutation.isPending}
+          status={goalStatus}
+        />
+        <ForecastPanel
+          startingLiquid={Number(netWorthQuery.data?.liquidTotal || 0)}
+          monthlyIncome={Number(model.plan?.currentMonthlyIncome || 0)}
+          monthlySpend={Number(model.plan?.currentMonthlySpend || 0)}
+        />
+        </>
+      )}
+
+      {view === "categories" && (
+        <CategoriesView
+          catalog={categoriesQuery.data}
+          onSaveCategory={handleSaveCategory}
+          onSaveGroup={handleSaveCategoryGroup}
+          onDeleteCategory={handleDeleteCategory}
+          onSaveRule={handleSaveRule}
+          onDeleteRule={handleDeleteRule}
+          saving={categoryMutation.isPending || categoryGroupMutation.isPending || categoryDeleteMutation.isPending || ruleMutation.isPending || ruleDeleteMutation.isPending}
+          status={categoryStatus}
         />
       )}
 
@@ -460,6 +736,13 @@ export default function App() {
       {view === "wealth" && (
         <WealthView
           wealthDashboard={model.wealthDashboard}
+          netWorth={netWorthQuery.data}
+          onSaveAccount={handleSaveNetWorthAccount}
+          onSaveLiability={handleSaveNetWorthLiability}
+          onDeleteLiability={handleDeleteNetWorthLiability}
+          savingAccount={netWorthMutation.isPending}
+          savingLiability={netWorthLiabilityMutation.isPending || netWorthLiabilityDeleteMutation.isPending}
+          netWorthStatus={netWorthStatus}
           onInspect={openTransactionInspector}
         />
       )}
@@ -497,6 +780,8 @@ export default function App() {
           transactionPage={model.transactionPage}
           visibleSpend={model.visibleSpend}
           yearTransactionTotal={data.kpis.transactions}
+          categoryOptions={selectCategoryCatalog(categoriesQuery.data).categoryOptions}
+          onRecategorize={handleRecategorize}
           onInspect={openTransactionInspector}
           onBucketChange={setBucket}
           onFilterChange={handleTransactionFilterChange}

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import {
+  NET_INCOME_RATIO,
   buildSidebarNavigation,
   emptyAnalytics,
   selectBuckets,
@@ -14,6 +15,7 @@ import {
   selectMonthDashboard,
   selectMonthFinancialFlow,
   selectParentPlanRows,
+  selectPlanFeasibilityWarnings,
   selectMonthStats,
   selectPlanRows,
   selectPlanSummary,
@@ -21,6 +23,7 @@ import {
   selectRecommendedCuts,
   selectRecurringSummary,
   selectReportsSections,
+  selectSafeToSpend,
   selectReportsWorkspace,
   selectSavingsFocus,
   selectSavingsRadar,
@@ -48,6 +51,7 @@ export function useDashboardModel({
   bucketOverrides,
   importRuns,
   fireSummary,
+  budgetSettings,
 }) {
   const buckets = useMemo(() => selectBuckets(data), [data]);
   const planRows = useMemo(() => selectPlanRows(data, customLimits, bucketOverrides), [data, customLimits, bucketOverrides]);
@@ -102,13 +106,18 @@ export function useDashboardModel({
   const recurring = data.recurring;
   const latestYear = Math.max(...years.map((row) => Number(row.year)));
   const isHistorical = Number(data.year) < latestYear;
-  const savingsTarget = Number(kpis.income) * 0.2;
-  const wantsTarget = Number(kpis.income) * 0.3;
+  const netIncomeRatio = Number(budgetSettings?.netIncomeRatio) > 0 ? Number(budgetSettings.netIncomeRatio) : NET_INCOME_RATIO;
+  const netIncome = Number(kpis.income) * netIncomeRatio;
+  const needsTarget = netIncome * 0.5;
+  const savingsTarget = netIncome * 0.2;
+  const wantsTarget = netIncome * 0.3;
   const needs = Number(budgetMix.find((row) => row.bucket === "Obowiązkowe stałe")?.sum || budgetMix.find((row) => row.bucket === "Potrzeby")?.sum || 0);
   const mixedNeeds = Number(budgetMix.find((row) => row.bucket === "Obowiązkowe zmienne")?.sum || budgetMix.find((row) => row.bucket === "Potrzeby mieszane")?.sum || 0);
   const wants = Number(budgetMix.find((row) => row.bucket === "Nieobowiązkowe")?.sum || budgetMix.find((row) => row.bucket === "Zachcianki")?.sum || 0);
   const plan = data.savingsPlan;
   const monthControl = data.monthControl;
+  const safeToSpend = selectSafeToSpend({ monthControl, recurring });
+  const planWarnings = selectPlanFeasibilityWarnings({ plan });
   const monthControlFinancialFlow = selectMonthFinancialFlow(data, monthControl?.monthKey);
   const savingsScenarioCut = Number(recommendedCuts?.realisticCut || planSummary.potentialMonthly || 0);
   const plannedSpendAfterCuts = Math.max(0, Number(plan.currentMonthlySpend) - savingsScenarioCut);
@@ -129,12 +138,15 @@ export function useDashboardModel({
     financialFlowTotal: monthControlFinancialFlow,
     isHistorical,
     monthControl,
+    planWarnings,
     primaryPlanRows,
+    safeToSpend,
   });
   const spendingPlanSections = selectSpendingPlanSections({
     financialFlowTotal: monthControlFinancialFlow,
     monthControl,
     parentStatus: monthDashboard.categoryStatus,
+    safeToSpend,
   });
   const reportsSections = selectReportsSections({
     activeTimeLabel: reportsTimeScope.activeTimeLabel,
@@ -147,6 +159,7 @@ export function useDashboardModel({
     needs,
     mixedNeeds,
     oneoffs,
+    needsTarget,
     savingsTarget,
     scopedStats,
     yearStats,
@@ -220,11 +233,15 @@ export function useDashboardModel({
     isHistorical,
     savingsTarget,
     wantsTarget,
+    needsTarget,
+    netIncome,
     needs,
     mixedNeeds,
     wants,
     plan,
     monthControl,
+    safeToSpend,
+    planWarnings,
     plannedSpendAfterCuts,
     plannedInvestmentAfterCuts,
     savingsWaterfall,

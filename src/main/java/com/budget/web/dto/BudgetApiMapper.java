@@ -3,13 +3,20 @@ package com.budget.web.dto;
 import com.budget.application.fire.FireSummary;
 import com.budget.application.fire.FireSettings;
 import com.budget.application.importing.ImportSummary;
+import com.budget.application.networth.NetWorthOverview;
 import com.budget.application.reporting.AnalyticsReport;
 import com.budget.application.reporting.CalendarReport;
 import com.budget.application.reporting.TransactionPage;
 import com.budget.application.reporting.TransactionRecord;
 import com.budget.application.reporting.YearSummary;
 import com.budget.application.settings.BudgetSettings;
+import com.budget.domain.category.Category;
+import com.budget.domain.category.CategoryGroup;
+import com.budget.domain.category.ClassificationRule;
+import com.budget.domain.goal.Goal;
 import com.budget.domain.importjob.ImportRun;
+import com.budget.domain.networth.Account;
+import com.budget.domain.networth.Liability;
 import com.budget.domain.report.BudgetSnapshot;
 import java.nio.file.Path;
 import java.util.List;
@@ -47,6 +54,186 @@ public class BudgetApiMapper {
                 map(snapshot.recurring(), this::toRecurring),
                 map(snapshot.largeOneoffs(), this::toLargeOneOff)
         );
+    }
+
+    public BudgetApiDtos.NetWorthResponse toNetWorth(NetWorthOverview overview) {
+        return new BudgetApiDtos.NetWorthResponse(
+                map(overview.accounts(), this::toNetWorthAccount),
+                map(overview.liabilities(), this::toLiability),
+                overview.liquidTotal(),
+                overview.investedAssets(),
+                overview.totalAssets(),
+                overview.totalLiabilities(),
+                overview.netWorth(),
+                overview.emergencyFundMin(),
+                overview.emergencyFundComfort(),
+                overview.emergencyProgressComfort()
+        );
+    }
+
+    public BudgetApiDtos.NetWorthAccountResponse toNetWorthAccount(NetWorthOverview.LiquidAccount row) {
+        return new BudgetApiDtos.NetWorthAccountResponse(
+                row.accountKey(),
+                row.name(),
+                row.kind(),
+                row.liquid(),
+                row.excludeFromNetWorth(),
+                row.configured(),
+                row.anchorBalance(),
+                row.anchorDate(),
+                row.netFlowSinceAnchor(),
+                row.derivedBalance(),
+                row.statementBalance(),
+                row.statementDate(),
+                row.reconciledBalance(),
+                row.drift(),
+                row.reconciled()
+        );
+    }
+
+    public Account toAccount(String accountKey, BudgetApiDtos.AccountUpsertRequest request) {
+        return new Account(
+                accountKey,
+                request.name(),
+                request.kind(),
+                request.liquid(),
+                request.excludeFromNetWorth(),
+                request.anchorBalance(),
+                request.anchorDate(),
+                request.statementBalance(),
+                request.statementDate()
+        );
+    }
+
+    public BudgetApiDtos.LiabilityResponse toLiability(Liability row) {
+        return new BudgetApiDtos.LiabilityResponse(
+                row.liabilityKey(),
+                row.name(),
+                row.kind(),
+                row.currentPrincipal(),
+                row.annualInterestRate(),
+                row.monthlyPayment(),
+                row.asOf()
+        );
+    }
+
+    public Liability toLiability(String liabilityKey, BudgetApiDtos.LiabilityUpsertRequest request) {
+        return new Liability(
+                liabilityKey,
+                request.name(),
+                request.kind(),
+                request.currentPrincipal(),
+                request.annualInterestRate(),
+                request.monthlyPayment(),
+                request.asOf()
+        );
+    }
+
+    public BudgetApiDtos.GoalResponse toGoal(Goal goal) {
+        return new BudgetApiDtos.GoalResponse(
+                goal.goalId(),
+                goal.name(),
+                goal.targetAmount(),
+                goal.currentAmount(),
+                goal.targetDate(),
+                goal.note()
+        );
+    }
+
+    public Goal toGoal(String goalId, BudgetApiDtos.GoalUpsertRequest request) {
+        return new Goal(
+                goalId,
+                request.name(),
+                request.targetAmount(),
+                request.currentAmount(),
+                request.targetDate(),
+                request.note()
+        );
+    }
+
+    public BudgetApiDtos.CategoriesResponse toCategories(List<CategoryGroup> groups, List<Category> categories, List<ClassificationRule> rules) {
+        return new BudgetApiDtos.CategoriesResponse(
+                groups.stream().map(this::toCategoryGroup).toList(),
+                categories.stream().map(this::toCategoryResponse).toList(),
+                rules.stream().map(this::toCategoryRule).toList()
+        );
+    }
+
+    public BudgetApiDtos.CategoryRuleResponse toCategoryRule(ClassificationRule rule) {
+        return new BudgetApiDtos.CategoryRuleResponse(
+                rule.ruleId(),
+                rule.matchType(),
+                rule.pattern(),
+                rule.categoryId(),
+                rule.priority(),
+                rule.enabled(),
+                rule.source()
+        );
+    }
+
+    public ClassificationRule toClassificationRule(String ruleId, BudgetApiDtos.RuleUpsertRequest request) {
+        return new ClassificationRule(
+                ruleId,
+                "title",
+                request.pattern(),
+                request.categoryId(),
+                request.priority(),
+                request.enabled(),
+                "user"
+        );
+    }
+
+    public BudgetApiDtos.CategoryGroupResponse toCategoryGroup(CategoryGroup group) {
+        return new BudgetApiDtos.CategoryGroupResponse(group.groupId(), group.label(), group.sortOrder());
+    }
+
+    public BudgetApiDtos.CategoryResponse toCategoryResponse(Category category) {
+        return new BudgetApiDtos.CategoryResponse(
+                category.categoryId(),
+                category.label(),
+                category.area(),
+                category.analyticsGroup(),
+                category.groupId(),
+                category.budgetBucket(),
+                category.fixedness(),
+                category.flowType(),
+                category.discretionary(),
+                category.excluded(),
+                category.realIncome(),
+                category.dailyPaced(),
+                category.protectedFlag(),
+                category.sinkingFundEligible(),
+                category.archived(),
+                category.sortOrder(),
+                category.builtin()
+        );
+    }
+
+    public Category toCategory(String categoryId, BudgetApiDtos.CategoryUpsertRequest request) {
+        return new Category(
+                categoryId,
+                request.label(),
+                request.area(),
+                request.analyticsGroup(),
+                request.groupId(),
+                request.budgetBucket(),
+                request.fixedness(),
+                request.flowType(),
+                request.discretionary(),
+                request.excluded(),
+                request.realIncome(),
+                request.dailyPaced(),
+                request.protectedFlag(),
+                request.sinkingFundEligible(),
+                request.archived(),
+                request.sortOrder(),
+                // builtin is system-determined: false for user upserts; preserved on update.
+                false
+        );
+    }
+
+    public CategoryGroup toCategoryGroup(String groupId, BudgetApiDtos.CategoryGroupUpsertRequest request) {
+        return new CategoryGroup(groupId, request.label(), request.sortOrder());
     }
 
     public BudgetApiDtos.CalendarResponse toCalendar(CalendarReport report) {
@@ -170,6 +357,8 @@ public class BudgetApiMapper {
                 settings.aggressiveMonthlySpend(),
                 settings.emergencyFundMinMonths(),
                 settings.emergencyFundComfortMonths(),
+                settings.netIncomeRatio(),
+                java.util.List.copyOf(settings.sinkingFundCategories()),
                 map(settings.categoryLimits(), row -> new BudgetApiDtos.CategoryLimitSettingDto(row.scope(), row.name(), row.category(), row.limit(), row.action(), row.bucketOverride()))
         );
     }
@@ -183,6 +372,8 @@ public class BudgetApiMapper {
                 dto.aggressiveMonthlySpend(),
                 dto.emergencyFundMinMonths(),
                 dto.emergencyFundComfortMonths(),
+                dto.netIncomeRatio(),
+                dto.sinkingFundCategories() == null ? null : java.util.List.copyOf(dto.sinkingFundCategories()),
                 map(dto.categoryLimits(), row -> new BudgetSettings.CategoryLimitSetting(row.scope(), row.name(), row.category(), row.limit(), row.action(), row.bucketOverride()))
         );
     }
@@ -219,6 +410,11 @@ public class BudgetApiMapper {
                 summary.taxableUnrealizedGain(),
                 summary.estimatedCapitalGainsTax(),
                 summary.currentMonthlyWealthContribution(),
+                summary.assumedInflation(),
+                summary.fireNumberNominalAtTarget(),
+                summary.suggestedEquityShare(),
+                summary.monteCarloSuccessRate(),
+                summary.ppkRecommendation(),
                 toFireBudgetLink(summary.budgetLink()),
                 toFireContributionPlan(summary.contributionPlan()),
                 toFireWithdrawalPlan(summary.withdrawalPlan()),

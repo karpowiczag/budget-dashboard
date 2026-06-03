@@ -93,6 +93,150 @@ export async function updateFireSettings(settings) {
   return readJson(response, "Nie mogę zapisać ustawień FIRE");
 }
 
+export async function fetchNetWorth() {
+  const response = await fetch("/api/v1/networth");
+  return readJson(response, "Nie mogę wczytać sald kont");
+}
+
+export async function saveNetWorthAccount(key, account) {
+  const response = await fetch(`/api/v1/networth/accounts/${encodeURIComponent(key)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(account),
+  });
+  return readJson(response, "Nie mogę zapisać konta");
+}
+
+export async function saveNetWorthLiability(key, liability) {
+  const response = await fetch(`/api/v1/networth/liabilities/${encodeURIComponent(key)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(liability),
+  });
+  return readJson(response, "Nie mogę zapisać zobowiązania");
+}
+
+export async function deleteNetWorthLiability(key) {
+  const response = await fetch(`/api/v1/networth/liabilities/${encodeURIComponent(key)}`, {
+    method: "DELETE",
+    headers: csrfHeaders(),
+  });
+  return readJson(response, "Nie mogę usunąć zobowiązania");
+}
+
+export async function fetchGoals() {
+  const response = await fetch("/api/v1/goals");
+  return readJson(response, "Nie mogę wczytać celów");
+}
+
+export async function saveGoal(id, goal) {
+  const response = await fetch(`/api/v1/goals/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(goal),
+  });
+  return readJson(response, "Nie mogę zapisać celu");
+}
+
+export async function deleteGoal(id) {
+  const response = await fetch(`/api/v1/goals/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: csrfHeaders(),
+  });
+  return readJson(response, "Nie mogę usunąć celu");
+}
+
+export async function fetchCategories() {
+  const response = await fetch("/api/v1/categories");
+  return readJson(response, "Nie mogę wczytać kategorii");
+}
+
+export async function saveCategory(id, category) {
+  const response = await fetch(`/api/v1/categories/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(category),
+  });
+  return readJson(response, "Nie mogę zapisać kategorii");
+}
+
+export async function deleteCategory(id, reassignTo) {
+  const query = reassignTo ? `?reassignTo=${encodeURIComponent(reassignTo)}` : "";
+  const response = await fetch(`/api/v1/categories/${encodeURIComponent(id)}${query}`, {
+    method: "DELETE",
+    headers: csrfHeaders(),
+  });
+  return readJson(response, "Nie mogę usunąć kategorii");
+}
+
+export async function saveCategoryGroup(id, group) {
+  const response = await fetch(`/api/v1/categories/groups/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(group),
+  });
+  return readJson(response, "Nie mogę zapisać grupy kategorii");
+}
+
+export async function reorderCategories(payload) {
+  const response = await fetch("/api/v1/categories/reorder", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(payload),
+  });
+  return readJson(response, "Nie mogę zmienić kolejności kategorii");
+}
+
+export async function saveCategoryRule(id, rule) {
+  const response = await fetch(`/api/v1/categories/rules/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(rule),
+  });
+  return readJson(response, "Nie mogę zapisać reguły");
+}
+
+export async function deleteCategoryRule(id) {
+  const response = await fetch(`/api/v1/categories/rules/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: csrfHeaders(),
+  });
+  return readJson(response, "Nie mogę usunąć reguły");
+}
+
+export async function recategorizeTransaction(year, id, categoryId) {
+  const response = await fetch(`/api/v1/reports/${year}/transactions/${encodeURIComponent(id)}/recategorize`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify({ categoryId }),
+  });
+  return readJson(response, "Nie mogę zmienić kategorii transakcji");
+}
+
 export async function uploadTransactions(file) {
   const body = new FormData();
   body.append("file", file);

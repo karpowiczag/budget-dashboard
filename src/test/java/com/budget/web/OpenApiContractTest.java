@@ -3,7 +3,10 @@ package com.budget.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.budget.web.controller.BudgetApiController;
+import com.budget.web.controller.CategoryApiController;
 import com.budget.web.controller.FireApiController;
+import com.budget.web.controller.GoalApiController;
+import com.budget.web.controller.NetWorthApiController;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.parser.OpenAPIV3Parser;
@@ -29,6 +32,7 @@ class OpenApiContractTest {
             Map.entry("calendar", "getReportCalendar"),
             Map.entry("analytics", "getReportAnalytics"),
             Map.entry("transactions", "listReportTransactions"),
+            Map.entry("recategorizeTransaction", "recategorizeTransaction"),
             Map.entry("upload", "uploadImportCsv"),
             Map.entry("rebuild", "rebuildImports"),
             Map.entry("importRuns", "listImportRuns"),
@@ -36,7 +40,21 @@ class OpenApiContractTest {
             Map.entry("saveBudgetSettings", "updateBudgetSettings"),
             Map.entry("summary", "getFireSummary"),
             Map.entry("settings", "getFireSettings"),
-            Map.entry("saveSettings", "updateFireSettings")
+            Map.entry("saveSettings", "updateFireSettings"),
+            Map.entry("netWorth", "getNetWorth"),
+            Map.entry("saveAccount", "updateNetWorthAccount"),
+            Map.entry("saveLiability", "updateNetWorthLiability"),
+            Map.entry("deleteLiability", "deleteNetWorthLiability"),
+            Map.entry("listGoals", "listGoals"),
+            Map.entry("updateGoal", "updateGoal"),
+            Map.entry("deleteGoal", "deleteGoal"),
+            Map.entry("listCategories", "listCategories"),
+            Map.entry("updateCategory", "updateCategory"),
+            Map.entry("updateCategoryGroup", "updateCategoryGroup"),
+            Map.entry("deleteCategory", "deleteCategory"),
+            Map.entry("reorderCategories", "reorderCategories"),
+            Map.entry("updateCategoryRule", "updateCategoryRule"),
+            Map.entry("deleteCategoryRule", "deleteCategoryRule")
     );
     private static final Map<String, String> SUCCESS_SCHEMAS = Map.ofEntries(
             Map.entry("getSession", "SessionResponse"),
@@ -45,6 +63,7 @@ class OpenApiContractTest {
             Map.entry("getReportCalendar", "CalendarResponse"),
             Map.entry("getReportAnalytics", "AnalyticsResponse"),
             Map.entry("listReportTransactions", "TransactionPage"),
+            Map.entry("recategorizeTransaction", "RecategorizeResponse"),
             Map.entry("uploadImportCsv", "ImportSummary"),
             Map.entry("rebuildImports", "ImportSummary"),
             Map.entry("listImportRuns", "[ImportRun]"),
@@ -52,7 +71,21 @@ class OpenApiContractTest {
             Map.entry("updateBudgetSettings", "BudgetSettings"),
             Map.entry("getFireSummary", "FireSummary"),
             Map.entry("getFireSettings", "FireSettings"),
-            Map.entry("updateFireSettings", "FireSettings")
+            Map.entry("updateFireSettings", "FireSettings"),
+            Map.entry("getNetWorth", "NetWorthResponse"),
+            Map.entry("updateNetWorthAccount", "NetWorthResponse"),
+            Map.entry("updateNetWorthLiability", "NetWorthResponse"),
+            Map.entry("deleteNetWorthLiability", "NetWorthResponse"),
+            Map.entry("listGoals", "[Goal]"),
+            Map.entry("updateGoal", "[Goal]"),
+            Map.entry("deleteGoal", "[Goal]"),
+            Map.entry("listCategories", "CategoriesResponse"),
+            Map.entry("updateCategory", "CategoriesResponse"),
+            Map.entry("updateCategoryGroup", "CategoriesResponse"),
+            Map.entry("deleteCategory", "CategoriesResponse"),
+            Map.entry("reorderCategories", "CategoriesResponse"),
+            Map.entry("updateCategoryRule", "CategoriesResponse"),
+            Map.entry("deleteCategoryRule", "CategoriesResponse")
     );
 
     @Autowired
@@ -68,7 +101,11 @@ class OpenApiContractTest {
         assertThat(openApi).isNotNull();
 
         handlerMapping.getHandlerMethods().forEach((mapping, handler) -> {
-            if (!BudgetApiController.class.equals(handler.getBeanType()) && !FireApiController.class.equals(handler.getBeanType())) {
+            if (!BudgetApiController.class.equals(handler.getBeanType())
+                    && !FireApiController.class.equals(handler.getBeanType())
+                    && !NetWorthApiController.class.equals(handler.getBeanType())
+                    && !GoalApiController.class.equals(handler.getBeanType())
+                    && !CategoryApiController.class.equals(handler.getBeanType())) {
                 return;
             }
             assertWebDtoReturnType(handler.getMethod().getGenericReturnType());
