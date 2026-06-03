@@ -1,9 +1,10 @@
+import { useState } from "react";
 import { Info } from "lucide-react";
 import { SavingsRadarChart } from "../components/charts/SavingsRadarChart.jsx";
 import { SavingsWaterfallChart } from "../components/charts/SavingsWaterfallChart.jsx";
 import { ReportDataTable } from "../components/tables/ReportDataTable.jsx";
 import { Panel } from "../components/ui/Panel.jsx";
-import { bucketAliasesForLimit, selectLimitRollover } from "../domain/budgetSelectors.js";
+import { bucketAliasesForLimit, selectLimitManager, selectLimitRollover } from "../domain/budgetSelectors.js";
 import { money } from "../domain/formatters.js";
 
 export function SavingsPlanView({
@@ -170,6 +171,13 @@ export function SavingsPlanView({
           />
         </div>
 
+        <LimitsManager
+          groups={selectLimitManager(planRows, parentPlanRows)}
+          bucketOptions={bucketOptions}
+          onLimitChange={onLimitChange}
+          onBucketOverrideChange={onBucketOverrideChange}
+        />
+
         <details className="planChartsDisclosure">
           <summary>Wizualizacja scenariusza</summary>
           <section className="gridTwo embeddedGrid">
@@ -185,6 +193,88 @@ export function SavingsPlanView({
         </details>
       </div>
     </Panel>
+  );
+}
+
+function LimitsManager({ groups = [], bucketOptions = [], onLimitChange, onBucketOverrideChange }) {
+  const [query, setQuery] = useState("");
+  const filter = query.trim().toLowerCase();
+  return (
+    <details className="planChartsDisclosure" open>
+      <summary>Wszystkie limity — pełna kontrola</summary>
+      <p className="nwMuted">Ustaw lub zmień limit dowolnej kategorii i koszyka, przenieś kategorię do innego koszyka. Wszystko w jednym miejscu.</p>
+      <input
+        className="limitSearch"
+        type="search"
+        placeholder="Szukaj kategorii…"
+        value={query}
+        aria-label="Szukaj kategorii"
+        onChange={(event) => setQuery(event.target.value)}
+      />
+      {groups.map((group) => {
+        const categories = group.categories.filter((category) => !filter || category.name.toLowerCase().includes(filter));
+        if (filter && !categories.length) return null;
+        return (
+          <div className="limitGroup" key={group.bucket}>
+            <div className="limitGroupHead">
+              <span className="limitGroupName">{group.bucket}</span>
+              <span className="nwMuted">średnia {money(group.currentMonthly)}</span>
+              <label className="limitGroupLimit">
+                Limit koszyka
+                <input
+                  type="number"
+                  min="0"
+                  step="100"
+                  value={group.bucketLimit ?? ""}
+                  placeholder="brak"
+                  aria-label={`Limit koszyka ${group.bucket}`}
+                  onChange={(event) => onLimitChange("bucket", group.bucket, Number(event.target.value || 0))}
+                />
+              </label>
+            </div>
+            <table className="nwTable">
+              <thead>
+                <tr>
+                  <th>Kategoria</th>
+                  <th className="num">Średnia / mies.</th>
+                  <th className="num">Limit</th>
+                  <th>Koszyk</th>
+                  <th className="num">Potencjał</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map((category) => (
+                  <tr key={category.category}>
+                    <td>{category.name}</td>
+                    <td className="num">{money(category.currentMonthly)}</td>
+                    <td className="num">
+                      <input
+                        type="number"
+                        min="0"
+                        step="50"
+                        value={Math.round(category.limit)}
+                        aria-label={`Limit kategorii ${category.name}`}
+                        onChange={(event) => onLimitChange("category", category.category, Number(event.target.value || 0))}
+                      />
+                    </td>
+                    <td>
+                      <select
+                        value={category.bucket}
+                        aria-label={`Koszyk kategorii ${category.name}`}
+                        onChange={(event) => onBucketOverrideChange(category.category, event.target.value === category.originalBucket ? "" : event.target.value)}
+                      >
+                        {bucketOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </td>
+                    <td className="num">{money(category.potentialMonthly)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+    </details>
   );
 }
 

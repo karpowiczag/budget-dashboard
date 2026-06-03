@@ -1177,6 +1177,48 @@ export function selectLimitRollover(planRows = [], activeMonths = 0) {
   };
 }
 
+// Flexible limits manager: every category grouped under its (effective) budget bucket, with
+// the bucket-level limit, so the user can set/edit a limit and reassign the bucket for ANY
+// category in one place (not just the top buckets). Pure shaping of plan rows already present.
+export function selectLimitManager(planRows = [], parentPlanRows = []) {
+  const bucketLimits = new Map(
+    (parentPlanRows || []).filter((row) => row.scope === "bucket").map((row) => [row.name, row]),
+  );
+  const byBucket = new Map();
+  (planRows || []).forEach((row) => {
+    const bucket = row.bucket || "Inne";
+    if (!byBucket.has(bucket)) byBucket.set(bucket, []);
+    byBucket.get(bucket).push({
+      category: row.category,
+      name: row.name || row.category,
+      bucket,
+      originalBucket: row.originalBucket || bucket,
+      currentMonthly: Number(row.currentMonthly || 0),
+      limit: Number(row.limit || 0),
+      potentialMonthly: Number(row.potentialMonthly || 0),
+    });
+  });
+  const order = BUDGET_BUCKET_OPTIONS;
+  const orderIndex = (bucket) => {
+    const index = order.indexOf(bucket);
+    return index < 0 ? order.length : index;
+  };
+  return Array.from(byBucket.keys())
+    .sort((a, b) => orderIndex(a) - orderIndex(b) || a.localeCompare(b, "pl"))
+    .map((bucket) => {
+      const categories = byBucket.get(bucket)
+        .sort((a, b) => b.currentMonthly - a.currentMonthly || a.name.localeCompare(b.name, "pl"));
+      const parent = bucketLimits.get(bucket);
+      return {
+        bucket,
+        bucketLimit: parent ? Number(parent.limit || 0) : null,
+        currentMonthly: categories.reduce((sum, category) => sum + category.currentMonthly, 0),
+        potentialMonthly: categories.reduce((sum, category) => sum + category.potentialMonthly, 0),
+        categories,
+      };
+    });
+}
+
 export function selectRecurringSummary({ monthControl, recurring, recurringCalendar }) {
   const obligations = selectRecurringObligations(recurring || recurringCalendar || []);
   const filteredCalendar = recurringCalendar?.length ? selectRecurringObligations(recurringCalendar) : [];

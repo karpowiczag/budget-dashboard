@@ -15,6 +15,7 @@ import {
   selectFinancialFlows,
   selectForecast,
   selectGoals,
+  selectLimitManager,
   selectLimitRollover,
   selectFixednessChart,
   selectHierarchySunburst,
@@ -1065,6 +1066,24 @@ describe("selectForecast", () => {
     expect(drop.monthlyNet).toBe(-2000);
     expect(drop.negative).toBe(true);
     expect(drop.runwayMonths).toBe(4);
+  });
+});
+
+describe("selectLimitManager", () => {
+  it("groups every category under its bucket with the bucket limit, ordered by bucket", () => {
+    const groups = selectLimitManager([
+      { category: "Żywność i chemia", bucket: "Obowiązkowe zmienne", originalBucket: "Obowiązkowe zmienne", currentMonthly: 2200, limit: 2400, potentialMonthly: 0 },
+      { category: "Jedzenie poza domem", bucket: "Nieobowiązkowe", originalBucket: "Nieobowiązkowe", currentMonthly: 750, limit: 600, potentialMonthly: 150 },
+      { category: "Restauracje premium", bucket: "Nieobowiązkowe", originalBucket: "Nieobowiązkowe", currentMonthly: 300, limit: 0, potentialMonthly: 300 },
+    ], [
+      { scope: "bucket", name: "Nieobowiązkowe", limit: 1000 },
+    ]);
+    expect(groups.map((group) => group.bucket)).toEqual(["Obowiązkowe zmienne", "Nieobowiązkowe"]);
+    const flexible = groups.find((group) => group.bucket === "Nieobowiązkowe");
+    expect(flexible.bucketLimit).toBe(1000);
+    expect(flexible.currentMonthly).toBe(1050);
+    expect(flexible.categories.map((category) => category.category)).toEqual(["Jedzenie poza domem", "Restauracje premium"]);
+    expect(groups.find((group) => group.bucket === "Obowiązkowe zmienne").bucketLimit).toBeNull();
   });
 });
 
