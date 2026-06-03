@@ -172,6 +172,15 @@ export async function saveCategory(id, category) {
   return readJson(response, "Nie mogę zapisać kategorii");
 }
 
+export async function deleteCategory(id, reassignTo) {
+  const query = reassignTo ? `?reassignTo=${encodeURIComponent(reassignTo)}` : "";
+  const response = await fetch(`/api/v1/categories/${encodeURIComponent(id)}${query}`, {
+    method: "DELETE",
+    headers: csrfHeaders(),
+  });
+  return readJson(response, "Nie mogę usunąć kategorii");
+}
+
 export async function saveCategoryGroup(id, group) {
   const response = await fetch(`/api/v1/categories/groups/${encodeURIComponent(id)}`, {
     method: "PUT",

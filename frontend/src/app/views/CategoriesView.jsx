@@ -49,7 +49,7 @@ function flowLabel(value) {
   return FLOW_LABELS[value] || value;
 }
 
-function CategoryEditorRow({ category, options, onSaveCategory, saving }) {
+function CategoryEditorRow({ category, options, onSaveCategory, onDeleteCategory, saving }) {
   const [label, setLabel] = useState(category.label || "");
   const [budgetBucket, setBudgetBucket] = useState(category.budgetBucket || "");
   const [fixedness, setFixedness] = useState(category.fixedness || "");
@@ -57,7 +57,9 @@ function CategoryEditorRow({ category, options, onSaveCategory, saving }) {
   const [dailyPaced, setDailyPaced] = useState(!!category.dailyPaced);
   const [protectedFlag, setProtectedFlag] = useState(!!category.protectedFlag);
   const [sinkingFundEligible, setSinkingFundEligible] = useState(!!category.sinkingFundEligible);
+  const [mergeTarget, setMergeTarget] = useState("");
   const canSave = label.trim() !== "" && !saving;
+  const mergeTargets = options.categoryOptions.filter((option) => option.id !== category.categoryId);
 
   return (
     <tr>
@@ -118,12 +120,37 @@ function CategoryEditorRow({ category, options, onSaveCategory, saving }) {
         >
           Ukryj
         </button>
+        {category.builtin ? (
+          <span className="nwMuted">systemowa</span>
+        ) : (
+          <>
+            <select value={mergeTarget} aria-label={`Cel przeniesienia ${category.label}`} onChange={(event) => setMergeTarget(event.target.value)}>
+              <option value="">Przenieś do…</option>
+              {mergeTargets.map((option) => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="nwGhost"
+              disabled={!mergeTarget || saving}
+              aria-label={`Usuń kategorię ${category.label}`}
+              onClick={() => {
+                if (window.confirm(`Usunąć „${category.label}” i przenieść jej transakcje oraz reguły do wybranej kategorii?`)) {
+                  onDeleteCategory(category.categoryId, mergeTarget);
+                }
+              }}
+            >
+              Usuń / Scal
+            </button>
+          </>
+        )}
       </td>
     </tr>
   );
 }
 
-function GroupSection({ group, options, onSaveCategory, onSaveGroup, saving }) {
+function GroupSection({ group, options, onSaveCategory, onSaveGroup, onDeleteCategory, saving }) {
   const [label, setLabel] = useState(group.label || "");
   return (
     <div className="categoryGroup">
@@ -154,7 +181,7 @@ function GroupSection({ group, options, onSaveCategory, onSaveGroup, saving }) {
             </thead>
             <tbody>
               {group.categories.map((category) => (
-                <CategoryEditorRow key={category.categoryId} category={category} options={options} onSaveCategory={onSaveCategory} saving={saving} />
+                <CategoryEditorRow key={category.categoryId} category={category} options={options} onSaveCategory={onSaveCategory} onDeleteCategory={onDeleteCategory} saving={saving} />
               ))}
             </tbody>
           </table>
@@ -303,7 +330,7 @@ function NewRuleForm({ categoryOptions, onSaveRule, saving }) {
   );
 }
 
-export function CategoriesView({ catalog, onSaveCategory, onSaveGroup, onSaveRule, onDeleteRule, saving = false, status }) {
+export function CategoriesView({ catalog, onSaveCategory, onSaveGroup, onDeleteCategory, onSaveRule, onDeleteRule, saving = false, status }) {
   const model = selectCategoryCatalog(catalog);
   return (
     <Panel title="Kategorie i grupy">
@@ -314,7 +341,7 @@ export function CategoriesView({ catalog, onSaveCategory, onSaveGroup, onSaveRul
         </div>
       ) : null}
       {model.groups.map((group) => (
-        <GroupSection key={group.groupId} group={group} options={model} onSaveCategory={onSaveCategory} onSaveGroup={onSaveGroup} saving={saving} />
+        <GroupSection key={group.groupId} group={group} options={model} onSaveCategory={onSaveCategory} onSaveGroup={onSaveGroup} onDeleteCategory={onDeleteCategory} saving={saving} />
       ))}
       {model.archived.length ? (
         <div className="categoryGroup">

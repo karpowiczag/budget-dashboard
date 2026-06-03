@@ -99,4 +99,34 @@ describe("CategoriesView", () => {
 
     expect(onSaveRule).toHaveBeenCalledWith("5", expect.objectContaining({ pattern: "OLDPATTERN", categoryId: "groceries" }));
   });
+
+  it("merges a user category into a chosen target after confirmation", async () => {
+    const onDeleteCategory = vi.fn();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<CategoriesView catalog={catalog()} onSaveCategory={vi.fn()} onSaveGroup={vi.fn()} onDeleteCategory={onDeleteCategory} />);
+
+    await userEvent.selectOptions(screen.getByLabelText("Cel przeniesienia Żywność i chemia"), "diningOut");
+    await userEvent.click(screen.getByLabelText("Usuń kategorię Żywność i chemia"));
+
+    expect(onDeleteCategory).toHaveBeenCalledWith("groceries", "diningOut");
+    confirmSpy.mockRestore();
+  });
+
+  it("offers no delete control for a builtin category", () => {
+    const withBuiltin = {
+      groups: [{ groupId: "obligatoryVariable", label: "Obowiązkowe zmienne", sortOrder: 2 }],
+      categories: [
+        {
+          categoryId: "groceries", label: "Żywność i chemia", area: "Koszty codzienne", analyticsGroup: "Potrzeby podstawowe",
+          groupId: "obligatoryVariable", budgetBucket: "Obowiązkowe zmienne", fixedness: "Zmienne konieczne", flowType: "livingExpense",
+          discretionary: false, excluded: false, realIncome: false, dailyPaced: true, protectedFlag: false, sinkingFundEligible: false,
+          archived: false, sortOrder: 18, builtin: true,
+        },
+      ],
+    };
+    render(<CategoriesView catalog={withBuiltin} onSaveCategory={vi.fn()} onSaveGroup={vi.fn()} onDeleteCategory={vi.fn()} />);
+
+    expect(screen.queryByLabelText("Usuń kategorię Żywność i chemia")).not.toBeInTheDocument();
+    expect(screen.getByText("systemowa")).toBeInTheDocument();
+  });
 });

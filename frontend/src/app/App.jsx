@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { deleteCategoryRule, deleteGoal, deleteNetWorthLiability, fetchAnalytics, fetchCalendar, fetchCategories, fetchFireSettings, fetchFireSummary, fetchGoals, fetchNetWorth, fetchTransactions, recategorizeTransaction, saveCategory, saveCategoryGroup, saveCategoryRule, saveGoal, saveNetWorthAccount, saveNetWorthLiability, updateFireSettings } from "./api/budgetApi.js";
+import { deleteCategory, deleteCategoryRule, deleteGoal, deleteNetWorthLiability, fetchAnalytics, fetchCalendar, fetchCategories, fetchFireSettings, fetchFireSummary, fetchGoals, fetchNetWorth, fetchTransactions, recategorizeTransaction, saveCategory, saveCategoryGroup, saveCategoryRule, saveGoal, saveNetWorthAccount, saveNetWorthLiability, updateFireSettings } from "./api/budgetApi.js";
 import { budgetQueryKeys } from "./api/queryKeys.js";
 import { AppShell } from "./components/layout/AppShell.jsx";
 import { DashboardFooter } from "./components/layout/DashboardFooter.jsx";
@@ -213,6 +213,9 @@ export default function App() {
   });
   const categoryGroupMutation = useMutation({
     mutationFn: ({ id, group }) => saveCategoryGroup(id, group),
+  });
+  const categoryDeleteMutation = useMutation({
+    mutationFn: ({ id, reassignTo }) => deleteCategory(id, reassignTo),
   });
   const ruleMutation = useMutation({
     mutationFn: ({ id, rule }) => saveCategoryRule(id, rule),
@@ -484,6 +487,23 @@ export default function App() {
     }
   }
 
+  async function handleDeleteCategory(id, reassignTo) {
+    setCategoryStatus({ type: "info", message: "Usuwam / scalam kategorię..." });
+    try {
+      const saved = await categoryDeleteMutation.mutateAsync({ id, reassignTo });
+      queryClient.setQueryData(budgetQueryKeys.categories, saved);
+      // A delete re-tags persisted transactions and re-analyzes the year, so refresh those too.
+      queryClient.invalidateQueries({ queryKey: ["budget", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", "transactions"] });
+      setCategoryStatus({ type: "success", message: "Kategoria usunięta i scalona." });
+      return saved;
+    } catch (error) {
+      setCategoryStatus({ type: "error", message: error.message });
+      throw error;
+    }
+  }
+
   async function handleSaveCategoryGroup(id, group) {
     setCategoryStatus({ type: "info", message: "Zapisuję grupę..." });
     try {
@@ -696,9 +716,10 @@ export default function App() {
           catalog={categoriesQuery.data}
           onSaveCategory={handleSaveCategory}
           onSaveGroup={handleSaveCategoryGroup}
+          onDeleteCategory={handleDeleteCategory}
           onSaveRule={handleSaveRule}
           onDeleteRule={handleDeleteRule}
-          saving={categoryMutation.isPending || categoryGroupMutation.isPending || ruleMutation.isPending || ruleDeleteMutation.isPending}
+          saving={categoryMutation.isPending || categoryGroupMutation.isPending || categoryDeleteMutation.isPending || ruleMutation.isPending || ruleDeleteMutation.isPending}
           status={categoryStatus}
         />
       )}
